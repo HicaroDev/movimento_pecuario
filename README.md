@@ -74,12 +74,6 @@ npm run dev
 npm run build
 ```
 
-**Credenciais de acesso (desenvolvimento):**
-
-| Perfil | E-mail | Senha |
-|--------|--------|-------|
-| Admin | admin@suplemento.com | admin123 |
-| Cliente | cliente@malhada.com | malhada123 |
 
 ## 📚 Documentação
 
