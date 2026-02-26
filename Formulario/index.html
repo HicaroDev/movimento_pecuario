@@ -1,0 +1,102 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Formulário - Suplemento Control</title>
+    <link rel="stylesheet" href="../shared.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div>
+          <div class="kicker">Suplemento Control</div>
+          <h1>Formulário de Lançamento</h1>
+          <p class="subtext">
+            Insira os dados por pasto e suplemento. Estes dados alimentam o
+            relatório e os gráficos.
+          </p>
+        </div>
+        <nav class="nav">
+          <a class="btn" href="../Relatorio/">Ir para Relatório</a>
+        </nav>
+      </header>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Novo Registro</h2>
+          <div class="actions">
+            <button class="btn ghost" id="load-sample">Carregar Exemplo</button>
+            <button class="btn" id="add-row">Adicionar</button>
+          </div>
+        </div>
+
+        <div class="grid-form">
+          <label>
+            Pasto
+            <input id="pasto" type="text" placeholder="Ex: Cana" />
+          </label>
+          <label>
+            Quantidade
+            <input id="quantidade" type="number" min="0" step="1" />
+          </label>
+          <label>
+            Tipo de Suplemento
+            <select id="tipo">
+              <option>Energético 0,3%</option>
+              <option>Mineral Adensado Águas</option>
+              <option>Ração Creep</option>
+            </select>
+          </label>
+          <label>
+            Período (dias)
+            <input id="periodo" type="number" min="0" step="1" value="30" />
+          </label>
+          <label>
+            Sacos (25 kg)
+            <input id="sacos" type="number" min="0" step="1" />
+          </label>
+          <label>
+            Kg consumidos no período
+            <input id="kg" type="number" min="0" step="1" />
+          </label>
+          <label>
+            Consumo (kg/cab dia)
+            <input id="consumo" type="number" min="0" step="0.001" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Registros Salvos</h2>
+          <div class="actions">
+            <button class="btn ghost" id="clear-all">Limpar Tudo</button>
+            <button class="btn" id="save">Salvar</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>PASTO</th>
+                <th>QUANTIDADE</th>
+                <th>TIPO DE SUPLEMENTO</th>
+                <th>PERÍODO</th>
+                <th>SACOS</th>
+                <th>KG CONSUMIDOS</th>
+                <th>CONSUMO</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script src="../shared.js"></script>
+    <script src="formulario.js"></script>
+  </body>
+</html>

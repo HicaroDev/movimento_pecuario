@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Suplemento Control</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      /* ── Reset & Base ─────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --sidebar-bg: #12122a;
+        --sidebar-w: 220px;
+        --green: #10b15a;
+        --green-dark: #0b6b45;
+        --green-light: #e6f7ef;
+        --navy: #0b2748;
+        --navy-light: #e3eaf3;
+        --purple: #7b2fbe;
+        --purple-light: #f0e8f7;
+        --bg: #f4f5f9;
+        --card: #ffffff;
+        --border: #e8e8ef;
+        --ink: #1a1a2e;
+        --muted: #8a8a9a;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --shadow: 0 2px 12px rgba(0,0,0,.06);
+        --shadow-md: 0 4px 20px rgba(0,0,0,.10);
+      }
+
+      body {
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ── Sidebar ──────────────────────────────────────────────── */
+      .sidebar {
+        width: var(--sidebar-w);
+        background: var(--sidebar-bg);
+        display: flex;
+        flex-direction: column;
+        padding: 24px 16px;
+        gap: 6px;
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 100;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 6px 24px;
+        border-bottom: 1px solid rgba(255,255,255,.07);
+        margin-bottom: 12px;
+      }
+
+      .brand-icon {
+        width: 36px; height: 36px;
+        background: linear-gradient(135deg, var(--purple), #a855f7);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(123,47,190,.4);
+      }
+
+      .brand-text { display: flex; flex-direction: column; }
+      .brand-name { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.2; }
+      .brand-sub  { color: #5a5c7a; font-size: 10px; margin-top: 2px; }
+
+      .nav-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        color: #3a3a5a;
+        padding: 4px 8px 8px;
+        margin-top: 8px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        color: #7a7a9a;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+      }
+
+      .nav-item:hover {
+        background: rgba(255,255,255,.05);
+        color: #ccc;
+      }
+
+      .nav-item.active {
+        background: rgba(16,177,90,.12);
+        color: var(--green);
+        font-weight: 600;
+      }
+
+      .nav-item .icon {
+        width: 18px; height: 18px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        font-size: 10px;
+        color: #3a3a5a;
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255,255,255,.05);
+      }
+
+      /* ── Main area ────────────────────────────────────────────── */
+      .main {
+        margin-left: var(--sidebar-w);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      /* ── Topbar ───────────────────────────────────────────────── */
+      .topbar {
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .topbar-left h1 {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .topbar-left p {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8f8fb;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 7px 12px;
+        font-size: 12px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .filter-bar svg { width: 14px; height: 14px; }
+
+      .btn-export {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: var(--green);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .2s;
+      }
+
+      .btn-export:hover { background: var(--green-dark); }
+
+      /* ── Content ──────────────────────────────────────────────── */
+      .content { padding: 24px 28px 48px; }
+
+      /* ── Tabs ─────────────────────────────────────────────────── */
+      .tab-pane { display: none; }
+      .tab-pane.active { display: block; }
+
+      /* ── KPI Cards ────────────────────────────────────────────── */
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .kpi-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 20px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: box-shadow .2s;
+      }
+
+      .kpi-card:hover { box-shadow: var(--shadow-md); }
+
+      .kpi-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+      }
+
+      .kpi-value {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
+
+      .kpi-card.k-green  .kpi-value { color: var(--green); }
+      .kpi-card.k-navy   .kpi-value { color: var(--navy); }
+      .kpi-card.k-purple .kpi-value { color: var(--purple); }
+      .kpi-card.k-ink    .kpi-value { color: var(--ink); }
+
+      .kpi-sub {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .kpi-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        width: fit-content;
+        margin-top: 2px;
+      }
+
+      .kpi-card.k-green  .kpi-badge { background: var(--green-light);  color: var(--green); }
+      .kpi-card.k-navy   .kpi-badge { background: var(--navy-light);   color: var(--navy); }
+      .kpi-card.k-purple .kpi-badge { background: var(--purple-light); color: var(--purple); }
+      .kpi-card.k-ink    .kpi-badge { background: #eee; color: var(--ink); }
+
+      /* ── Metric Cards (gradient) ──────────────────────────────── */
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .metric-card {
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: var(--shadow);
+        color: #fff;
+      }
+
+      .metric-card.m-green {
+        background: linear-gradient(135deg, #10b15a, #0b6b45);
+      }
+
+      .metric-card.m-navy {
+        background: linear-gradient(135deg, #1a4a7a, #0b2748);
+      }
+
+      .metric-card.m-purple {
+        background: linear-gradient(135deg, #a855f7, #7b2fbe);
+      }
+
+      .metric-info { display: flex; flex-direction: column; gap: 4px; }
+      .metric-name { font-size: 12px; font-weight: 600; opacity: .85; }
+      .metric-value {
+        font-size: 36px;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        line-height: 1;
+      }
+      .metric-unit { font-size: 11px; opacity: .7; }
+
+      .metric-icon {
+        width: 48px; height: 48px;
+        background: rgba(255,255,255,.15);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px;
+      }
+
+      /* ── Section card ─────────────────────────────────────────── */
+      .section-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .section-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        background: var(--green);
+        color: #fff;
+      }
+
+      .section-card-header.s-navy   { background: var(--navy); }
+      .section-card-header.s-purple { background: var(--purple); }
+
+      .section-card-title { font-size: 13px; font-weight: 700; }
+      .section-card-logo  { font-size: 10px; font-weight: 700; text-align: right; line-height: 1.2; opacity: .8; }
+
+      /* ── Chart summary card ───────────────────────────────────── */
+      .chart-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+
+      .chart-card-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 16px;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+      }
+
+      .chart-subtitle {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: -12px;
+        margin-bottom: 16px;
+      }
+
+      /* ── Supplement table block ───────────────────────────────── */
+      .sup-block {
+        padding: 0;
+      }
+
+      .sup-title {
+        text-align: center;
+        font-size: 14px;
+        font-weight: 800;
+        padding: 14px 20px 0;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+        color: var(--ink);
+      }
+
+      .sup-body {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 20px;
+        padding: 16px 20px 20px;
+        align-items: start;
+      }
+
+      /* ── Tables ───────────────────────────────────────────────── */
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+
+      thead th {
+        text-align: left;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+        color: var(--muted);
+        padding: 8px 6px 10px;
+        border-bottom: 2px solid #eee;
+        white-space: nowrap;
+      }
+
+      tbody td {
+        padding: 7px 6px;
+        border-bottom: 1px solid #f3f3f6;
+        font-size: 11px;
+      }
+
+      tbody td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      tbody tr:nth-child(even) { background: #fafbfc; }
+      tbody tr:hover { background: #f0f5f2; }
+
+      .total-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 6px 0;
+        margin-top: 8px;
+        border-top: 2px solid var(--ink);
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .btn-detail {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 20px 16px;
+        padding: 7px 14px;
+        background: transparent;
+        border: 1px solid var(--green);
+        color: var(--green);
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s;
+      }
+
+      .btn-detail:hover { background: var(--green); color: #fff; }
+
+      /* ── Chart canvas ─────────────────────────────────────────── */
+      .chart-wrap { position: relative; height: 220px; }
+      .chart-wrap-sm { position: relative; height: 180px; }
+
+      /* ── Inventário tab (form) ────────────────────────────────── */
+      .form-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px 18px;
+      }
+
+      .form-label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .3px;
+      }
+
+      .form-label input,
+      .form-label select {
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        color: var(--ink);
+        background: var(--card);
+        transition: border-color .2s, box-shadow .2s;
+        font-family: inherit;
+      }
+
+      .form-label input:focus,
+      .form-label select:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px rgba(16,177,90,.1);
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .btn-primary {
+        padding: 9px 18px;
+        background: var(--green);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .2s;
+      }
+
+      .btn-primary:hover { background: var(--green-dark); }
+
+      .btn-ghost {
+        padding: 9px 18px;
+        background: var(--card);
+        color: var(--ink);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+      }
+
+      .btn-ghost:hover { background: #f8f8fb; }
+
+      .table-wrap { overflow-x: auto; }
+
+      .badge-del {
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--muted);
+        border-radius: 6px;
+        padding: 3px 8px;
+        cursor: pointer;
+        font-size: 11px;
+        transition: all .2s;
+      }
+
+      .badge-del:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
+      /* ── Responsive ───────────────────────────────────────────── */
+      @media (max-width: 1100px) {
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        .sup-body { grid-template-columns: 1fr; }
+        .sup-body .chart-wrap-sm { height: 200px; }
+      }
+
+      @media (max-width: 768px) {
+        .sidebar { width: 64px; padding: 16px 8px; }
+        .brand-text, .nav-item span, .sidebar-footer, .nav-label { display: none; }
+        .main { margin-left: 64px; }
+        .kpi-grid { grid-template-columns: 1fr 1fr; }
+        .metric-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  Sidebar                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🌿</div>
+        <div class="brand-text">
+          <span class="brand-name">Suplemento Control</span>
+          <span class="brand-sub">Fazenda Malhada Grande</span>
+        </div>
+      </div>
+
+      <span class="nav-label">Menu</span>
+
+      <button class="nav-item active" onclick="switchTab('dashboard', this)">
+        <span class="icon">📊</span>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('inventario', this)">
+        <span class="icon">📋</span>
+        <span>Inventário</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('saidas', this)">
+        <span class="icon">📤</span>
+        <span>Saídas</span>
+      </button>
+
+      <div class="sidebar-footer">Movimento Pecuário</div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  Main                                                        -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="main">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="page-title">Dashboard</h1>
+          <p>Veja um resumo de suplementação dos animais.</p>
+        </div>
+        <div class="topbar-right">
+          <div class="filter-bar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/>
+            </svg>
+            Filtrar
+          </div>
+          <button class="btn-export" onclick="window.print()">
+            📄 Exportar PDF
+          </button>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <div class="content">
+
+        <!-- ──────────────────────────────────────────────────────── -->
+        <!--  TAB: Dashboard                                          -->
+        <!-- ──────────────────────────────────────────────────────── -->
+        <div class="tab-pane active" id="tab-dashboard">
+
+          <!-- KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card k-ink">
+              <span class="kpi-label">Total Animais</span>
+              <span class="kpi-value" id="kpi-animais">—</span>
+              <span class="kpi-badge">cabeças</span>
+            </div>
+            <div class="kpi-card k-navy">
+              <span class="kpi-label">Total Sacos (25 kg)</span>
+              <span class="kpi-value" id="kpi-sacos">—</span>
+              <span class="kpi-badge">unidades</span>
+            </div>
+            <div class="kpi-card k-green">
+              <span class="kpi-label">Pastos Monitorados</span>
+              <span class="kpi-value" id="kpi-pastos">—</span>
+              <span class="kpi-badge">pastos</span>
+            </div>
+            <div class="kpi-card k-purple">
+              <span class="kpi-label">Consumo Médio Total</span>
+              <span class="kpi-value" id="kpi-consumo">—</span>
+              <span class="kpi-badge">kg/cab dia</span>
+            </div>
+          </div>
+
+          <!-- Metric Cards -->
+          <div class="metric-grid">
+            <div class="metric-card m-green">
+              <div class="metric-info">
+                <span class="metric-name">Energético 0,3%</span>
+                <span class="metric-value" id="metric-energetico">—</span>
+                <span class="metric-unit">kg / cab dia (média)</span>
+              </div>
+              <div class="metric-icon">⚡</div>
+            </div>
+            <div class="metric-card m-navy">
+              <div class="metric-info">
+                <span class="metric-name">Mineral Adensado Águas</span>
+                <span class="metric-value" id="metric-mineral">—</span>
+                <span class="metric-unit">kg / cab dia (média)</span>
+              </div>
+              <div class="metric-icon">🧪</div>
+            </div>
+            <div class="metric-card m-purple">
+              <div class="metric-info">
+                <span class="metric-name">Ração Creep</span>
+                <span class="metric-value" id="metric-creep">—</span>
+                <span class="metric-unit">kg / cab dia (média)</span>
+              </div>
+              <div class="metric-icon">🌾</div>
+            </div>
+          </div>
+
+          <!-- Chart: Médias -->
+          <div class="chart-card">
+            <div class="chart-card-title">Consumo kg/cab dia — Médias por Suplemento</div>
+            <p class="chart-subtitle">Fazenda Malhada Grande · Março 2025</p>
+            <div class="chart-wrap">
+              <canvas id="chart-summary"></canvas>
+            </div>
+          </div>
+
+          <!-- Section: Energético -->
+          <div class="section-card">
+            <div class="section-card-header">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Energético 0,3% (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th>
+                          <th>Qtd</th>
+                          <th>Suplemento</th>
+                          <th>Período</th>
+                          <th>Sacos</th>
+                          <th>Kg Consumidos</th>
+                          <th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbl-energetico"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="tot-energetico"></div>
+                </div>
+                <div class="chart-wrap-sm">
+                  <canvas id="chart-energetico"></canvas>
+                </div>
+              </div>
+              <button class="btn-detail" onclick="switchTab('saidas', document.querySelector('[onclick*=saidas]'))">
+                ↗ Visualizar Análise Detalhada
+              </button>
+            </div>
+          </div>
+
+          <!-- Section: Mineral -->
+          <div class="section-card">
+            <div class="section-card-header s-navy">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Mineral Adensado Águas (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th>
+                          <th>Qtd</th>
+                          <th>Suplemento</th>
+                          <th>Período</th>
+                          <th>Sacos</th>
+                          <th>Kg Consumidos</th>
+                          <th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbl-mineral"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="tot-mineral"></div>
+                </div>
+                <div class="chart-wrap-sm">
+                  <canvas id="chart-mineral"></canvas>
+                </div>
+              </div>
+              <button class="btn-detail" onclick="switchTab('saidas', document.querySelector('[onclick*=saidas]'))">
+                ↗ Visualizar Análise Detalhada
+              </button>
+            </div>
+          </div>
+
+          <!-- Section: Creep -->
+          <div class="section-card">
+            <div class="section-card-header s-purple">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Ração Creep (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th>
+                          <th>Qtd</th>
+                          <th>Suplemento</th>
+                          <th>Período</th>
+                          <th>Sacos</th>
+                          <th>Kg Consumidos</th>
+                          <th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tbl-creep"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="tot-creep"></div>
+                </div>
+                <div class="chart-wrap-sm">
+                  <canvas id="chart-creep"></canvas>
+                </div>
+              </div>
+              <button class="btn-detail" onclick="switchTab('saidas', document.querySelector('[onclick*=saidas]'))">
+                ↗ Visualizar Análise Detalhada
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /tab-dashboard -->
+
+        <!-- ──────────────────────────────────────────────────────── -->
+        <!--  TAB: Inventário (Formulário)                            -->
+        <!-- ──────────────────────────────────────────────────────── -->
+        <div class="tab-pane" id="tab-inventario">
+
+          <div class="form-card">
+            <div class="form-grid" style="margin-bottom:16px">
+              <label class="form-label">
+                Pasto
+                <input id="pasto" type="text" placeholder="Ex: Cana" />
+              </label>
+              <label class="form-label">
+                Quantidade
+                <input id="quantidade" type="number" min="0" step="1" />
+              </label>
+              <label class="form-label">
+                Tipo de Suplemento
+                <select id="tipo">
+                  <option>Energético 0,3%</option>
+                  <option>Mineral Adensado Águas</option>
+                  <option>Ração Creep</option>
+                </select>
+              </label>
+              <label class="form-label">
+                Período (dias)
+                <input id="periodo" type="number" min="0" step="1" value="30" />
+              </label>
+              <label class="form-label">
+                Sacos (25 kg)
+                <input id="sacos-in" type="number" min="0" step="1" />
+              </label>
+              <label class="form-label">
+                Kg consumidos no período
+                <input id="kg" type="number" min="0" step="1" />
+              </label>
+              <label class="form-label">
+                Consumo (kg/cab dia)
+                <input id="consumo-in" type="number" min="0" step="0.001" />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" id="add-row">+ Adicionar</button>
+              <button class="btn-primary" id="save">Salvar</button>
+              <button class="btn-ghost" id="load-sample">Carregar Exemplo</button>
+              <button class="btn-ghost" id="clear-all">Limpar Tudo</button>
+            </div>
+          </div>
+
+          <div class="form-card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pasto</th>
+                    <th>Quantidade</th>
+                    <th>Tipo de Suplemento</th>
+                    <th>Período</th>
+                    <th>Sacos</th>
+                    <th>Kg Consumidos</th>
+                    <th>Consumo</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /tab-inventario -->
+
+        <!-- ──────────────────────────────────────────────────────── -->
+        <!--  TAB: Saídas (Relatório)                                 -->
+        <!-- ──────────────────────────────────────────────────────── -->
+        <div class="tab-pane" id="tab-saidas">
+
+          <div class="form-card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 18px">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px;background:#f8f8fb;border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px;height:38px">
+                <label style="font-weight:600;font-size:12px;color:var(--ink);white-space:nowrap">Suplemento</label>
+                <select id="filter-supplement" style="border:none;background:transparent;font-size:12px;color:var(--muted);min-width:80px;cursor:pointer">
+                  <option value="">Todos</option>
+                  <option value="Energético 0,3%">Energético 0,3%</option>
+                  <option value="Mineral Adensado Águas">Mineral Adensado Águas</option>
+                  <option value="Ração Creep">Ração Creep</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;background:#f8f8fb;border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px;height:38px">
+                <label style="font-weight:600;font-size:12px;color:var(--ink)">Pasto</label>
+                <select id="filter-pasto" style="border:none;background:transparent;font-size:12px;color:var(--muted);min-width:80px;cursor:pointer">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn-export" id="print-report" onclick="window.print()">📄 Imprimir / PDF</button>
+          </div>
+
+          <!-- Summary cards -->
+          <div class="metric-grid">
+            <div class="metric-card m-green">
+              <div class="metric-info">
+                <span class="metric-name">Energético 0,3%</span>
+                <span class="metric-value" id="summary-energetico">—</span>
+                <span class="metric-unit">kg / cab dia</span>
+                <span style="font-size:11px;opacity:.7;margin-top:4px" id="badge-energetico">0 pastos</span>
+              </div>
+              <div class="metric-icon">⚡</div>
+            </div>
+            <div class="metric-card m-navy">
+              <div class="metric-info">
+                <span class="metric-name">Mineral Adensado Águas</span>
+                <span class="metric-value" id="summary-mineral">—</span>
+                <span class="metric-unit">kg / cab dia</span>
+                <span style="font-size:11px;opacity:.7;margin-top:4px" id="badge-mineral">0 pastos</span>
+              </div>
+              <div class="metric-icon">🧪</div>
+            </div>
+            <div class="metric-card m-purple">
+              <div class="metric-info">
+                <span class="metric-name">Ração Creep</span>
+                <span class="metric-value" id="summary-creep">—</span>
+                <span class="metric-unit">kg / cab dia</span>
+                <span style="font-size:11px;opacity:.7;margin-top:4px" id="badge-creep">0 pastos</span>
+              </div>
+              <div class="metric-icon">🌾</div>
+            </div>
+          </div>
+
+          <!-- Report pages (reuse existing structure) -->
+          <div class="form-card" style="padding:20px">
+            <div style="text-align:center;margin-bottom:16px">
+              <h2 style="font-size:16px;font-weight:800">CONSUMO KG/CAB DIA — MÉDIAS CONSUMO</h2>
+              <p style="font-size:12px;color:var(--muted);margin-top:4px">FAZENDA MALHADA GRANDE · MAR/25</p>
+            </div>
+            <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:center">
+              <table>
+                <tbody id="summary-table"></tbody>
+              </table>
+              <div style="height:280px">
+                <canvas id="chart-summary2"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card" id="report-energetico-block">
+            <div class="section-card-header">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Energético 0,3% (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th><th>Qtd</th><th>Suplemento</th>
+                          <th>Período</th><th>Sacos</th><th>Kg Consumidos</th><th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="table-energetico"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="total-energetico"></div>
+                </div>
+                <div class="chart-wrap-sm"><canvas id="chart-energetico2"></canvas></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card" id="report-mineral-block">
+            <div class="section-card-header s-navy">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Mineral Adensado Águas (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th><th>Qtd</th><th>Suplemento</th>
+                          <th>Período</th><th>Sacos</th><th>Kg Consumidos</th><th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="table-mineral"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="total-mineral"></div>
+                </div>
+                <div class="chart-wrap-sm"><canvas id="chart-mineral2"></canvas></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card" id="report-creep-block">
+            <div class="section-card-header s-purple">
+              <span class="section-card-title">CONTROLE DE CONSUMO SUPLEMENTOS · FAZENDA MALHADA GRANDE 2025</span>
+              <span class="section-card-logo">MOVIMENTO<br>PECUÁRIO</span>
+            </div>
+            <div class="sup-block">
+              <p class="sup-title">Consumo kg/cab dia — Ração Creep (Março 2025)</p>
+              <div class="sup-body">
+                <div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Pasto</th><th>Qtd</th><th>Suplemento</th>
+                          <th>Período</th><th>Sacos</th><th>Kg Consumidos</th><th>Consumo</th>
+                        </tr>
+                      </thead>
+                      <tbody id="table-creep"></tbody>
+                    </table>
+                  </div>
+                  <div class="total-line" id="total-creep"></div>
+                </div>
+                <div class="chart-wrap-sm"><canvas id="chart-creep2"></canvas></div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /tab-saidas -->
+
+      </div><!-- /content -->
+    </div><!-- /main -->
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  Scripts                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <script>
+      /* ── Tab switching ──────────────────────────────────────────── */
+      const TITLES = { dashboard: 'Dashboard', inventario: 'Inventário', saidas: 'Saídas' };
+
+      function switchTab(name, btn) {
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        if (btn) btn.classList.add('active');
+        document.getElementById('page-title').textContent = TITLES[name] || name;
+        if (name === 'dashboard') renderDashboard();
+        if (name === 'saidas')    renderReport();
+      }
+
+      /* ── Storage ────────────────────────────────────────────────── */
+      const STORE_KEY = 'suplemento_v3';
+
+      function loadRows() {
+        try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+        catch { return []; }
+      }
+
+      function saveRows(rows) {
+        localStorage.setItem(STORE_KEY, JSON.stringify(rows));
+      }
+
+      /* ── Sample data ─────────────────────────────────────────────── */
+      const SAMPLE = [
+        { pasto:'Cana',        quantidade:120, tipo:'Energético 0,3%',      periodo:30, sacos:18,  kg:450,  consumo:0.125 },
+        { pasto:'Braquiária',  quantidade:85,  tipo:'Energético 0,3%',      periodo:30, sacos:12,  kg:300,  consumo:0.118 },
+        { pasto:'Napier',      quantidade:200, tipo:'Energético 0,3%',      periodo:30, sacos:42,  kg:1050, consumo:0.175 },
+        { pasto:'Mombaça',     quantidade:150, tipo:'Energético 0,3%',      periodo:30, sacos:30,  kg:750,  consumo:0.167 },
+        { pasto:'Tanzânia',    quantidade:110, tipo:'Energético 0,3%',      periodo:30, sacos:22,  kg:550,  consumo:0.167 },
+        { pasto:'Estrela',     quantidade:95,  tipo:'Mineral Adensado Águas', periodo:30, sacos:8, kg:200,  consumo:0.070 },
+        { pasto:'Braquiária',  quantidade:85,  tipo:'Mineral Adensado Águas', periodo:30, sacos:6, kg:150,  consumo:0.059 },
+        { pasto:'Mombaça',     quantidade:150, tipo:'Mineral Adensado Águas', periodo:30, sacos:14,kg:350,  consumo:0.078 },
+        { pasto:'Napier',      quantidade:200, tipo:'Mineral Adensado Águas', periodo:30, sacos:18,kg:450,  consumo:0.075 },
+        { pasto:'Tanzânia',    quantidade:110, tipo:'Mineral Adensado Águas', periodo:30, sacos:10,kg:250,  consumo:0.076 },
+        { pasto:'Creep A',     quantidade:40,  tipo:'Ração Creep',           periodo:30, sacos:20, kg:500,  consumo:0.417 },
+        { pasto:'Creep B',     quantidade:35,  tipo:'Ração Creep',           periodo:30, sacos:16, kg:400,  consumo:0.381 },
+        { pasto:'Creep C',     quantidade:30,  tipo:'Ração Creep',           periodo:30, sacos:14, kg:350,  consumo:0.389 },
+      ];
+
+      /* ── Chart registry ──────────────────────────────────────────── */
+      const CHARTS = {};
+
+      function makeChart(id, labels, datasets, options = {}) {
+        if (CHARTS[id]) CHARTS[id].destroy();
+        const ctx = document.getElementById(id);
+        if (!ctx) return;
+        CHARTS[id] = new Chart(ctx, {
+          type: 'bar',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, padding: 12 } },
+              tooltip: { mode: 'index' }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+              y: { grid: { color: '#f0f0f5' }, ticks: { font: { size: 10 } } }
+            },
+            ...options
+          }
+        });
+      }
+
+      function makeBarChart(id, labels, values, color) {
+        makeChart(id, labels, [{
+          label: 'Consumo kg/cab dia',
+          data: values,
+          backgroundColor: color,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]);
+      }
+
+      /* ── Row form ────────────────────────────────────────────────── */
+      let rows = loadRows();
+
+      function renderRows() {
+        const tbody = document.getElementById('rows');
+        if (!tbody) return;
+        tbody.innerHTML = rows.map((r, i) => `
+          <tr>
+            <td>${r.pasto}</td>
+            <td class="num">${r.quantidade}</td>
+            <td>${r.tipo}</td>
+            <td class="num">${r.periodo}</td>
+            <td class="num">${r.sacos}</td>
+            <td class="num">${r.kg}</td>
+            <td class="num">${r.consumo.toFixed(3)}</td>
+            <td><button class="badge-del" onclick="deleteRow(${i})">✕</button></td>
+          </tr>`).join('');
+      }
+
+      function deleteRow(i) {
+        rows.splice(i, 1);
+        saveRows(rows);
+        renderRows();
+        renderDashboard();
+        renderReport();
+      }
+
+      document.getElementById('add-row').addEventListener('click', () => {
+        const p = document.getElementById('pasto').value.trim();
+        const q = parseFloat(document.getElementById('quantidade').value);
+        const t = document.getElementById('tipo').value;
+        const pe = parseFloat(document.getElementById('periodo').value) || 30;
+        const s = parseFloat(document.getElementById('sacos-in').value) || 0;
+        const k = parseFloat(document.getElementById('kg').value) || 0;
+        const c = parseFloat(document.getElementById('consumo-in').value) || 0;
+        if (!p || !q) { alert('Preencha ao menos Pasto e Quantidade.'); return; }
+        rows.push({ pasto: p, quantidade: q, tipo: t, periodo: pe, sacos: s, kg: k, consumo: c });
+        saveRows(rows);
+        renderRows();
+        renderDashboard();
+        ['pasto','quantidade','sacos-in','kg','consumo-in'].forEach(id => document.getElementById(id).value = '');
+      });
+
+      document.getElementById('save').addEventListener('click', () => {
+        saveRows(rows);
+        alert('Dados salvos!');
+      });
+
+      document.getElementById('clear-all').addEventListener('click', () => {
+        if (confirm('Limpar todos os dados?')) {
+          rows = [];
+          saveRows(rows);
+          renderRows();
+          renderDashboard();
+          renderReport();
+        }
+      });
+
+      document.getElementById('load-sample').addEventListener('click', () => {
+        rows = [...SAMPLE];
+        saveRows(rows);
+        renderRows();
+        renderDashboard();
+        renderReport();
+      });
+
+      /* ── Dashboard render ────────────────────────────────────────── */
+      function byType(tipo) { return rows.filter(r => r.tipo === tipo); }
+
+      function avg(arr, key) {
+        if (!arr.length) return 0;
+        return arr.reduce((s, r) => s + (r[key] || 0), 0) / arr.length;
+      }
+
+      function sum(arr, key) { return arr.reduce((s, r) => s + (r[key] || 0), 0); }
+
+      function renderTable(tbodyId, totId, data, color) {
+        const tbody = document.getElementById(tbodyId);
+        const tot   = document.getElementById(totId);
+        if (!tbody) return;
+        tbody.innerHTML = data.map(r => `
+          <tr>
+            <td>${r.pasto}</td>
+            <td class="num">${r.quantidade}</td>
+            <td>${r.tipo}</td>
+            <td class="num">${r.periodo}</td>
+            <td class="num">${r.sacos}</td>
+            <td class="num">${r.kg.toFixed(1)}</td>
+            <td class="num"><strong>${r.consumo.toFixed(3)}</strong></td>
+          </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">Sem dados</td></tr>';
+        if (tot) {
+          const ts = sum(data,'sacos'), tk = sum(data,'kg');
+          const ta = avg(data,'consumo');
+          tot.innerHTML = `<span>Total sacos: <strong>${ts}</strong></span>
+                           <span>Total kg: <strong>${tk.toFixed(1)}</strong></span>
+                           <span>Média consumo: <strong>${ta.toFixed(3)} kg/cab dia</strong></span>`;
+        }
+      }
+
+      function renderDashboard() {
+        const ene = byType('Energético 0,3%');
+        const min = byType('Mineral Adensado Águas');
+        const cre = byType('Ração Creep');
+        const all = rows;
+
+        /* KPIs */
+        const totalAnimais = [...new Set(all.map(r => r.pasto + r.tipo))].length > 0
+          ? sum(all,'quantidade') / (all.length || 1)
+          : 0;
+        const uAnimais = [...new Set(all.map(r => r.quantidade))];
+        setText('kpi-animais', all.length ? sum(all,'quantidade') : '—');
+        setText('kpi-sacos',   all.length ? sum(all,'sacos') : '—');
+        setText('kpi-pastos',  all.length ? [...new Set(all.map(r=>r.pasto))].length : '—');
+        const overallAvg = all.length ? avg(all,'consumo') : 0;
+        setText('kpi-consumo', all.length ? overallAvg.toFixed(3) : '—');
+
+        /* Metrics */
+        setText('metric-energetico', ene.length ? avg(ene,'consumo').toFixed(3) : '—');
+        setText('metric-mineral',    min.length ? avg(min,'consumo').toFixed(3) : '—');
+        setText('metric-creep',      cre.length ? avg(cre,'consumo').toFixed(3) : '—');
+
+        /* Summary chart */
+        makeChart('chart-summary',
+          ['Energético 0,3%', 'Mineral Adensado Águas', 'Ração Creep'],
+          [
+            { label: 'Média kg/cab dia', data: [avg(ene,'consumo'), avg(min,'consumo'), avg(cre,'consumo')],
+              backgroundColor: ['#10b15a', '#0b2748', '#7b2fbe'], borderRadius: 8, borderSkipped: false }
+          ]
+        );
+
+        /* Tables */
+        renderTable('tbl-energetico', 'tot-energetico', ene, '#10b15a');
+        renderTable('tbl-mineral',    'tot-mineral',    min, '#0b2748');
+        renderTable('tbl-creep',      'tot-creep',      cre, '#7b2fbe');
+
+        /* Per-type charts */
+        makeBarChart('chart-energetico', ene.map(r=>r.pasto), ene.map(r=>r.consumo), '#10b15a');
+        makeBarChart('chart-mineral',    min.map(r=>r.pasto), min.map(r=>r.consumo), '#0b2748');
+        makeBarChart('chart-creep',      cre.map(r=>r.pasto), cre.map(r=>r.consumo), '#7b2fbe');
+      }
+
+      /* ── Report render ───────────────────────────────────────────── */
+      function renderReport() {
+        const ene = byType('Energético 0,3%');
+        const min = byType('Mineral Adensado Águas');
+        const cre = byType('Ração Creep');
+
+        const ae = avg(ene,'consumo'), am = avg(min,'consumo'), ac = avg(cre,'consumo');
+
+        /* Summary values */
+        setText('summary-energetico', ene.length ? ae.toFixed(3) : '—');
+        setText('summary-mineral',    min.length ? am.toFixed(3) : '—');
+        setText('summary-creep',      cre.length ? ac.toFixed(3) : '—');
+        setText('badge-energetico',   `${ene.length} pastos`);
+        setText('badge-mineral',      `${min.length} pastos`);
+        setText('badge-creep',        `${cre.length} pastos`);
+
+        /* Summary table */
+        const st = document.getElementById('summary-table');
+        if (st) {
+          st.innerHTML = [
+            ['Energético 0,3%', ae, '#10b15a'],
+            ['Mineral Adensado Águas', am, '#0b2748'],
+            ['Ração Creep', ac, '#7b2fbe']
+          ].map(([n,v,c]) => `
+            <tr>
+              <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;font-size:13px">${n}</td>
+              <td class="num" style="padding:10px 8px;border-bottom:1px solid #f0f0f5;font-size:16px;font-weight:800;color:${c};text-align:right">${v.toFixed(3)}</td>
+            </tr>`).join('');
+        }
+
+        makeChart('chart-summary2',
+          ['Energético 0,3%', 'Mineral Adensado Águas', 'Ração Creep'],
+          [{ label: 'Média kg/cab dia', data: [ae, am, ac],
+             backgroundColor: ['#10b15a','#0b2748','#7b2fbe'], borderRadius: 8, borderSkipped: false }]
+        );
+
+        /* Per-type */
+        renderTable('table-energetico', 'total-energetico', ene);
+        renderTable('table-mineral',    'total-mineral',    min);
+        renderTable('table-creep',      'total-creep',      cre);
+
+        makeBarChart('chart-energetico2', ene.map(r=>r.pasto), ene.map(r=>r.consumo), '#10b15a');
+        makeBarChart('chart-mineral2',    min.map(r=>r.pasto), min.map(r=>r.consumo), '#0b2748');
+        makeBarChart('chart-creep2',      cre.map(r=>r.pasto), cre.map(r=>r.consumo), '#7b2fbe');
+
+        /* Pasto filter */
+        const fp = document.getElementById('filter-pasto');
+        if (fp) {
+          const pastos = [...new Set(rows.map(r=>r.pasto))].sort();
+          fp.innerHTML = '<option value="">Todos</option>' + pastos.map(p=>`<option value="${p}">${p}</option>`).join('');
+        }
+      }
+
+      function setText(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      }
+
+      /* ── Init ────────────────────────────────────────────────────── */
+      renderRows();
+      renderDashboard();
+    </script>
+  </body>
+</html>

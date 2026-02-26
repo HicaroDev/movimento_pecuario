@@ -1,0 +1,130 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relat&oacute;rio - Suplemento Control</title>
+    <link rel="stylesheet" href="../shared.css" />
+    <link rel="stylesheet" href="../report.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="report-header">
+        <h1>CONSUMO KG/CAB DIA - M&Eacute;DIAS CONSUMO</h1>
+        <div class="subhead">FAZENDA MALHADA GRANDE - MAR/25</div>
+      </header>
+
+      <section class="summary">
+        <div class="summary-table">
+          <table>
+            <tbody id="summary-table"></tbody>
+          </table>
+        </div>
+        <div class="summary-chart" data-chart="summary"></div>
+      </section>
+    </div>
+
+    <div class="page break">
+      <section class="block">
+        <div class="sheet-header">
+          <div class="sheet-title">
+            CONTROLE DE CONSUMO SUPLEMENTOS - FAZENDA MALHADA GRANDE 2025
+          </div>
+          <div class="sheet-logo">MOVIMENTO<br />PECU&Aacute;RIO</div>
+        </div>
+        <h2>CONSUMO KG/CAB DIA - ENERG&Eacute;TICO 0,3% (MAR&Ccedil;O 2025)</h2>
+        <div class="row">
+          <div class="left">
+            <table>
+              <thead>
+                <tr>
+                  <th>PASTO</th>
+                  <th>QUANTIDADE</th>
+                  <th>TIPO DE SUPLEMENTO</th>
+                  <th>PER&Iacute;ODO (dias)</th>
+                  <th>SACOS (25 kg)</th>
+                  <th>KG CONSUMIDOS NO PER&Iacute;ODO</th>
+                  <th>CONSUMO (kg/cab dia)</th>
+                </tr>
+              </thead>
+              <tbody id="table-energetico"></tbody>
+            </table>
+            <div class="total-line" id="total-energetico"></div>
+          </div>
+          <div class="right" data-chart="energetico"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page break">
+      <section class="block">
+        <div class="sheet-header">
+          <div class="sheet-title">
+            CONTROLE DE CONSUMO SUPLEMENTOS - FAZENDA MALHADA GRANDE 2025
+          </div>
+          <div class="sheet-logo">MOVIMENTO<br />PECU&Aacute;RIO</div>
+        </div>
+        <h2>CONSUMO KG/CAB DIA - MINERAL ADENSADO (MAR&Ccedil;O 2025)</h2>
+        <div class="row">
+          <div class="left">
+            <table>
+              <thead>
+                <tr>
+                  <th>PASTO</th>
+                  <th>QUANTIDADE</th>
+                  <th>TIPO DE SUPLEMENTO</th>
+                  <th>PER&Iacute;ODO (dias)</th>
+                  <th>SACOS (25 kg)</th>
+                  <th>KG CONSUMIDOS NO PER&Iacute;ODO</th>
+                  <th>CONSUMO (kg/cab dia)</th>
+                </tr>
+              </thead>
+              <tbody id="table-mineral"></tbody>
+            </table>
+            <div class="total-line" id="total-mineral"></div>
+          </div>
+          <div class="right" data-chart="mineral"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page break">
+      <section class="block">
+        <div class="sheet-header">
+          <div class="sheet-title">
+            CONTROLE DE CONSUMO SUPLEMENTOS - FAZENDA MALHADA GRANDE 2025
+          </div>
+          <div class="sheet-logo">MOVIMENTO<br />PECU&Aacute;RIO</div>
+        </div>
+        <h2>CONSUMO KG/CAB DIA - RA&Ccedil;&Atilde;O CREEP (MAR&Ccedil;O 2025)</h2>
+        <div class="row">
+          <div class="left">
+            <table>
+              <thead>
+                <tr>
+                  <th>PASTO</th>
+                  <th>QUANTIDADE</th>
+                  <th>TIPO DE SUPLEMENTO</th>
+                  <th>PER&Iacute;ODO (dias)</th>
+                  <th>SACOS (25 kg)</th>
+                  <th>KG CONSUMIDOS NO PER&Iacute;ODO</th>
+                  <th>CONSUMO (kg/cab dia)</th>
+                </tr>
+              </thead>
+              <tbody id="table-creep"></tbody>
+            </table>
+            <div class="total-line" id="total-creep"></div>
+          </div>
+          <div class="right" data-chart="creep"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page nav-footer">
+      <a class="btn" href="../Formulario/">Ir para Formul&aacute;rio</a>
+    </div>
+
+    <script src="../shared.js"></script>
+    <script src="relatorio.js"></script>
+  </body>
+</html>

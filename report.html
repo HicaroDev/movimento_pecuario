@@ -1,0 +1,120 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard - Fazenda Malhada Grande</title>
+    <link rel="stylesheet" href="report.css" />
+  </head>
+  <body>
+    <div class="dashboard">
+      <header class="dash-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="dash-sub">Fazenda Malhada Grande</p>
+        </div>
+        <div class="dash-actions">
+          <div class="pill ghost">
+            <span class="icon">CAL</span>
+            <span id="range-text">Oct 18 - Nov 18</span>
+          </div>
+          <button class="pill ghost">Monthly</button>
+          <button class="pill ghost">Filter</button>
+          <button class="pill primary">Export</button>
+        </div>
+      </header>
+
+      <section class="stats">
+        <div class="card stat">
+          <div class="stat-head">
+            <span class="stat-label">Page Views</span>
+            <span class="stat-icon">PV</span>
+          </div>
+          <div class="stat-value" id="stat-views">12,450</div>
+          <div class="stat-change up" id="stat-views-change">+15.8%</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-head">
+            <span class="stat-label">Total Revenue</span>
+            <span class="stat-icon">TR</span>
+          </div>
+          <div class="stat-value" id="stat-revenue">$ 363.95</div>
+          <div class="stat-change down" id="stat-revenue-change">-34.0%</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-head">
+            <span class="stat-label">Bounce Rate</span>
+            <span class="stat-icon">BR</span>
+          </div>
+          <div class="stat-value" id="stat-bounce">86.5%</div>
+          <div class="stat-change up" id="stat-bounce-change">+24.2%</div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card chart-card wide">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Sales Overview</div>
+              <div class="card-sub" id="sales-total">$ 9,257.51</div>
+            </div>
+            <div class="card-actions">
+              <button class="ghost">Filter</button>
+              <button class="ghost">Sort</button>
+              <button class="ghost icon-only">...</button>
+            </div>
+          </div>
+          <div class="legend" id="sales-legend"></div>
+          <div class="chart" id="sales-chart"></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Total Subscriber</div>
+              <div class="card-value" id="subs-total">24,473</div>
+              <div class="stat-change up" id="subs-change">+8.3% (+749)</div>
+            </div>
+            <button class="ghost small">Weekly</button>
+          </div>
+          <div class="chart" id="subs-chart"></div>
+        </div>
+      </section>
+
+      <section class="grid lower">
+        <div class="card chart-card">
+          <div class="card-head">
+            <div class="card-title">Sales Distribution</div>
+            <button class="ghost small">Monthly</button>
+          </div>
+          <div class="distribution">
+            <div class="dist-summary">
+              <div class="dist-item">
+                <span>Website</span>
+                <strong id="dist-web">$ 374.82</strong>
+              </div>
+              <div class="dist-item">
+                <span>Mobile App</span>
+                <strong id="dist-app">$ 241.60</strong>
+              </div>
+              <div class="dist-item">
+                <span>Other</span>
+                <strong id="dist-other">$ 213.42</strong>
+              </div>
+            </div>
+            <div class="chart donut" id="dist-chart"></div>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-head">
+            <div class="card-title">List of Integration</div>
+            <button class="ghost link">See All</button>
+          </div>
+          <div class="integration" id="integration-table"></div>
+        </div>
+      </section>
+    </div>
+
+    <script src="report.js"></script>
+  </body>
+</html>

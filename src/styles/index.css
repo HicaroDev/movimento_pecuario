@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+/* ── Cor da marca: verde Movimento Pecuário ── */
+@theme inline {
+  --color-teal-300: #4da882;
+  --color-teal-400: #2d8a62;
+  --color-teal-500: #1d7050;
+  --color-teal-600: #1a6040;
+  --color-teal-700: #155033;
+  --color-teal-800: #0f3d26;
+}
+
+:root {
+  --brand:       #1a6040;
+  --brand-dark:  #155033;
+  --green:       #1a6040;
+  --navy:        #0b2748;
+  --purple:      #6b2fa0;
+  --teal:        #1a6040;
+  --sidebar-from: #1a1f2e;
+  --sidebar-to:   #2d3548;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f9fafb;
+    color: #111827;
+  }
+}
+
+/* ── Print styles ── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-break {
+    page-break-before: always;
+  }
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+}
