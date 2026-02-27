@@ -1,5 +1,9 @@
-# ── Stage 1: build ──────────────────────────────────────────
-FROM node:20-alpine AS builder
+# Imagem única com Node + nginx
+# O build acontece no startup do container, depois que o EasyPanel
+# escreve o arquivo .env com as variáveis de ambiente.
+FROM node:20-alpine
+
+RUN apk add --no-cache nginx
 
 WORKDIR /app
 
@@ -8,22 +12,12 @@ RUN npm ci
 
 COPY . .
 
-# Variáveis injetadas pelo EasyPanel em tempo de build (Vite as embute no JS)
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ARG VITE_SUPABASE_SERVICE_ROLE_KEY
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
-ENV VITE_SUPABASE_SERVICE_ROLE_KEY=$VITE_SUPABASE_SERVICE_ROLE_KEY
-
-RUN npm run build
-
-# ── Stage 2: serve ──────────────────────────────────────────
-FROM nginx:alpine
-
-COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+RUN mkdir -p /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/docker-entrypoint.sh"]
