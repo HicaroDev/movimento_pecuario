@@ -7,6 +7,15 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# Variáveis injetadas pelo EasyPanel em tempo de build (Vite as embute no JS)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_SERVICE_ROLE_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_SERVICE_ROLE_KEY=$VITE_SUPABASE_SERVICE_ROLE_KEY
+
 RUN npm run build
 
 # ── Stage 2: serve ──────────────────────────────────────────
