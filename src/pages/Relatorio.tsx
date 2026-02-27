@@ -7,11 +7,12 @@ import { StatsOverview } from '../components/StatsOverview';
 import { MetricCard } from '../components/MetricCard';
 import { SummaryChart } from '../components/SummaryChart';
 import { SupplementSection } from '../components/SupplementSection';
+import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { groupByType, averageConsumo, sumQuantidade, fmt } from '../lib/utils';
 import { supplementOrder, supplementColors } from '../lib/data';
 
 export function Relatorio() {
-  const { entries } = useData();
+  const { entries, loading } = useData();
 
   const [filterSupplement, setFilterSupplement] = useState('');
   const [filterPasto, setFilterPasto] = useState('');
@@ -189,43 +190,57 @@ export function Relatorio() {
         </motion.div>
 
         {/* ── 4 KPI cards ── */}
-        <StatsOverview
-          totalEntries={totalEntries}
-          totalAnimals={totalAnimals}
-          totalPastos={totalPastos}
-          avgConsumption={avgConsumption}
-        />
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : (
+          <StatsOverview
+            totalEntries={totalEntries}
+            totalAnimals={totalAnimals}
+            totalPastos={totalPastos}
+            avgConsumption={avgConsumption}
+          />
+        )}
 
         {/* ── 3 metric cards ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <MetricCard
-            icon="energy"
-            title="Energético 0,3%"
-            value={fmt(energeticoAvg)}
-            subtitle={`${groups['Energético 0,3%']?.length ?? 0} pastos`}
-            color={supplementColors['Energético 0,3%']}
-            trend={5.2}
-          />
-          <MetricCard
-            icon="mineral"
-            title="Mineral Adensado Águas"
-            value={fmt(mineralAvg)}
-            subtitle={`${groups['Mineral Adensado Águas']?.length ?? 0} pastos`}
-            color={supplementColors['Mineral Adensado Águas']}
-            trend={-2.1}
-          />
-          <MetricCard
-            icon="feed"
-            title="Ração Creep"
-            value={fmt(creepAvg)}
-            subtitle={`${groups['Ração Creep']?.length ?? 0} pastos`}
-            color={supplementColors['Ração Creep']}
-            trend={8.7}
-          />
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <MetricCard
+              icon="energy"
+              title="Energético 0,3%"
+              value={fmt(energeticoAvg)}
+              subtitle={`${groups['Energético 0,3%']?.length ?? 0} pastos`}
+              color={supplementColors['Energético 0,3%']}
+              trend={5.2}
+            />
+            <MetricCard
+              icon="mineral"
+              title="Mineral Adensado Águas"
+              value={fmt(mineralAvg)}
+              subtitle={`${groups['Mineral Adensado Águas']?.length ?? 0} pastos`}
+              color={supplementColors['Mineral Adensado Águas']}
+              trend={-2.1}
+            />
+            <MetricCard
+              icon="feed"
+              title="Ração Creep"
+              value={fmt(creepAvg)}
+              subtitle={`${groups['Ração Creep']?.length ?? 0} pastos`}
+              color={supplementColors['Ração Creep']}
+              trend={8.7}
+            />
+          </div>
+        )}
 
         {/* ── Summary page (table + chart) ── */}
-        {filtered.length > 0 && (
+        {loading ? (
+          <div className="mb-8"><SkeletonChart /></div>
+        ) : filtered.length > 0 && (
           <div className="mb-8">
             <SummaryChart
               data={summaryData}
@@ -236,28 +251,34 @@ export function Relatorio() {
         )}
 
         {/* ── Per-supplement sections ── */}
-        <div className="space-y-8">
-          {supplementOrder.map((tipo) => {
-            const sectionEntries = groups[tipo] ?? [];
-            if (sectionEntries.length === 0) return null;
-            const color = supplementColors[tipo] ?? '#0b6b45';
-            return (
-              <SupplementSection
-                key={tipo}
-                tipo={tipo}
-                color={color}
-                entries={sectionEntries}
-                periodo="MARÇO 2025"
-              />
-            );
-          })}
-        </div>
+        {loading ? (
+          <SkeletonChart />
+        ) : (
+          <>
+            <div className="space-y-8">
+              {supplementOrder.map((tipo) => {
+                const sectionEntries = groups[tipo] ?? [];
+                if (sectionEntries.length === 0) return null;
+                const color = supplementColors[tipo] ?? '#0b6b45';
+                return (
+                  <SupplementSection
+                    key={tipo}
+                    tipo={tipo}
+                    color={color}
+                    entries={sectionEntries}
+                    periodo="MARÇO 2025"
+                  />
+                );
+              })}
+            </div>
 
-        {filtered.length === 0 && (
-          <div className="bg-white border border-dashed border-gray-300 rounded-xl p-16 text-center text-gray-500">
-            <p className="text-lg font-medium">Sem dados para os filtros selecionados.</p>
-            <p className="text-sm mt-2">Ajuste os filtros acima ou carregue dados no Formulário.</p>
-          </div>
+            {filtered.length === 0 && (
+              <div className="bg-white border border-dashed border-gray-300 rounded-xl p-16 text-center text-gray-500">
+                <p className="text-lg font-medium">Sem dados para os filtros selecionados.</p>
+                <p className="text-sm mt-2">Ajuste os filtros acima ou carregue dados no Formulário.</p>
+              </div>
+            )}
+          </>
         )}
       </motion.div>
     </div>

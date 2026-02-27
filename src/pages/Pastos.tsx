@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { farmService } from '../services/farmService';
+import { SkeletonTable } from '../components/Skeleton';
 import type { Pasture } from '../context/DataContext';
 
 const inputClass =
@@ -91,7 +92,7 @@ function PastureEditRow({ pasture, onSave, onCancel }: {
 /* ─────────────── Main Pastos page ─────────────── */
 
 export function Pastos() {
-  const { pastures, addPasture, deletePasture, updatePasture, activeFarmId } = useData();
+  const { pastures, addPasture, deletePasture, updatePasture, activeFarmId, loading } = useData();
   const { isAdmin, user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -200,6 +201,9 @@ export function Pastos() {
         )}
 
         {/* Table */}
+        {loading ? (
+          <SkeletonTable rows={4} cols={4} />
+        ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
@@ -259,6 +263,7 @@ export function Pastos() {
             </div>
           )}
         </motion.div>
+        )}
 
         {/* Future: relatório de pasto placeholder */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}

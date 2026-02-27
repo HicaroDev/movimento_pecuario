@@ -21,7 +21,7 @@ const inputClass =
 const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 
 export function Formulario() {
-  const { entries, addEntry, removeEntry, clearAll, loadSample, pastures } = useData();
+  const { entries, addEntry, removeEntry, clearAll, loadSample, pastures, loading } = useData();
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormFields>({
     defaultValues: { periodo: 30 },
@@ -124,12 +124,19 @@ export function Formulario() {
                 <label className={labelClass}>Pasto</label>
                 <select
                   {...register('pasto', { required: true })}
+                  disabled={loading}
                   className={`${inputClass} cursor-pointer ${errors.pasto ? 'ring-2 ring-red-400' : ''}`}
                 >
-                  <option value="">Selecione</option>
-                  {pastures.map(p => (
-                    <option key={p.id} value={p.nome}>{p.nome}</option>
-                  ))}
+                  {loading ? (
+                    <option disabled value="">Carregando pastos...</option>
+                  ) : (
+                    <>
+                      <option value="">Selecione</option>
+                      {pastures.map(p => (
+                        <option key={p.id} value={p.nome}>{p.nome}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
               <div>

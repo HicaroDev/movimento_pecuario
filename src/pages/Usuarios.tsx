@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { farmService } from '../services/farmService';
+import { SkeletonTable } from '../components/Skeleton';
+import { logger } from '../lib/logger';
 import type { FarmUser, Module, Role } from '../types/user';
 import type { Farm } from '../types/farm';
 
@@ -43,7 +45,16 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
   const [saving, setSaving]   = useState(false);
 
   useEffect(() => {
-    farmService.list().then(list => setFarms(list.filter(f => f.active)));
+    farmService.list()
+      .then(list => {
+        const active = list.filter(f => f.active);
+        logger.info('UserModal', `fazendas carregadas: ${active.length}`);
+        setFarms(active);
+      })
+      .catch(err => {
+        logger.error('UserModal', 'erro ao carregar fazendas', err);
+        toast.error('Erro ao carregar fazendas.');
+      });
   }, []);
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<UserFormData>({
@@ -71,16 +82,19 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
       if (data.password) payload.password = data.password;
 
       if (editing) {
+        logger.info('UserModal', `editando usuário ${editing.id}`, payload);
         await userService.update(editing.id, payload);
         toast.success('Usuário atualizado!');
       } else {
         if (!data.password) { toast.error('Senha é obrigatória.'); setSaving(false); return; }
+        logger.info('UserModal', 'criando novo usuário', { email: data.email });
         await userService.create({ ...payload, password: data.password } as Omit<FarmUser, 'id' | 'createdAt'>);
         toast.success('Usuário criado!', { description: data.name });
       }
       onSaved();
       onClose();
     } catch (e: unknown) {
+      logger.error('UserModal', 'erro ao salvar', e);
       toast.error(e instanceof Error ? e.message : 'Erro ao salvar.');
     } finally {
       setSaving(false);
@@ -195,7 +209,7 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
               Cancelar
             </button>
             <button type="submit" disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
               <Save className="w-4 h-4" />
               {saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Criar usuário'}
             </button>
@@ -271,7 +285,7 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1">
-          <button onClick={() => onEdit(u)} className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Pencil className="w-4 h-4" /></button>
+          <button onClick={() => onEdit(u)} className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Pencil className="w-4 h-4" /></button>
           <button onClick={toggleActive} disabled={u.id === currentUserId}
             className={`p-1.5 rounded transition-colors disabled:opacity-30 ${u.active ? 'text-green-500 hover:bg-green-50' : 'text-red-400 hover:bg-red-50'}`}>
             {u.active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
@@ -291,6 +305,7 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
 export function Usuarios() {
   const { user, isAdmin } = useAuth();
   const [users, setUsers]         = useState<FarmUser[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<FarmUser | null>(null);
 
@@ -298,16 +313,29 @@ export function Usuarios() {
   const [farmUsers, setFarmUsers] = useState<FarmUser[]>([]);
   const [farm, setFarm]           = useState<Farm | null>(null);
 
-  async function refresh() { setUsers(await userService.list()); }
+  async function refresh() {
+    setLoading(true);
+    setUsers(await userService.list());
+    setLoading(false);
+  }
 
   useEffect(() => {
     if (isAdmin) {
       refresh();
     } else if (user?.id) {
+      setLoading(true);
       userService.findById(user.id).then(profile => {
         if (profile?.farmId) {
-          userService.listByFarm(profile.farmId).then(setFarmUsers);
-          farmService.findById(profile.farmId).then(f => setFarm(f));
+          Promise.all([
+            userService.listByFarm(profile.farmId),
+            farmService.findById(profile.farmId),
+          ]).then(([fu, f]) => {
+            setFarmUsers(fu);
+            setFarm(f);
+            setLoading(false);
+          });
+        } else {
+          setLoading(false);
         }
       });
     }
@@ -333,32 +361,36 @@ export function Usuarios() {
             </p>
           </div>
           <button onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm">
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
             <Plus className="w-4 h-4" /> Novo Usuário
           </button>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  {['Usuário', 'Perfil', 'Fazenda', 'Módulos', 'Status', 'Ações'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {users.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Nenhum usuário cadastrado.</td></tr>
-                ) : (
-                  users.map(u => <UserRow key={u.id} u={u} currentUserId={user!.id} onEdit={openEdit} onRefresh={refresh} />)
-                )}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
+        {loading ? (
+          <SkeletonTable rows={4} cols={6} />
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Usuário', 'Perfil', 'Fazenda', 'Módulos', 'Status', 'Ações'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Nenhum usuário cadastrado.</td></tr>
+                  ) : (
+                    users.map(u => <UserRow key={u.id} u={u} currentUserId={user!.id} onEdit={openEdit} onRefresh={refresh} />)
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
       <AnimatePresence>
@@ -381,10 +413,13 @@ export function Usuarios() {
           </p>
         </div>
 
+        {loading ? (
+          <SkeletonTable rows={3} cols={4} />
+        ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-            <UserCog className="w-4 h-4 text-indigo-500" />
+            <UserCog className="w-4 h-4 text-teal-500" />
             <span className="text-sm font-semibold text-gray-800">Equipe da Fazenda</span>
           </div>
 
@@ -426,6 +461,7 @@ export function Usuarios() {
             </ul>
           )}
         </motion.div>
+        )}
       </motion.div>
     </div>
   );

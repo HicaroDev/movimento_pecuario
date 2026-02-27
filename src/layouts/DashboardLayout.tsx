@@ -16,7 +16,7 @@ const navItems = [
   { path: '/usuarios',   label: 'Usuários',   icon: Users,      module: 'usuarios'   as Module },
 ];
 
-/* ── Seletor de fazenda para admin (no sidebar) ── */
+/* ── Seletor de fazenda para admin ── */
 function AdminFarmSelector() {
   const { activeFarmId, selectFarm } = useData();
   const [farms, setFarms] = useState<Farm[]>([]);
@@ -29,25 +29,28 @@ function AdminFarmSelector() {
 
   return (
     <div className="px-4 pb-3">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Fazenda</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5 text-gray-400">
+        Fazenda
+      </p>
       <div className="relative">
         <select
           value={activeFarmId}
           onChange={e => selectFarm(e.target.value)}
-          className="w-full h-8 pl-2.5 pr-7 rounded-lg bg-white/8 border border-white/10 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer"
+          className="w-full h-8 pl-2.5 pr-7 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer"
+          style={{ background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.10)' }}
         >
           {farms.map(f => (
-            <option key={f.id} value={f.id} className="text-gray-800">{f.nomeFazenda}</option>
+            <option key={f.id} value={f.id}>{f.nomeFazenda}</option>
           ))}
         </select>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-gray-400" />
       </div>
     </div>
   );
 }
 
 export function DashboardLayout() {
-  const location = useLocation();
+  const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
 
@@ -59,30 +62,54 @@ export function DashboardLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+    <div
+      className="flex h-screen"
+      style={{
+        background: `
+          radial-gradient(ellipse at 20% 60%, rgba(26,96,64,0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 20%, rgba(11,39,72,0.05) 0%, transparent 45%),
+          linear-gradient(160deg, #f8fafb 0%, #f0f9f6 40%, #f8fafb 100%)
+        `,
+      }}
+    >
+      {/* Sidebar — glassmorphism claro */}
       <aside
-        className="w-64 text-white flex flex-col shadow-2xl flex-shrink-0"
-        style={{ background: 'linear-gradient(to bottom, #1a1f2e, #2d3548)' }}
+        className="w-64 flex flex-col flex-shrink-0 relative"
+        style={{
+          background: 'rgba(255, 255, 255, 0.80)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderRight: '1px solid rgba(0, 0, 0, 0.07)',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.06)',
+        }}
       >
         {/* Logo */}
         <motion.div
-          className="p-5 border-b border-white/10"
+          className="p-5"
+          style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="bg-white rounded-xl p-3 mb-4 shadow-md">
+          <div
+            className="rounded-xl p-3 mb-4"
+            style={{
+              background: 'rgba(255,255,255,0.9)',
+              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            }}
+          >
             <img src="/images/logo.png" alt="Movimento Pecuário" className="w-full h-auto" />
           </div>
-          <h1 className="text-base font-bold text-white">Suplemento Control</h1>
-          <p className="text-xs text-gray-400 mt-0.5 truncate">{user?.name}</p>
+          <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
+          <p className="text-xs mt-0.5 truncate text-gray-400">{user?.name}</p>
         </motion.div>
 
         {/* Seletor de fazenda — somente admin */}
         {isAdmin && (
           <motion.div
-            className="pt-3 border-b border-white/10"
+            className="pt-3"
+            style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -92,7 +119,7 @@ export function DashboardLayout() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
           {visibleNavItems.map((item, index) => {
             const isActive =
               item.path === '/'
@@ -108,15 +135,24 @@ export function DashboardLayout() {
               >
                 <Link
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg'
-                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                  }`}
-                  style={isActive ? { boxShadow: '0 4px 14px rgba(26,96,64,0.4)' } : undefined}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
+                  style={isActive ? {
+                    background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 16px rgba(26,96,64,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(26,96,64,0.3)',
+                  } : {
+                    color: '#6b7280',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-sm font-medium">{item.label}</span>
                 </Link>
               </motion.div>
             );
@@ -124,23 +160,38 @@ export function DashboardLayout() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white/10 space-y-3">
+        <div className="p-4 space-y-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-              <User className="w-4 h-4 text-gray-300" />
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(26,96,64,0.10)', border: '1px solid rgba(26,96,64,0.15)' }}
+            >
+              <User className="w-4 h-4 text-teal-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user?.name}</p>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
-                isAdmin ? 'bg-teal-500/20 text-teal-300' : 'bg-blue-500/20 text-blue-300'
-              }`}>
+              <p className="text-xs font-semibold text-gray-800 truncate">{user?.name}</p>
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                style={isAdmin
+                  ? { background: 'rgba(26,96,64,0.12)', color: '#1a6040' }
+                  : { background: 'rgba(59,130,246,0.12)', color: '#2563eb' }
+                }
+              >
                 {isAdmin ? 'Admin' : 'Cliente'}
               </span>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all text-sm"
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-xl transition-all text-sm text-gray-400"
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+              (e.currentTarget as HTMLElement).style.color = '#374151';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              (e.currentTarget as HTMLElement).style.color = '#9ca3af';
+            }}
           >
             <LogOut className="w-4 h-4" />
             <span>Sair</span>
@@ -149,7 +200,10 @@ export function DashboardLayout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto">
+      <main
+        className="flex-1 overflow-auto"
+        style={{ background: 'rgba(248,250,252,0.85)' }}
+      >
         <Outlet />
       </main>
     </div>

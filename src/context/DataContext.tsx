@@ -47,6 +47,7 @@ function toPasture(row: Record<string, unknown>): Pasture {
 interface DataContextType {
   activeFarmId: string;
   selectFarm: (farmId: string) => void;
+  loading: boolean;
   entries: DataEntry[];
   addEntry: (entry: DataEntry) => void;
   removeEntry: (index: number) => void;
@@ -68,6 +69,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
 
   const [activeFarmId, setActiveFarmId] = useState<string>('');
+  const [loading,      setLoading]      = useState(false);
   const [entries,      setEntries]      = useState<DataEntry[]>([]);
   const [pastures,     setPastures]     = useState<Pasture[]>([]);
   const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
@@ -98,19 +100,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   /* Carrega dados quando a fazenda muda */
   useEffect(() => {
-    if (!activeFarmId) {
-      setEntries([]); setPastures([]); setClientInfo(null);
-      return;
-    }
+    // Limpa imediatamente para não exibir dados da fazenda anterior
+    setEntries([]); setPastures([]); setClientInfo(null);
+
+    if (!activeFarmId) return;
+
+    setLoading(true);
+    let cancelled = false;
+
     Promise.all([
       supabase.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
       supabase.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
+      if (cancelled) return; // fazenda mudou novamente — descarta resposta stale
       setEntries((entriesRes.data ?? []).map(toDataEntry));
       setPastures((pasturesRes.data ?? []).map(toPasture));
       setClientInfo(farm);
+      setLoading(false);
     });
+
+    return () => { cancelled = true; };
   }, [activeFarmId]);
 
   function selectFarm(farmId: string) {
@@ -201,6 +211,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       activeFarmId, selectFarm,
+      loading,
       entries, addEntry, removeEntry, clearAll, loadSample,
       clientInfo, updateClientInfo,
       pastures, addPasture, deletePasture, updatePasture,

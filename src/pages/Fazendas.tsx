@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { farmService } from '../services/farmService';
 import { userService } from '../services/userService';
+import { SkeletonCard } from '../components/Skeleton';
 import type { Farm } from '../types/farm';
 
 const inputClass =
@@ -326,11 +327,16 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
 export function Fazendas() {
   const { user, isAdmin } = useAuth();
   const [farms, setFarms]         = useState<Farm[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Farm | null>(null);
   const [myFarm, setMyFarm]       = useState<Farm | null>(null);
 
-  async function refresh() { setFarms(await farmService.list()); }
+  async function refresh() {
+    setLoading(true);
+    setFarms(await farmService.list());
+    setLoading(false);
+  }
 
   useEffect(() => { refresh(); }, []);
 
@@ -368,7 +374,11 @@ export function Fazendas() {
           </button>
         </div>
 
-        {farms.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : farms.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-20 text-center">
             <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 font-medium">Nenhuma fazenda cadastrada</p>

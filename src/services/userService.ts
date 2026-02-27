@@ -1,13 +1,30 @@
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 import type { FarmUser, Module } from '../types/user';
 
-// Cliente separado para criar usuários sem afetar a sessão do admin
-const _authHelper = createClient(
-  import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
-);
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL as string;
+const SERVICE_ROLE_KEY  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string;
+
+// Chama a Admin REST API diretamente — sem criar segundo GoTrueClient no browser
+async function adminCreateAuthUser(email: string, password: string, name: string, role: string): Promise<string> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name, role },
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.msg ?? json.message ?? 'Erro ao criar usuário.');
+  return json.id as string;
+}
 
 function toFarmUser(row: Record<string, unknown>): FarmUser {
   return {
@@ -51,14 +68,8 @@ export const userService = {
   },
 
   async create(d: Omit<FarmUser, 'id' | 'createdAt'>): Promise<FarmUser> {
-    // Usa cliente auxiliar para não sobrescrever sessão do admin
-    const { data: auth, error: authErr } = await _authHelper.auth.signUp({
-      email: d.email,
-      password: d.password,
-      options: { data: { name: d.name, role: d.role } },
-    });
-    if (authErr) throw new Error(authErr.message);
-    if (!auth.user) throw new Error('Erro ao criar usuário.');
+    // Cria auth user via REST (sem segundo GoTrueClient), já confirmado
+    const userId = await adminCreateAuthUser(d.email, d.password, d.name, d.role);
 
     // Trigger cria o perfil; atualiza com os dados extras
     const { data: profile, error: profileErr } = await supabase
@@ -71,7 +82,7 @@ export const userService = {
         modules: d.modules,
         active:  d.active,
       })
-      .eq('id', auth.user.id)
+      .eq('id', userId)
       .select().single();
     if (profileErr) throw new Error(profileErr.message);
     return toFarmUser(profile);
@@ -86,16 +97,38 @@ export const userService = {
     if (d.modules !== undefined) patch.modules = d.modules;
     if (d.active  !== undefined) patch.active  = d.active;
 
-    const { data, error } = await supabase
-      .from('profiles').update(patch).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return toFarmUser(data);
+    logger.info('userService.update', `atualizando perfil ${id}`, patch);
+
+    // Usa service role key para bypass de RLS (admin editando outro usuário)
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify(patch),
+    });
+    const json = await res.json();
+    logger.info('userService.update', `resposta ${res.status}`, json);
+    if (!res.ok) throw new Error(json?.message ?? 'Erro ao atualizar usuário.');
+    if (!json[0]) throw new Error('Usuário não encontrado.');
+    return toFarmUser(json[0]);
   },
 
   async remove(id: string): Promise<void> {
-    // Soft delete — desativa o perfil
-    const { error } = await supabase
-      .from('profiles').update({ active: false }).eq('id', id);
-    if (error) throw new Error(error.message);
+    // Deleta o auth user via Admin API (cascade deleta o profile)
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      },
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.msg ?? json.message ?? 'Erro ao remover usuário.');
+    }
   },
 };
