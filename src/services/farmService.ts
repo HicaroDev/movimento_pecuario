@@ -1,69 +1,66 @@
+import { supabase } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
-const STORAGE_KEY = 'suplementoControlFarms';
-
-const SEED_FARMS: Farm[] = [
-  {
-    id: 'farm-1',
-    nomeFazenda: 'Fazenda Malhada Grande',
-    nomeResponsavel: '',
-    quantidadeCabecas: 0,
-    endereco: '',
-    telefone: '',
-    email: '',
-    logoUrl: '',
-    active: true,
-    createdAt: new Date('2025-01-01').toISOString(),
-  },
-];
-
-function load(): Farm[] | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Farm[]) : null;
-  } catch { return null; }
+function toFarm(row: Record<string, unknown>): Farm {
+  return {
+    id:                row.id as string,
+    nomeFazenda:       row.nome_fazenda as string,
+    nomeResponsavel:   (row.nome_responsavel as string) ?? undefined,
+    quantidadeCabecas: (row.quantidade_cabecas as number) ?? undefined,
+    endereco:          (row.endereco as string) ?? undefined,
+    telefone:          (row.telefone as string) ?? undefined,
+    email:             (row.email as string) ?? undefined,
+    logoUrl:           (row.logo_url as string) ?? undefined,
+    active:            row.active as boolean,
+    createdAt:         row.created_at as string,
+  };
 }
 
-function save(farms: Farm[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(farms));
+function toRow(d: Partial<Farm>) {
+  return {
+    ...(d.nomeFazenda       !== undefined && { nome_fazenda:       d.nomeFazenda }),
+    ...(d.nomeResponsavel   !== undefined && { nome_responsavel:   d.nomeResponsavel ?? null }),
+    ...(d.quantidadeCabecas !== undefined && { quantidade_cabecas: d.quantidadeCabecas ?? null }),
+    ...(d.endereco          !== undefined && { endereco:           d.endereco ?? null }),
+    ...(d.telefone          !== undefined && { telefone:           d.telefone ?? null }),
+    ...(d.email             !== undefined && { email:              d.email ?? null }),
+    ...(d.logoUrl           !== undefined && { logo_url:           d.logoUrl ?? null }),
+    ...(d.active            !== undefined && { active:             d.active }),
+  };
 }
-
-function init(): Farm[] {
-  const existing = load();
-  if (existing && existing.length > 0) return existing;
-  save(SEED_FARMS);
-  return [...SEED_FARMS];
-}
-
-// API-ready interface — troque por supabase.from('farms') quando vier o backend
 
 export const farmService = {
-  list(): Farm[] {
-    return init();
+  async list(): Promise<Farm[]> {
+    const { data, error } = await supabase
+      .from('farms').select('*').order('nome_fazenda');
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(toFarm);
   },
 
-  findById(id: string): Farm | undefined {
-    return init().find(f => f.id === id);
+  async findById(id: string): Promise<Farm | null> {
+    const { data, error } = await supabase
+      .from('farms').select('*').eq('id', id).maybeSingle();
+    if (error) return null;
+    return data ? toFarm(data) : null;
   },
 
-  create(data: Omit<Farm, 'id' | 'createdAt'>): Farm {
-    const farms = init();
-    const farm: Farm = { ...data, id: Date.now().toString(), createdAt: new Date().toISOString() };
-    save([...farms, farm]);
-    return farm;
+  async create(d: Omit<Farm, 'id' | 'createdAt'>): Promise<Farm> {
+    const { data, error } = await supabase
+      .from('farms').insert({ nome_fazenda: d.nomeFazenda, ...toRow(d) })
+      .select().single();
+    if (error) throw new Error(error.message);
+    return toFarm(data);
   },
 
-  update(id: string, data: Partial<Farm>): Farm {
-    const farms = init();
-    const idx = farms.findIndex(f => f.id === id);
-    if (idx === -1) throw new Error('Fazenda não encontrada.');
-    const updated = { ...farms[idx], ...data };
-    farms[idx] = updated;
-    save(farms);
-    return updated;
+  async update(id: string, d: Partial<Farm>): Promise<Farm> {
+    const { data, error } = await supabase
+      .from('farms').update(toRow(d)).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return toFarm(data);
   },
 
-  remove(id: string): void {
-    save(init().filter(f => f.id !== id));
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('farms').delete().eq('id', id);
+    if (error) throw new Error(error.message);
   },
 };

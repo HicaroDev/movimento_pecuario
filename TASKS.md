@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-02-26
+> Última atualização: 2026-02-27
 
 ## Legenda
 - [ ] Pendente
@@ -113,6 +113,24 @@
 
 ---
 
+## FASE 1.6 — Migração Supabase (CONCLUÍDA ✅)
+
+### Auth Supabase
+- [x] **T-190** `src/lib/supabase.ts` — cliente Supabase (self-hosted EasyPanel: saas-supabase.bj3amt.easypanel.host)
+- [x] **T-191** `src/context/AuthContext.tsx` — login via `supabase.auth.signInWithPassword`, `fetchProfile` lê `profiles` table, `hasModule()`, `farmId` em `AuthUser`
+- [x] **T-192** `src/services/farmService.ts` — CRUD via Supabase `farms` table (list, findById, create, update, delete)
+- [x] **T-193** `src/services/userService.ts` — CRUD via Supabase `profiles` table (list, findById, listByFarm, create, update, remove)
+- [x] **T-194** `supabase/seed.sql` + `scripts/seed.mjs` — seed completo: 2 usuários, 1 fazenda, 19 pastos, 28 data_entries
+
+### Dados Supabase
+- [x] **T-195** `src/context/DataContext.tsx` — removido userService/localStorage; usa Supabase para `data_entries` e `pastures`; admin auto-seleciona primeira fazenda; `AdminFarmSelector` no sidebar
+- [x] **T-196** `src/layouts/DashboardLayout.tsx` — `AdminFarmSelector` com select de fazenda no sidebar (somente admin)
+- [x] **T-197** `src/pages/Formulario.tsx` — removido saveData/localStorage; entrada vai direto ao Supabase via DataContext
+- [x] **T-198** `src/types/user.ts` — `AuthUser` ganha campo `farmId` para clientes
+- [x] **T-199** `/padrao` executado: todos os componentes verificados ✅; `SummaryChart` corrigido (removido `LabelList` para consistência com padrão)
+
+---
+
 ## FASE 2 — SaaS com Backend (PLANEJADA ⬜)
 
 ### 2A — Setup + Fundação
@@ -190,9 +208,10 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1 — Verificações browser | 10 | 0 | [ ] Pendente |
 | 1.5 — Auth + Multi-tenant + Gestão | 16 | 16 | ✅ Concluída |
-| 2A-G — Next.js + Supabase | 35 | 0 | ⬜ Planejada |
+| 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
+| 2A-G — Supabase (em andamento) | 35 | 0 | 🔄 Em andamento |
 | 3 — SaaS Escala | 6 | 0 | ⬜ Futuro |
-| **TOTAL** | **104** | **53** | **51%** |
+| **TOTAL** | **114** | **63** | **55%** |
 
 ---
 

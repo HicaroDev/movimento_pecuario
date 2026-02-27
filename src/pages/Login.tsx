@@ -24,7 +24,7 @@ export function Login() {
     setError('');
     setLoading(true);
     await new Promise(r => setTimeout(r, 150));
-    const ok = login(data.email, data.password);
+    const ok = await login(data.email, data.password);
     setLoading(false);
     if (ok) {
       navigate('/');

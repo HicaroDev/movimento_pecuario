@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -23,6 +23,7 @@ function FarmModal({ editing, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const [logoPreview, setLogoPreview] = useState(editing?.logoUrl || '');
+  const [saving, setSaving] = useState(false);
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<Farm>({
     defaultValues: editing || { active: true },
   });
@@ -40,20 +41,23 @@ function FarmModal({ editing, onClose, onSaved }: {
     reader.readAsDataURL(file);
   }
 
-  function onSubmit(data: Farm) {
+  async function onSubmit(data: Farm) {
+    setSaving(true);
     try {
       const payload = { ...data, logoUrl: logoPreview };
       if (editing) {
-        farmService.update(editing.id, payload);
+        await farmService.update(editing.id, payload);
         toast.success('Fazenda atualizada!');
       } else {
-        farmService.create({ ...payload, active: data.active ?? true });
+        await farmService.create({ ...payload, active: data.active ?? true });
         toast.success('Fazenda cadastrada!', { description: data.nomeFazenda });
       }
       onSaved();
       onClose();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erro ao salvar.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -140,7 +144,6 @@ function FarmModal({ editing, onClose, onSaved }: {
               </div>
             </div>
 
-            {/* Status */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-200">
               <div>
                 <p className="text-sm font-medium text-gray-800">Fazenda ativa</p>
@@ -153,7 +156,6 @@ function FarmModal({ editing, onClose, onSaved }: {
                 </div>
               </label>
             </div>
-
           </div>
 
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
@@ -161,10 +163,10 @@ function FarmModal({ editing, onClose, onSaved }: {
               className="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-600 hover:bg-white transition-colors">
               Cancelar
             </button>
-            <button type="submit"
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
               <Save className="w-4 h-4" />
-              {editing ? 'Salvar alterações' : 'Cadastrar fazenda'}
+              {saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar fazenda'}
             </button>
           </div>
         </form>
@@ -180,19 +182,27 @@ function FarmCard({ farm, onEdit, onRefresh }: {
   onEdit: (f: Farm) => void;
   onRefresh: () => void;
 }) {
-  const usersCount = userService.listByFarm(farm.id).length;
+  const [usersCount, setUsersCount] = useState(0);
 
-  function toggleActive() {
-    farmService.update(farm.id, { active: !farm.active });
-    onRefresh();
-    toast.success(farm.active ? 'Fazenda desativada.' : 'Fazenda ativada.');
+  useEffect(() => {
+    userService.listByFarm(farm.id).then(users => setUsersCount(users.length));
+  }, [farm.id]);
+
+  async function toggleActive() {
+    try {
+      await farmService.update(farm.id, { active: !farm.active });
+      onRefresh();
+      toast.success(farm.active ? 'Fazenda desativada.' : 'Fazenda ativada.');
+    } catch { toast.error('Erro ao atualizar fazenda.'); }
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!window.confirm(`Excluir a fazenda "${farm.nomeFazenda}"?\n\nAtenção: os usuários vinculados perderão o acesso.`)) return;
-    farmService.remove(farm.id);
-    onRefresh();
-    toast.success('Fazenda removida.');
+    try {
+      await farmService.remove(farm.id);
+      onRefresh();
+      toast.success('Fazenda removida.');
+    } catch { toast.error('Erro ao remover fazenda.'); }
   }
 
   return (
@@ -211,17 +221,12 @@ function FarmCard({ farm, onEdit, onRefresh }: {
             )}
             <div className="min-w-0">
               <h3 className="text-base font-bold text-gray-900 truncate">{farm.nomeFazenda}</h3>
-              {farm.nomeResponsavel && (
-                <p className="text-xs text-gray-500 truncate">{farm.nomeResponsavel}</p>
-              )}
+              {farm.nomeResponsavel && <p className="text-xs text-gray-500 truncate">{farm.nomeResponsavel}</p>}
             </div>
           </div>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${farm.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-              {farm.active ? '● Ativo' : '○ Inativo'}
-            </span>
-          </div>
+          <span className={`text-[10px] font-medium px-2 py-1 rounded-full flex-shrink-0 ${farm.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+            {farm.active ? '● Ativo' : '○ Inativo'}
+          </span>
         </div>
 
         <div className="space-y-1.5 mb-4">
@@ -277,18 +282,14 @@ function FarmCard({ farm, onEdit, onRefresh }: {
 
 /* ─────────────── View do cliente (read-only) ─────────────── */
 
-function MyFarmView({ farmId }: { farmId: string }) {
-  const farm = farmService.findById(farmId);
-
-  if (!farm) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
-        <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-500 font-medium">Fazenda não vinculada</p>
-        <p className="text-xs text-gray-400 mt-1">Entre em contato com o administrador.</p>
-      </div>
-    );
-  }
+function MyFarmView({ farm }: { farm: Farm | null }) {
+  if (!farm) return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
+      <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+      <p className="text-gray-500 font-medium">Fazenda não vinculada</p>
+      <p className="text-xs text-gray-400 mt-1">Entre em contato com o administrador.</p>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -312,24 +313,9 @@ function MyFarmView({ farmId }: { farmId: string }) {
             <span><span className="font-semibold">{farm.quantidadeCabecas.toLocaleString('pt-BR')}</span> cabeças</span>
           </div>
         ) : null}
-        {farm.endereco && (
-          <div className="flex items-center gap-2 text-gray-700">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <span>{farm.endereco}</span>
-          </div>
-        )}
-        {farm.telefone && (
-          <div className="flex items-center gap-2 text-gray-700">
-            <Phone className="w-4 h-4 text-gray-400" />
-            <span>{farm.telefone}</span>
-          </div>
-        )}
-        {farm.email && (
-          <div className="flex items-center gap-2 text-gray-700">
-            <Mail className="w-4 h-4 text-gray-400" />
-            <span>{farm.email}</span>
-          </div>
-        )}
+        {farm.endereco && <div className="flex items-center gap-2 text-gray-700"><MapPin className="w-4 h-4 text-gray-400" /><span>{farm.endereco}</span></div>}
+        {farm.telefone && <div className="flex items-center gap-2 text-gray-700"><Phone className="w-4 h-4 text-gray-400" /><span>{farm.telefone}</span></div>}
+        {farm.email    && <div className="flex items-center gap-2 text-gray-700"><Mail  className="w-4 h-4 text-gray-400" /><span>{farm.email}</span></div>}
       </div>
     </div>
   );
@@ -339,64 +325,72 @@ function MyFarmView({ farmId }: { farmId: string }) {
 
 export function Fazendas() {
   const { user, isAdmin } = useAuth();
-  const [farms, setFarms]         = useState<Farm[]>(() => farmService.list());
+  const [farms, setFarms]         = useState<Farm[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Farm | null>(null);
+  const [myFarm, setMyFarm]       = useState<Farm | null>(null);
 
-  function refresh() { setFarms(farmService.list()); }
+  async function refresh() { setFarms(await farmService.list()); }
+
+  useEffect(() => { refresh(); }, []);
+
+  // Carrega fazenda do cliente
+  useEffect(() => {
+    if (!isAdmin && user?.id) {
+      userService.findById(user.id).then(profile => {
+        if (profile?.farmId) farmService.findById(profile.farmId).then(setMyFarm);
+      });
+    }
+  }, [user?.id, isAdmin]);
+
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(f: Farm) { setEditing(f); setModalOpen(true); }
   function closeModal() { setModalOpen(false); setEditing(null); }
 
   /* ── Admin view ── */
-  if (isAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-          className="max-w-5xl mx-auto">
+  if (isAdmin) return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+        className="max-w-5xl mx-auto">
 
-          <div className="mb-8 flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">Fazendas</h1>
-              <p className="text-sm text-gray-500">
-                {farms.filter(f => f.active).length} ativa{farms.filter(f => f.active).length !== 1 ? 's' : ''}
-                {' '}· {farms.length} total
-              </p>
-            </div>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">Fazendas</h1>
+            <p className="text-sm text-gray-500">
+              {farms.filter(f => f.active).length} ativa{farms.filter(f => f.active).length !== 1 ? 's' : ''}
+              {' '}· {farms.length} total
+            </p>
+          </div>
+          <button onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
+            <Plus className="w-4 h-4" /> Nova Fazenda
+          </button>
+        </div>
+
+        {farms.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-20 text-center">
+            <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">Nenhuma fazenda cadastrada</p>
             <button onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
-              <Plus className="w-4 h-4" /> Nova Fazenda
+              className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold mx-auto hover:bg-teal-700 transition-colors">
+              <Plus className="w-4 h-4" /> Cadastrar primeira fazenda
             </button>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {farms.map(f => <FarmCard key={f.id} farm={f} onEdit={openEdit} onRefresh={refresh} />)}
+          </div>
+        )}
+      </motion.div>
 
-          {farms.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-20 text-center">
-              <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">Nenhuma fazenda cadastrada</p>
-              <button onClick={openCreate}
-                className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold mx-auto hover:bg-teal-700 transition-colors">
-                <Plus className="w-4 h-4" /> Cadastrar primeira fazenda
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {farms.map(f => (
-                <FarmCard key={f.id} farm={f} onEdit={openEdit} onRefresh={refresh} />
-              ))}
-            </div>
-          )}
-        </motion.div>
-
-        <AnimatePresence>
-          {modalOpen && <FarmModal editing={editing} onClose={closeModal} onSaved={refresh} />}
-        </AnimatePresence>
-      </div>
-    );
-  }
+      <AnimatePresence>
+        {modalOpen && <FarmModal editing={editing} onClose={closeModal} onSaved={refresh} />}
+      </AnimatePresence>
+    </div>
+  );
 
   /* ── Client view ── */
-  const farmId = userService.findById(user?.id || '')?.farmId || '';
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
@@ -405,7 +399,7 @@ export function Fazendas() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Minha Fazenda</h1>
         </div>
-        <MyFarmView farmId={farmId} />
+        <MyFarmView farm={myFarm} />
       </motion.div>
     </div>
   );

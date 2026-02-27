@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { DataEntry } from '../lib/data';
-import { loadData, sampleRows } from '../lib/data';
+import { sampleRows } from '../lib/data';
 import { useAuth } from './AuthContext';
-import { userService } from '../services/userService';
 import { farmService } from '../services/farmService';
+import { supabase } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
 /* ── Types ── */
@@ -15,72 +15,31 @@ export interface Pasture {
   observacoes?: string;
 }
 
-// ClientInfo agora é Farm (dados da fazenda ativa)
 export type ClientInfo = Farm;
 
-/* ── Default pastures (Fazenda Malhada Grande, id='2') ── */
-const defaultPastures: Pasture[] = [
-  { id: '1',  nome: 'Cana' },
-  { id: '2',  nome: 'Tamboril' },
-  { id: '3',  nome: 'Sujo 1' },
-  { id: '4',  nome: 'Mama de Baixo Piquete 1' },
-  { id: '5',  nome: 'Mama de Baixo Piquete 2' },
-  { id: '6',  nome: 'Palhadão do Meio' },
-  { id: '7',  nome: 'Rio do Ouro de Baixo' },
-  { id: '8',  nome: 'Rio do Ouro de Cima' },
-  { id: '9',  nome: 'Pequi 2' },
-  { id: '10', nome: 'João Jacinto de Cima' },
-  { id: '11', nome: 'Da Maternidade' },
-  { id: '12', nome: 'Ponte Cima' },
-  { id: '13', nome: 'Luizinho' },
-  { id: '14', nome: 'Boiada Gorda' },
-  { id: '15', nome: 'Divaldo' },
-  { id: '16', nome: 'Pasto do Braquiarão' },
-  { id: '17', nome: 'João Jacinto de Baixo' },
-  { id: '18', nome: 'Tucuzão Braquiára' },
-  { id: '19', nome: 'Da Pedra' },
-];
+/* ── Helpers de mapeamento ── */
 
-/* ── Per-farm storage helpers (entries & pastures only) ── */
-
-function jsonLoad<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch { return null; }
+function toDataEntry(row: Record<string, unknown>): DataEntry {
+  return {
+    id:         row.id as string,
+    data:       row.data as string,
+    pasto:      (row.pasto_nome as string) ?? '',
+    quantidade: row.quantidade as number,
+    tipo:       row.suplemento as string,
+    periodo:    row.periodo as number,
+    sacos:      (row.sacos as number) ?? 0,
+    kg:         row.kg as number,
+    consumo:    row.consumo as number,
+  };
 }
 
-function jsonSave(key: string, value: unknown): void {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
-}
-
-function loadEntriesFarm(farmId: string): DataEntry[] {
-  const perFarm = jsonLoad<{ rows: DataEntry[] }>(`suplementoControlData_${farmId}`);
-  if (perFarm?.rows?.length) return perFarm.rows;
-  if (farmId === '2') {
-    const legacy = loadData();
-    if (legacy?.length) return legacy;
-  }
-  return farmId === '2' ? sampleRows : [];
-}
-
-function saveEntriesFarm(farmId: string, entries: DataEntry[]): void {
-  jsonSave(`suplementoControlData_${farmId}`, { rows: entries, updatedAt: new Date().toISOString() });
-}
-
-function loadPasturesFarm(farmId: string): Pasture[] {
-  const perFarm = jsonLoad<Pasture[]>(`suplementoControlPastures_${farmId}`);
-  if (perFarm?.length) return perFarm;
-  if (farmId === '2') {
-    const legacy = jsonLoad<Pasture[]>('suplementoControlPastures');
-    if (legacy?.length) return legacy;
-    return defaultPastures;
-  }
-  return [];
-}
-
-function savePasturesFarm(farmId: string, pastures: Pasture[]): void {
-  jsonSave(`suplementoControlPastures_${farmId}`, pastures);
+function toPasture(row: Record<string, unknown>): Pasture {
+  return {
+    id:          row.id as string,
+    nome:        row.nome as string,
+    area:        (row.area as number) ?? undefined,
+    observacoes: (row.observacoes as string) ?? undefined,
+  };
 }
 
 /* ── Context type ── */
@@ -93,7 +52,6 @@ interface DataContextType {
   removeEntry: (index: number) => void;
   clearAll: () => void;
   loadSample: () => void;
-  /* clientInfo agora vem do userService.fazenda */
   clientInfo: ClientInfo | null;
   updateClientInfo: (info: ClientInfo) => void;
   pastures: Pasture[];
@@ -109,50 +67,51 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
 
-  const initialFarmId = (() => {
-    if (!user) return '';
-    if (!isAdmin) {
-      // cliente: usar o farmId vinculado ao usuário
-      return userService.findById(user.id)?.farmId || '';
-    }
-    return localStorage.getItem('suplementoControlActiveFarm') || 'farm-1';
-  })();
+  const [activeFarmId, setActiveFarmId] = useState<string>('');
+  const [entries,      setEntries]      = useState<DataEntry[]>([]);
+  const [pastures,     setPastures]     = useState<Pasture[]>([]);
+  const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
 
-  const [activeFarmId, setActiveFarmId] = useState<string>(initialFarmId);
-  const [entries,   setEntries]   = useState<DataEntry[]>(() => activeFarmId ? loadEntriesFarm(activeFarmId)  : []);
-  const [pastures,  setPastures]  = useState<Pasture[]>(()   => activeFarmId ? loadPasturesFarm(activeFarmId) : []);
-
-  /* clientInfo vem do farmService — fonte única de verdade */
-  const getFarmInfo = (farmId: string): ClientInfo | null =>
-    farmService.findById(farmId) ?? null;
-
-  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(() =>
-    activeFarmId ? getFarmInfo(activeFarmId) : null
-  );
-
-  /* Sync on user change */
+  /* Determina a fazenda ativa ao logar */
   useEffect(() => {
     if (!user) { setActiveFarmId(''); return; }
+
+    // Cliente: usa o farmId já presente no perfil (vem do AuthContext)
     if (!isAdmin) {
-      const fid = userService.findById(user.id)?.farmId || '';
-      setActiveFarmId(fid);
+      setActiveFarmId(user.farmId || '');
       return;
     }
+
+    // Admin: restaura da sessão ou auto-seleciona a primeira fazenda
     const saved = localStorage.getItem('suplementoControlActiveFarm');
-    if (saved) setActiveFarmId(saved);
-  }, [user?.id, isAdmin]);
+    if (saved) {
+      setActiveFarmId(saved);
+    } else {
+      farmService.list().then(farms => {
+        if (farms.length > 0) {
+          setActiveFarmId(farms[0].id);
+          localStorage.setItem('suplementoControlActiveFarm', farms[0].id);
+        }
+      });
+    }
+  }, [user?.id, user?.farmId, isAdmin]);
 
-  /* Reload when farm changes */
+  /* Carrega dados quando a fazenda muda */
   useEffect(() => {
-    if (!activeFarmId) return;
-    setEntries(loadEntriesFarm(activeFarmId));
-    setPastures(loadPasturesFarm(activeFarmId));
-    setClientInfo(getFarmInfo(activeFarmId));
+    if (!activeFarmId) {
+      setEntries([]); setPastures([]); setClientInfo(null);
+      return;
+    }
+    Promise.all([
+      supabase.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
+      supabase.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
+      farmService.findById(activeFarmId),
+    ]).then(([entriesRes, pasturesRes, farm]) => {
+      setEntries((entriesRes.data ?? []).map(toDataEntry));
+      setPastures((pasturesRes.data ?? []).map(toPasture));
+      setClientInfo(farm);
+    });
   }, [activeFarmId]);
-
-  /* Auto-persist entries & pastures (clientInfo é gerido pelo farmService) */
-  useEffect(() => { if (activeFarmId) saveEntriesFarm(activeFarmId, entries); }, [entries, activeFarmId]);
-  useEffect(() => { if (activeFarmId) savePasturesFarm(activeFarmId, pastures); }, [pastures, activeFarmId]);
 
   function selectFarm(farmId: string) {
     if (!isAdmin) return;
@@ -160,27 +119,84 @@ export function DataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('suplementoControlActiveFarm', farmId);
   }
 
-  /* clientInfo é salvo via farmService */
   function updateClientInfo(info: ClientInfo) {
     if (!activeFarmId) return;
-    const updated = farmService.update(activeFarmId, info);
-    setClientInfo(updated);
+    farmService.update(activeFarmId, info).then(updated => setClientInfo(updated));
   }
 
-  /* Entries */
-  const addEntry    = (e: DataEntry) => setEntries(prev => [...prev, e]);
-  const removeEntry = (i: number)    => setEntries(prev => prev.filter((_, idx) => idx !== i));
-  const clearAll    = () => {
-    setEntries([]);
-    if (activeFarmId) localStorage.removeItem(`suplementoControlData_${activeFarmId}`);
-  };
-  const loadSample = () => setEntries(sampleRows);
+  /* ── Entries ── */
+  function addEntry(entry: DataEntry) {
+    const tempId = `temp-${Date.now()}`;
+    setEntries(prev => [...prev, { ...entry, id: tempId }]);
+    supabase.from('data_entries').insert({
+      farm_id:   activeFarmId,
+      data:      entry.data || new Date().toISOString().split('T')[0],
+      pasto_nome: entry.pasto,
+      suplemento: entry.tipo,
+      quantidade: entry.quantidade,
+      periodo:    entry.periodo,
+      sacos:      entry.sacos,
+      kg:         entry.kg,
+      consumo:    entry.consumo,
+    }).select().single().then(({ data, error }) => {
+      if (data) setEntries(prev => prev.map(e => e.id === tempId ? toDataEntry(data) : e));
+      if (error) setEntries(prev => prev.filter(e => e.id !== tempId));
+    });
+  }
 
-  /* Pastures */
-  const addPasture    = (p: Omit<Pasture, 'id'>) => setPastures(prev => [...prev, { ...p, id: Date.now().toString() }]);
-  const deletePasture = (id: string) => setPastures(prev => prev.filter(p => p.id !== id));
-  const updatePasture = (id: string, data: Partial<Pasture>) =>
-    setPastures(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  function removeEntry(index: number) {
+    const entry = entries[index];
+    setEntries(prev => prev.filter((_, i) => i !== index));
+    if (entry?.id && !entry.id.startsWith('temp-')) {
+      supabase.from('data_entries').delete().eq('id', entry.id);
+    }
+  }
+
+  function clearAll() {
+    setEntries([]);
+    if (activeFarmId) supabase.from('data_entries').delete().eq('farm_id', activeFarmId);
+  }
+
+  function loadSample() {
+    const today = new Date().toISOString().split('T')[0];
+    const rows = sampleRows.map(r => ({
+      farm_id: activeFarmId, data: today,
+      pasto_nome: r.pasto, suplemento: r.tipo,
+      quantidade: r.quantidade, periodo: r.periodo,
+      sacos: r.sacos, kg: r.kg, consumo: r.consumo,
+    }));
+    setEntries(sampleRows.map((r, i) => ({ ...r, id: `temp-sample-${i}` })));
+    supabase.from('data_entries').insert(rows).select().then(({ data }) => {
+      if (data) setEntries(data.map(toDataEntry));
+    });
+  }
+
+  /* ── Pastures ── */
+  function addPasture(p: Omit<Pasture, 'id'>) {
+    const tempId = `temp-${Date.now()}`;
+    setPastures(prev => [...prev, { ...p, id: tempId }]);
+    supabase.from('pastures').insert({
+      farm_id: activeFarmId, nome: p.nome,
+      area: p.area ?? null, observacoes: p.observacoes ?? null,
+    }).select().single().then(({ data, error }) => {
+      if (data) setPastures(prev => prev.map(x => x.id === tempId ? toPasture(data) : x));
+      if (error) setPastures(prev => prev.filter(x => x.id !== tempId));
+    });
+  }
+
+  function deletePasture(id: string) {
+    setPastures(prev => prev.filter(p => p.id !== id));
+    supabase.from('pastures').delete().eq('id', id);
+  }
+
+  function updatePasture(id: string, patch: Partial<Pasture>) {
+    setPastures(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    supabase.from('pastures').update({
+      ...(patch.nome        !== undefined && { nome:        patch.nome }),
+      ...(patch.area        !== undefined && { area:        patch.area ?? null }),
+      ...(patch.observacoes !== undefined && { observacoes: patch.observacoes ?? null }),
+    }).eq('id', id);
+  }
 
   return (
     <DataContext.Provider value={{

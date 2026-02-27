@@ -1,4 +1,6 @@
 export interface DataEntry {
+  id?: string;     // UUID do Supabase
+  data?: string;   // YYYY-MM-DD
   pasto: string;
   quantidade: number;
   tipo: string;

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
 import { Leaf, Plus, Trash2, Pencil, Save, X, ChevronDown, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { userService } from '../services/userService';
+import { farmService } from '../services/farmService';
 import type { Pasture } from '../context/DataContext';
 
 const inputClass =
@@ -22,7 +22,13 @@ interface PastureForm {
 
 function FarmSelector() {
   const { activeFarmId, selectFarm } = useData();
-  const farms = userService.list().filter(u => u.active && u.role === 'client');
+  const [farms, setFarms] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    farmService.list().then(list =>
+      setFarms(list.filter(f => f.active).map(f => ({ id: f.id, name: f.nomeFazenda })))
+    );
+  }, []);
 
   return (
     <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
@@ -89,6 +95,7 @@ export function Pastos() {
   const { isAdmin, user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [farmName, setFarmName] = useState<string>(user?.name || '—');
 
   const {
     register,
@@ -98,10 +105,11 @@ export function Pastos() {
   } = useForm<PastureForm>();
 
   // Farm name for display
-  const activeFarm = isAdmin
-    ? userService.findById(activeFarmId)
-    : userService.findById(user?.id || '');
-  const farmName = activeFarm?.name || user?.name || '—';
+  useEffect(() => {
+    const id = isAdmin ? activeFarmId : (user?.id || '');
+    if (!id) return;
+    farmService.findById(id).then(f => setFarmName(f?.nomeFazenda || user?.name || '—'));
+  }, [activeFarmId, isAdmin, user?.id, user?.name]);
 
   function onAdd(data: PastureForm) {
     addPasture(data);

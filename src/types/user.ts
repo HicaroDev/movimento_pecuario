@@ -19,4 +19,5 @@ export interface AuthUser {
   email: string;
   role: Role;
   modules: Module[];
+  farmId?: string;
 }

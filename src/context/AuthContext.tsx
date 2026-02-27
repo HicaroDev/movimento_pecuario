@@ -1,62 +1,71 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { AuthUser, Module } from '../types/user';
-import { userService } from '../services/userService';
+import { supabase } from '../lib/supabase';
 
 export type { Role, Module } from '../types/user';
 export type { AuthUser } from '../types/user';
 
-const STORAGE_KEY = 'suplementoControlAuth';
-
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAdmin: boolean;
   hasModule: (m: Module) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function fetchProfile(userId: string): Promise<AuthUser | null> {
+  const { data, error } = await supabase
+    .from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error || !data || !data.active) return null;
+  return {
+    id:      data.id,
+    name:    data.name,
+    email:   data.email ?? '',
+    role:    data.role,
+    modules: data.modules ?? [],
+    farmId:  data.farm_id ?? undefined,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return null;
-      const parsed = JSON.parse(stored) as AuthUser;
-      // Migração: re-enriquecer sempre que a lista de módulos mudar (ex: renomear 'cliente'→'fazendas')
-      const currentModules = ['relatorio', 'formulario', 'pastos', 'fazendas', 'usuarios'];
-      const needsRefresh = !parsed.modules
-        || parsed.modules.includes('cliente' as never)
-        || currentModules.some(m => !parsed.modules.includes(m as never));
-      if (needsRefresh) {
-        const fresh = userService.findByEmail(parsed.email);
-        if (!fresh || !fresh.active) return null;
-        const { password: _pw, ...authUser } = fresh;
-        return authUser;
-      }
-      return parsed;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser]       = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [user]);
+    // Sessão inicial
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setUser(profile);
+      }
+      setLoading(false);
+    });
 
-  function login(email: string, password: string): boolean {
-    const found = userService.findByEmail(email);
-    if (!found || found.password !== password || !found.active) return false;
-    const { password: _pw, ...authUser } = found;
-    setUser(authUser);
-    return true;
+    // Escuta mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          setUser(profile);
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function login(email: string, password: string): Promise<boolean> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return !error;
   }
 
-  function logout() {
+  async function logout(): Promise<void> {
+    await supabase.auth.signOut();
     setUser(null);
   }
 
@@ -66,9 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
+      user, loading,
+      login, logout,
       isAdmin: user?.role === 'admin',
       hasModule,
     }}>

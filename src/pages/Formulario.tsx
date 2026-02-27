@@ -1,11 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, Save } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
 import type { DataEntry } from '../lib/data';
-import { supplementOrder, saveData } from '../lib/data';
+import { supplementOrder } from '../lib/data';
 import { fmt, fmtInt } from '../lib/utils';
 
 interface FormFields {
@@ -51,11 +51,6 @@ export function Formulario() {
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
     reset({ periodo: 30 });
-  };
-
-  const handleSave = () => {
-    saveData(entries);
-    toast.success('Dados salvos!', { description: `${entries.length} registros no localStorage.` });
   };
 
   const handleClearAll = () => {
@@ -228,15 +223,6 @@ export function Formulario() {
                 className="px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Limpar Tudo
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={entries.length === 0}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
-              >
-                <Save className="w-4 h-4" />
-                Salvar
               </button>
             </div>
           </div>
