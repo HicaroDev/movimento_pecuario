@@ -7,9 +7,8 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY são obrigatórios no .env.local');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    // Desabilita o navigator.locks para evitar deadlock entre instâncias
-    lock: <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn(),
-  },
-});
+// navigator.locks reativado — coordena renovação de token entre abas.
+// O deadlock anterior era causado por dois GoTrueClient simultâneos
+// (adminClient + supabase). Como o adminClient foi removido e as
+// operações admin usam fetch() direto, não há mais risco de deadlock.
+export const supabase = createClient(supabaseUrl, supabaseKey);

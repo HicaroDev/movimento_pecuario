@@ -122,11 +122,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [activeFarmId]);
 
   /* Carrega dados quando a fazenda muda ou ao voltar ao foco */
+  const prevFarmRef = useRef<string>('');
   useEffect(() => {
-    // Limpa imediatamente para não exibir dados da fazenda anterior
-    setEntries([]); setPastures([]); setClientInfo(null);
+    const farmChanged = prevFarmRef.current !== activeFarmId;
+    prevFarmRef.current = activeFarmId;
 
-    if (!activeFarmId) return;
+    if (!activeFarmId) {
+      setEntries([]); setPastures([]); setClientInfo(null);
+      return;
+    }
+
+    // Só limpa os dados quando a FAZENDA mudou.
+    // Em refresh de background (refreshTick), mantém dados visíveis enquanto recarrega.
+    if (farmChanged) {
+      setEntries([]); setPastures([]); setClientInfo(null);
+    }
 
     setLoading(true);
     let cancelled = false;
@@ -136,7 +146,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
-      if (cancelled) return; // fazenda mudou novamente — descarta resposta stale
+      if (cancelled) return;
       setEntries((entriesRes.data ?? []).map(toDataEntry));
       setPastures((pasturesRes.data ?? []).map(toPasture));
       setClientInfo(farm);
