@@ -10,10 +10,11 @@ RUN npm ci
 
 COPY . .
 
-COPY nginx.conf /etc/nginx/http.d/default.conf
+# Substitui o nginx.conf completo (events + http + server)
+COPY nginx.conf /etc/nginx/nginx.conf
+
 RUN mkdir -p /usr/share/nginx/html /run/nginx
 
 EXPOSE 80
 
-# CMD inline — sem script externo (evita problema de CRLF)
 CMD sh -c "npm run build && cp -r /app/dist/* /usr/share/nginx/html/ && nginx -g 'daemon off;'"
