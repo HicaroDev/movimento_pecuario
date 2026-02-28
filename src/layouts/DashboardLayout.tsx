@@ -74,7 +74,7 @@ export function DashboardLayout() {
     >
       {/* Sidebar — glassmorphism claro */}
       <aside
-        className="w-64 flex flex-col flex-shrink-0 relative"
+        className="w-64 flex flex-col flex-shrink-0 relative no-print"
         style={{
           background: 'rgba(255, 255, 255, 0.80)',
           backdropFilter: 'blur(24px)',
@@ -202,7 +202,7 @@ export function DashboardLayout() {
       {/* Main */}
       <main
         className="flex-1 overflow-auto"
-        style={{ background: 'rgba(248,250,252,0.85)' }}
+        style={{ background: '#f8fafc' }}
       >
         <Outlet />
       </main>
