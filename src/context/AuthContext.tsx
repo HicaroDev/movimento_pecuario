@@ -56,7 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Renova sessão quando o tab volta ao foco (evita expiração em idle)
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.refreshSession();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
   }, []);
 
   async function login(email: string, password: string): Promise<boolean> {

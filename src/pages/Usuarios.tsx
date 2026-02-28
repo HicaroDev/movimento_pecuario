@@ -308,6 +308,7 @@ export function Usuarios() {
   const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<FarmUser | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Cliente: dados da sua fazenda
   const [farmUsers, setFarmUsers] = useState<FarmUser[]>([]);
@@ -318,6 +319,15 @@ export function Usuarios() {
     setUsers(await userService.list());
     setLoading(false);
   }
+
+  // Recarrega quando o tab volta ao foco
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setRefreshTick(t => t + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   useEffect(() => {
     if (isAdmin) {
@@ -339,7 +349,7 @@ export function Usuarios() {
         }
       });
     }
-  }, [user?.id, isAdmin]);
+  }, [user?.id, isAdmin, refreshTick]);
 
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(u: FarmUser) { setEditing(u); setModalOpen(true); }

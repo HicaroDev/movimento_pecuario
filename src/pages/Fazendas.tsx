@@ -331,6 +331,7 @@ export function Fazendas() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Farm | null>(null);
   const [myFarm, setMyFarm]       = useState<Farm | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   async function refresh() {
     setLoading(true);
@@ -338,7 +339,16 @@ export function Fazendas() {
     setLoading(false);
   }
 
-  useEffect(() => { refresh(); }, []);
+  // Recarrega quando o tab volta ao foco
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setRefreshTick(t => t + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refreshTick]);
 
   // Carrega fazenda do cliente
   useEffect(() => {

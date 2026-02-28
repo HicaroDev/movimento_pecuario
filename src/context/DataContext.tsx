@@ -73,6 +73,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [entries,      setEntries]      = useState<DataEntry[]>([]);
   const [pastures,     setPastures]     = useState<Pasture[]>([]);
   const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
+  const [refreshTick,  setRefreshTick]  = useState(0);
 
   /* Determina a fazenda ativa ao logar */
   useEffect(() => {
@@ -98,7 +99,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, user?.farmId, isAdmin]);
 
-  /* Carrega dados quando a fazenda muda */
+  /* Recarrega quando o tab volta ao foco */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && activeFarmId) {
+        setRefreshTick(t => t + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [activeFarmId]);
+
+  /* Carrega dados quando a fazenda muda ou ao voltar ao foco */
   useEffect(() => {
     // Limpa imediatamente para não exibir dados da fazenda anterior
     setEntries([]); setPastures([]); setClientInfo(null);
@@ -121,7 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
 
     return () => { cancelled = true; };
-  }, [activeFarmId]);
+  }, [activeFarmId, refreshTick]);
 
   function selectFarm(farmId: string) {
     if (!isAdmin) return;
