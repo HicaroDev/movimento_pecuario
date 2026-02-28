@@ -21,14 +21,19 @@ interface PastureForm {
 
 /* ─────────────── Farm selector for admin ─────────────── */
 
+// Cache de módulo — persiste entre remounts (HMR / navegação)
+let _farmSelectorCache: { id: string; name: string }[] = [];
+
 function FarmSelector() {
   const { activeFarmId, selectFarm } = useData();
-  const [farms, setFarms] = useState<{ id: string; name: string }[]>([]);
+  const [farms, setFarms] = useState<{ id: string; name: string }[]>(_farmSelectorCache);
 
   useEffect(() => {
-    farmService.list().then(list =>
-      setFarms(list.filter(f => f.active).map(f => ({ id: f.id, name: f.nomeFazenda })))
-    );
+    farmService.list().then(list => {
+      const active = list.filter(f => f.active).map(f => ({ id: f.id, name: f.nomeFazenda }));
+      _farmSelectorCache = active;
+      setFarms(active);
+    });
   }, []);
 
   return (
