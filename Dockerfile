@@ -10,7 +10,7 @@ RUN npm ci
 
 COPY . .
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/http.d/default.conf
 RUN mkdir -p /usr/share/nginx/html /run/nginx
 
 EXPOSE 80
