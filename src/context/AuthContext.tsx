@@ -46,10 +46,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Escuta mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        // TOKEN_REFRESHED apenas renova o JWT — não muda o perfil.
+        // Ignorar evita que outras abas abertas percam os dados ao troca de aba.
+        if (event === 'TOKEN_REFRESHED') return;
+
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          setUser(profile);
+          // Só atualiza se o usuário realmente mudou
+          setUser(prev => (prev?.id === profile?.id ? prev : profile));
         } else {
           setUser(null);
         }

@@ -81,19 +81,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     // Cliente: usa o farmId já presente no perfil (vem do AuthContext)
     if (!isAdmin) {
-      setActiveFarmId(user.farmId || '');
+      // Só atualiza se realmente mudou — evita reload desnecessário em troca de aba
+      setActiveFarmId(prev => (prev === (user.farmId || '') ? prev : user.farmId || ''));
       return;
     }
 
     // Admin: restaura da sessão ou auto-seleciona a primeira fazenda
     const saved = localStorage.getItem('suplementoControlActiveFarm');
     if (saved) {
-      setActiveFarmId(saved);
+      // Só atualiza se realmente mudou
+      setActiveFarmId(prev => (prev === saved ? prev : saved));
     } else {
       farmService.list().then(farms => {
         if (farms.length > 0) {
-          setActiveFarmId(farms[0].id);
-          localStorage.setItem('suplementoControlActiveFarm', farms[0].id);
+          setActiveFarmId(prev => {
+            if (prev === farms[0].id) return prev;
+            localStorage.setItem('suplementoControlActiveFarm', farms[0].id);
+            return farms[0].id;
+          });
         }
       });
     }
