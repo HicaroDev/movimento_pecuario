@@ -151,6 +151,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setPastures((pasturesRes.data ?? []).map(toPasture));
       setClientInfo(farm);
       setLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      // Falha de rede — libera o loading para não travar a tela
+      setLoading(false);
     });
 
     return () => { cancelled = true; };
