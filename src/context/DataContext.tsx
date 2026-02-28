@@ -69,7 +69,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
 
   const [activeFarmId, setActiveFarmId] = useState<string>('');
-  const [loading,      setLoading]      = useState(false);
+  const [loading,      setLoading]      = useState(true);
   const [entries,      setEntries]      = useState<DataEntry[]>([]);
   const [pastures,     setPastures]     = useState<Pasture[]>([]);
   const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
@@ -99,6 +99,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('suplementoControlActiveFarm', farms[0].id);
             return farms[0].id;
           });
+        } else {
+          setLoading(false); // Admin sem fazendas cadastradas
         }
       });
     }
@@ -129,6 +131,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (!activeFarmId) {
       setEntries([]); setPastures([]); setClientInfo(null);
+      // Libera o loading se deslogou ou se o cliente não tem fazenda atribuída
+      if (!user || (!isAdmin && !user.farmId)) setLoading(false);
       return;
     }
 
