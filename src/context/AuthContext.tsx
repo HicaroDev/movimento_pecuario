@@ -56,10 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Renova sessão quando o tab volta ao foco (evita expiração em idle)
+    // Renova sessão apenas se tab ficou oculto 30+ segundos
+    let hiddenAt: number | null = null;
     const handleVisible = () => {
-      if (document.visibilityState === 'visible') {
-        supabase.auth.refreshSession();
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+      } else if (document.visibilityState === 'visible') {
+        const elapsed = hiddenAt ? Date.now() - hiddenAt : 0;
+        if (elapsed > 30_000) supabase.auth.refreshSession();
+        hiddenAt = null;
       }
     };
     document.addEventListener('visibilitychange', handleVisible);

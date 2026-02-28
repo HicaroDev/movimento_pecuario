@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -320,13 +320,21 @@ export function Usuarios() {
     setLoading(false);
   }
 
-  // Recarrega quando o tab volta ao foco
+  // Recarrega apenas se tab ficou oculto 30+ segundos
+  const hiddenAtRef = useRef<number | null>(null);
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') setRefreshTick(t => t + 1);
+    const THRESHOLD = 30_000;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === 'visible') {
+        const elapsed = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0;
+        if (elapsed > THRESHOLD) setRefreshTick(t => t + 1);
+        hiddenAtRef.current = null;
+      }
     };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
   useEffect(() => {

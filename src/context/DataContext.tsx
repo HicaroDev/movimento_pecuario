@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { DataEntry } from '../lib/data';
 import { sampleRows } from '../lib/data';
 import { useAuth } from './AuthContext';
@@ -99,15 +99,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, user?.farmId, isAdmin]);
 
-  /* Recarrega quando o tab volta ao foco */
+  /* Recarrega quando o tab volta ao foco após 30s+ de inatividade */
+  const hiddenAtRef = useRef<number | null>(null);
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && activeFarmId) {
-        setRefreshTick(t => t + 1);
+    const THRESHOLD = 30_000; // só recarrega se ficou oculto 30+ segundos
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === 'visible' && activeFarmId) {
+        const elapsed = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0;
+        if (elapsed > THRESHOLD) setRefreshTick(t => t + 1);
+        hiddenAtRef.current = null;
       }
     };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [activeFarmId]);
 
   /* Carrega dados quando a fazenda muda ou ao voltar ao foco */
