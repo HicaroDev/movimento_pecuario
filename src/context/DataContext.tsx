@@ -132,13 +132,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Só limpa os dados quando a FAZENDA mudou.
-    // Em refresh de background (refreshTick), mantém dados visíveis enquanto recarrega.
+    // Só limpa os dados e mostra skeleton quando a FAZENDA mudou (primeira carga ou troca).
+    // Em refresh de background (refreshTick), mantém dados visíveis enquanto recarrega silenciosamente.
     if (farmChanged) {
       setEntries([]); setPastures([]); setClientInfo(null);
+      setLoading(true);
     }
-
-    setLoading(true);
     let cancelled = false;
 
     Promise.all([

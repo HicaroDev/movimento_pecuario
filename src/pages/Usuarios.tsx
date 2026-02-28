@@ -302,21 +302,29 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
 
 /* ─────────────── Página principal ─────────────── */
 
+// Cache de módulo — persiste entre navegações sem precisar de contexto
+let _usersCache: FarmUser[]  = [];
+let _farmUsersCache: FarmUser[] = [];
+let _farmCache: Farm | null  = null;
+
 export function Usuarios() {
   const { user, isAdmin } = useAuth();
-  const [users, setUsers]         = useState<FarmUser[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [users, setUsers]         = useState<FarmUser[]>(_usersCache);
+  const [loading, setLoading]     = useState(_usersCache.length === 0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<FarmUser | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
   // Cliente: dados da sua fazenda
-  const [farmUsers, setFarmUsers] = useState<FarmUser[]>([]);
-  const [farm, setFarm]           = useState<Farm | null>(null);
+  const [farmUsers, setFarmUsers] = useState<FarmUser[]>(_farmUsersCache);
+  const [farm, setFarm]           = useState<Farm | null>(_farmCache);
 
   async function refresh() {
-    setLoading(true);
-    setUsers(await userService.list());
+    // Só mostra skeleton se não há dados em cache
+    if (_usersCache.length === 0) setLoading(true);
+    const result = await userService.list();
+    _usersCache = result;
+    setUsers(result);
     setLoading(false);
   }
 
@@ -341,13 +349,15 @@ export function Usuarios() {
     if (isAdmin) {
       refresh();
     } else if (user?.id) {
-      setLoading(true);
+      if (_farmUsersCache.length === 0) setLoading(true);
       userService.findById(user.id).then(profile => {
         if (profile?.farmId) {
           Promise.all([
             userService.listByFarm(profile.farmId),
             farmService.findById(profile.farmId),
           ]).then(([fu, f]) => {
+            _farmUsersCache = fu;
+            _farmCache = f;
             setFarmUsers(fu);
             setFarm(f);
             setLoading(false);

@@ -324,18 +324,24 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
 
 /* ─────────────── Página principal ─────────────── */
 
+// Cache de módulo — persiste entre navegações sem precisar de contexto
+let _farmsCache: Farm[]    = [];
+let _myFarmCache: Farm | null = null;
+
 export function Fazendas() {
   const { user, isAdmin } = useAuth();
-  const [farms, setFarms]         = useState<Farm[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [farms, setFarms]         = useState<Farm[]>(_farmsCache);
+  const [loading, setLoading]     = useState(_farmsCache.length === 0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Farm | null>(null);
-  const [myFarm, setMyFarm]       = useState<Farm | null>(null);
+  const [myFarm, setMyFarm]       = useState<Farm | null>(_myFarmCache);
   const [refreshTick, setRefreshTick] = useState(0);
 
   async function refresh() {
-    setLoading(true);
-    setFarms(await farmService.list());
+    if (_farmsCache.length === 0) setLoading(true);
+    const result = await farmService.list();
+    _farmsCache = result;
+    setFarms(result);
     setLoading(false);
   }
 
@@ -362,7 +368,10 @@ export function Fazendas() {
   useEffect(() => {
     if (!isAdmin && user?.id) {
       userService.findById(user.id).then(profile => {
-        if (profile?.farmId) farmService.findById(profile.farmId).then(setMyFarm);
+        if (profile?.farmId) farmService.findById(profile.farmId).then(f => {
+          _myFarmCache = f;
+          setMyFarm(f);
+        });
       });
     }
   }, [user?.id, isAdmin]);
