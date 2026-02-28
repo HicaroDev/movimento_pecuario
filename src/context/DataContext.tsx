@@ -63,6 +63,23 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+const fallbackContext: DataContextType = {
+  activeFarmId: '',
+  selectFarm: () => {},
+  loading: true,
+  entries: [],
+  addEntry: () => {},
+  removeEntry: () => {},
+  clearAll: () => {},
+  loadSample: () => {},
+  clientInfo: null,
+  updateClientInfo: () => {},
+  pastures: [],
+  addPasture: () => {},
+  deletePasture: () => {},
+  updatePasture: () => {},
+};
+
 /* ── Provider ── */
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -131,8 +148,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (!activeFarmId) {
       setEntries([]); setPastures([]); setClientInfo(null);
-      // Libera o loading se deslogou ou se o cliente não tem fazenda atribuída
-      if (!user || (!isAdmin && !user.farmId)) setLoading(false);
+      // Libera loading só quando definitivamente não há fazenda para carregar.
+      // Enquanto user ainda não carregou (null), mantém loading=true para não
+      // piscar estado vazio antes do skeleton aparecer.
+      if (user && !isAdmin && !user.farmId) setLoading(false);
       return;
     }
 
@@ -144,23 +163,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
 
+    // Timeout de segurança — libera o skeleton se o servidor demorar mais de 20s
+    // (ex: aba nova com servidor frio ou rede lenta)
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 20_000);
+
     Promise.all([
       supabase.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
       supabase.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
       if (cancelled) return;
-      setEntries((entriesRes.data ?? []).map(toDataEntry));
-      setPastures((pasturesRes.data ?? []).map(toPasture));
-      setClientInfo(farm);
+      if (!entriesRes.error) setEntries((entriesRes.data ?? []).map(toDataEntry));
+      if (!pasturesRes.error) setPastures((pasturesRes.data ?? []).map(toPasture));
+      if (farm) setClientInfo(farm);
       setLoading(false);
     }).catch(() => {
       if (cancelled) return;
-      // Falha de rede — libera o loading para não travar a tela
       setLoading(false);
+    }).finally(() => {
+      clearTimeout(timeoutId);
     });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timeoutId); };
   }, [activeFarmId, refreshTick]);
 
   function selectFarm(farmId: string) {
@@ -263,6 +289,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
 export function useData(): DataContextType {
   const ctx = useContext(DataContext);
-  if (!ctx) throw new Error('useData must be used within DataProvider');
+  if (!ctx) {
+    if (typeof window !== 'undefined') {
+      console.warn('useData called without DataProvider');
+    }
+    return fallbackContext;
+  }
   return ctx;
 }
