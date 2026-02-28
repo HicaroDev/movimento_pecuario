@@ -1,6 +1,4 @@
-# Imagem única com Node + nginx
-# O build acontece no startup do container, depois que o EasyPanel
-# escreve o arquivo .env com as variáveis de ambiente.
+# Build acontece no startup para que o EasyPanel já tenha escrito o .env
 FROM node:20-alpine
 
 RUN apk add --no-cache nginx
@@ -13,12 +11,9 @@ RUN npm ci
 COPY . .
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-# Converte CRLF → LF (necessário quando gerado no Windows) e dá permissão
-RUN sed -i 's/\r//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
-
-RUN mkdir -p /usr/share/nginx/html
+RUN mkdir -p /usr/share/nginx/html /run/nginx
 
 EXPOSE 80
 
-CMD ["/docker-entrypoint.sh"]
+# CMD inline — sem script externo (evita problema de CRLF)
+CMD sh -c "npm run build && cp -r /app/dist/* /usr/share/nginx/html/ && nginx -g 'daemon off;'"
