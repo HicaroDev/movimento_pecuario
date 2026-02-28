@@ -1,3 +1,4 @@
+/* @refresh reset */
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { DataEntry } from '../lib/data';
 import { sampleRows } from '../lib/data';
