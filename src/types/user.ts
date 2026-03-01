@@ -3,11 +3,12 @@ export type Module = 'relatorio' | 'formulario' | 'pastos' | 'fazendas' | 'usuar
 
 export interface FarmUser {
   id: string;
-  name: string;       // nome de exibição
+  name: string;
   email: string;
-  password: string;   // plain text agora; hash quando vier backend
+  password: string;
   role: Role;
-  farmId?: string;    // fazenda vinculada (obrigatório para clientes)
+  farmId?: string;    // fazenda principal (backward compat — farm_id)
+  farmIds: string[];  // todas as fazendas vinculadas (farm_ids[])
   modules: Module[];
   active: boolean;
   createdAt: string;
@@ -19,5 +20,6 @@ export interface AuthUser {
   email: string;
   role: Role;
   modules: Module[];
-  farmId?: string;
+  farmId?: string;    // fazenda principal
+  farmIds: string[];  // todas as fazendas
 }

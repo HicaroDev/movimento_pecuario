@@ -16,17 +16,13 @@ const navItems = [
   { path: '/usuarios',   label: 'Usuários',   icon: Users,      module: 'usuarios'   as Module },
 ];
 
-/* ── Seletor de fazenda para admin ── */
-function AdminFarmSelector() {
+/* ── Seletor de fazenda reutilizável ── */
+let _adminFarmsCache: Farm[]  = [];
+let _clientFarmsCache: Farm[] = [];
+
+function FarmSelectorWidget({ farms }: { farms: Farm[] }) {
   const { activeFarmId, selectFarm } = useData();
-  const [farms, setFarms] = useState<Farm[]>([]);
-
-  useEffect(() => {
-    farmService.list().then(list => setFarms(list.filter(f => f.active)));
-  }, []);
-
   if (farms.length === 0) return null;
-
   return (
     <div className="px-4 pb-3">
       <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5 text-gray-400">
@@ -47,6 +43,37 @@ function AdminFarmSelector() {
       </div>
     </div>
   );
+}
+
+function AdminFarmSelector() {
+  const [farms, setFarms] = useState<Farm[]>(_adminFarmsCache);
+  useEffect(() => {
+    farmService.list().then(list => {
+      const active = list.filter(f => f.active);
+      _adminFarmsCache = active;
+      setFarms(active);
+    });
+  }, []);
+  return <FarmSelectorWidget farms={farms} />;
+}
+
+function ClientFarmSelector() {
+  const { user } = useAuth();
+  const [farms, setFarms] = useState<Farm[]>(_clientFarmsCache);
+  const farmIds = user?.farmIds ?? [];
+
+  useEffect(() => {
+    if (farmIds.length <= 1) return;
+    Promise.all(farmIds.map(id => farmService.findById(id))).then(results => {
+      const active = results.filter((f): f is Farm => f !== null && f.active);
+      _clientFarmsCache = active;
+      setFarms(active);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [farmIds.join(',')]);
+
+  if (farmIds.length <= 1) return null;
+  return <FarmSelectorWidget farms={farms} />;
 }
 
 export function DashboardLayout() {
@@ -105,8 +132,8 @@ export function DashboardLayout() {
           <p className="text-xs mt-0.5 truncate text-gray-400">{user?.name}</p>
         </motion.div>
 
-        {/* Seletor de fazenda — somente admin */}
-        {isAdmin && (
+        {/* Seletor de fazenda — admin (todas) ou cliente multi-fazenda */}
+        {(isAdmin || (user?.farmIds?.length ?? 0) > 1) && (
           <motion.div
             className="pt-3"
             style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
@@ -114,7 +141,7 @@ export function DashboardLayout() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <AdminFarmSelector />
+            {isAdmin ? <AdminFarmSelector /> : <ClientFarmSelector />}
           </motion.div>
         )}
 

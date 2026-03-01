@@ -30,7 +30,10 @@ const MODULE_ICONS: Record<Module, React.ElementType> = {
 
 /* ─────────────── Modal de usuário ─────────────── */
 
-interface UserFormData { name: string; email: string; password: string; role: Role; farmId: string; }
+// Cache de module para as fazendas do modal — persiste entre aberturas
+let _modalFarmsCache: Farm[] = [];
+
+interface UserFormData { name: string; email: string; password: string; role: Role; }
 
 function UserModal({ editing, currentUserId, onClose, onSaved }: {
   editing: FarmUser | null;
@@ -38,17 +41,21 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [farms, setFarms]     = useState<Farm[]>([]);
-  const [modules, setModules] = useState<Module[]>(editing?.modules ?? ALL_MODULES);
-  const [active, setActive]   = useState<boolean>(editing?.active ?? true);
-  const [showPwd, setShowPwd] = useState(false);
-  const [saving, setSaving]   = useState(false);
+  const [farms, setFarms]         = useState<Farm[]>(_modalFarmsCache);
+  const [selectedFarmIds, setSelectedFarmIds] = useState<string[]>(
+    editing?.farmIds?.length ? editing.farmIds : (editing?.farmId ? [editing.farmId] : [])
+  );
+  const [modules, setModules]     = useState<Module[]>(editing?.modules ?? ALL_MODULES);
+  const [active, setActive]       = useState<boolean>(editing?.active ?? true);
+  const [showPwd, setShowPwd]     = useState(false);
+  const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
     farmService.list()
       .then(list => {
         const active = list.filter(f => f.active);
         logger.info('UserModal', `fazendas carregadas: ${active.length}`);
+        _modalFarmsCache = active;
         setFarms(active);
       })
       .catch(err => {
@@ -61,11 +68,16 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
     defaultValues: {
       name: editing?.name ?? '', email: editing?.email ?? '',
       password: '', role: editing?.role ?? 'client',
-      farmId: editing?.farmId ?? '',
     },
   });
 
   const selectedRole = watch('role');
+
+  function toggleFarm(farmId: string) {
+    setSelectedFarmIds(prev =>
+      prev.includes(farmId) ? prev.filter(id => id !== farmId) : [...prev, farmId]
+    );
+  }
 
   function toggleModule(m: Module) {
     setModules(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -74,9 +86,11 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
   async function onSubmit(data: UserFormData) {
     setSaving(true);
     try {
+      const farmIds = data.role === 'admin' ? [] : selectedFarmIds;
       const payload: Partial<FarmUser> = {
         name: data.name, email: data.email, role: data.role,
-        farmId: data.role === 'admin' ? undefined : (data.farmId || undefined),
+        farmIds,
+        farmId: farmIds[0] ?? undefined,
         modules, active,
       };
       if (data.password) payload.password = data.password;
@@ -156,11 +170,23 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
 
             {selectedRole === 'client' && (
               <div>
-                <label className={labelClass}>Fazenda vinculada</label>
+                <label className={labelClass}>Fazendas vinculadas</label>
                 {farms.length > 0 ? (
-                  <select className={inputClass} {...register('farmId')}>
-                    {farms.map(f => <option key={f.id} value={f.id}>{f.nomeFazenda}</option>)}
-                  </select>
+                  <div className="grid grid-cols-1 gap-2 mt-1">
+                    {farms.map(f => {
+                      const on = selectedFarmIds.includes(f.id);
+                      return (
+                        <label key={f.id}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                            on ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}>
+                          <input type="checkbox" checked={on} onChange={() => toggleFarm(f.id)} className="sr-only" />
+                          <Building2 className="w-4 h-4 flex-shrink-0" />
+                          <span className="text-sm font-medium">{f.nomeFazenda}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     Nenhuma fazenda ativa. Cadastre uma fazenda primeiro.
@@ -228,11 +254,16 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
   onEdit: (u: FarmUser) => void;
   onRefresh: () => void;
 }) {
-  const [farm, setFarm] = useState<Farm | null>(null);
+  const [farmNames, setFarmNames] = useState<string[]>([]);
 
   useEffect(() => {
-    if (u.farmId) farmService.findById(u.farmId).then(f => setFarm(f));
-  }, [u.farmId]);
+    const ids = u.farmIds?.length ? u.farmIds : (u.farmId ? [u.farmId] : []);
+    if (ids.length === 0) return;
+    Promise.all(ids.map(id => farmService.findById(id))).then(results => {
+      setFarmNames(results.filter((f): f is Farm => f !== null).map(f => f.nomeFazenda));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [u.farmIds?.join(','), u.farmId]);
 
   async function toggleActive() {
     if (u.id === currentUserId) return;
@@ -267,7 +298,9 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
         </span>
       </td>
       <td className="px-4 py-3">
-        <span className="text-xs text-gray-600">{farm?.nomeFazenda || <span className="text-gray-400 italic">—</span>}</span>
+        <span className="text-xs text-gray-600">
+          {farmNames.length > 0 ? farmNames.join(', ') : <span className="text-gray-400 italic">—</span>}
+        </span>
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1">
@@ -322,10 +355,16 @@ export function Usuarios() {
   async function refresh() {
     // Só mostra skeleton se não há dados em cache
     if (_usersCache.length === 0) setLoading(true);
-    const result = await userService.list();
-    _usersCache = result;
-    setUsers(result);
-    setLoading(false);
+    try {
+      const result = await userService.list();
+      _usersCache = result;
+      setUsers(result);
+    } catch {
+      // Mantém cache atual para evitar "limpar" a tela em erros temporários
+      setUsers(_usersCache);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Recarrega apenas se tab ficou oculto 30+ segundos

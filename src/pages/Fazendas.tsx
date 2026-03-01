@@ -339,10 +339,16 @@ export function Fazendas() {
 
   async function refresh() {
     if (_farmsCache.length === 0) setLoading(true);
-    const result = await farmService.list();
-    _farmsCache = result;
-    setFarms(result);
-    setLoading(false);
+    try {
+      const result = await farmService.list();
+      _farmsCache = result;
+      setFarms(result);
+    } catch {
+      // Mantém cache atual para evitar "limpar" a tela em erros temporários
+      setFarms(_farmsCache);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Recarrega apenas se tab ficou oculto 30+ segundos

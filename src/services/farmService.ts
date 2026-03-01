@@ -1,6 +1,33 @@
 import { supabase } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
+let farmsCache: Farm[] | null = null;
+let farmsCacheAt = 0;
+const CACHE_TTL = 60_000;
+const STORAGE_KEY = 'suplementoControlFarmsCache';
+
+function loadCacheFromStorage(): Farm[] | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { items: Farm[]; at: number };
+    if (!Array.isArray(parsed.items)) return null;
+    farmsCache = parsed.items;
+    farmsCacheAt = parsed.at || Date.now();
+    return farmsCache;
+  } catch {
+    return null;
+  }
+}
+
+function saveCacheToStorage(items: Farm[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, at: Date.now() }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function toFarm(row: Record<string, unknown>): Farm {
   return {
     id:                row.id as string,
@@ -31,17 +58,40 @@ function toRow(d: Partial<Farm>) {
 
 export const farmService = {
   async list(): Promise<Farm[]> {
-    const { data, error } = await supabase
-      .from('farms').select('*').order('nome_fazenda');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(toFarm);
+    try {
+      const { data, error } = await supabase
+        .from('farms').select('*').order('nome_fazenda');
+      if (error) throw new Error(error.message);
+      const farms = (data ?? []).map(toFarm);
+      farmsCache = farms;
+      farmsCacheAt = Date.now();
+      saveCacheToStorage(farms);
+      return farms;
+    } catch (err) {
+      if (farmsCache) return farmsCache;
+      const stored = loadCacheFromStorage();
+      if (stored) return stored;
+      throw err;
+    }
   },
 
   async findById(id: string): Promise<Farm | null> {
-    const { data, error } = await supabase
-      .from('farms').select('*').eq('id', id).maybeSingle();
-    if (error) return null;
-    return data ? toFarm(data) : null;
+    if (!farmsCache) loadCacheFromStorage();
+    if (farmsCache && Date.now() - farmsCacheAt < CACHE_TTL) {
+      const cached = farmsCache.find(f => f.id === id);
+      if (cached) return cached;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('farms').select('*').eq('id', id).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toFarm(data) : null;
+    } catch {
+      if (farmsCache) {
+        return farmsCache.find(f => f.id === id) ?? null;
+      }
+      return null;
+    }
   },
 
   async create(d: Omit<Farm, 'id' | 'createdAt'>): Promise<Farm> {

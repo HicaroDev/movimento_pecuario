@@ -12,6 +12,10 @@ if (!supabaseUrl || !supabaseKey) {
 // Os conflitos entre abas são tratados via TOKEN_REFRESHED filter no AuthContext.
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
     lock: <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn(),
   },
 });

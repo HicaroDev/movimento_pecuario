@@ -4,6 +4,32 @@ import type { FarmUser, Module } from '../types/user';
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL as string;
 const SERVICE_ROLE_KEY  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string;
+const STORAGE_KEY = 'suplementoControlUsersCache';
+let usersCache: FarmUser[] | null = null;
+let usersCacheAt = 0;
+const CACHE_TTL = 60_000;
+
+function loadCacheFromStorage(): FarmUser[] | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { items: FarmUser[]; at: number };
+    if (!Array.isArray(parsed.items)) return null;
+    usersCache = parsed.items;
+    usersCacheAt = parsed.at || Date.now();
+    return usersCache;
+  } catch {
+    return null;
+  }
+}
+
+function saveCacheToStorage(items: FarmUser[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, at: Date.now() }));
+  } catch {
+    // ignore
+  }
+}
 
 // Chama a Admin REST API diretamente — sem criar segundo GoTrueClient no browser
 async function adminCreateAuthUser(email: string, password: string, name: string, role: string): Promise<string> {
@@ -27,13 +53,16 @@ async function adminCreateAuthUser(email: string, password: string, name: string
 }
 
 function toFarmUser(row: Record<string, unknown>): FarmUser {
+  const farmIds = (row.farm_ids as string[]) ?? [];
+  const farmId  = (row.farm_id as string) ?? farmIds[0] ?? undefined;
   return {
     id:        row.id as string,
     name:      row.name as string,
     email:     (row.email as string) ?? '',
     password:  '',
     role:      row.role as 'admin' | 'client',
-    farmId:    (row.farm_id as string) ?? undefined,
+    farmId,
+    farmIds,
     modules:   (row.modules as Module[]) ?? [],
     active:    row.active as boolean,
     createdAt: row.created_at as string,
@@ -42,17 +71,40 @@ function toFarmUser(row: Record<string, unknown>): FarmUser {
 
 export const userService = {
   async list(): Promise<FarmUser[]> {
-    const { data, error } = await supabase
-      .from('profiles').select('*').order('name');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(toFarmUser);
+    try {
+      const { data, error } = await supabase
+        .from('profiles').select('*').order('name');
+      if (error) throw new Error(error.message);
+      const users = (data ?? []).map(toFarmUser);
+      usersCache = users;
+      usersCacheAt = Date.now();
+      saveCacheToStorage(users);
+      return users;
+    } catch (err) {
+      if (usersCache) return usersCache;
+      const stored = loadCacheFromStorage();
+      if (stored) return stored;
+      throw err;
+    }
   },
 
   async listByFarm(farmId: string): Promise<FarmUser[]> {
-    const { data, error } = await supabase
-      .from('profiles').select('*').eq('farm_id', farmId).order('name');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(toFarmUser);
+    try {
+      const { data, error } = await supabase
+        .from('profiles').select('*')
+        .or(`farm_id.eq.${farmId},farm_ids.cs.{${farmId}}`)
+        .order('name');
+      if (error) throw new Error(error.message);
+      const users = (data ?? []).map(toFarmUser);
+      usersCache = usersCache ? [...usersCache.filter(u => u.farmId !== farmId), ...users] : users;
+      usersCacheAt = Date.now();
+      saveCacheToStorage(usersCache);
+      return users;
+    } catch (err) {
+      if (!usersCache) loadCacheFromStorage();
+      if (usersCache) return usersCache.filter(u => u.farmId === farmId);
+      throw err;
+    }
   },
 
   async findByEmail(email: string): Promise<FarmUser | null> {
@@ -62,9 +114,19 @@ export const userService = {
   },
 
   async findById(id: string): Promise<FarmUser | null> {
-    const { data } = await supabase
-      .from('profiles').select('*').eq('id', id).maybeSingle();
-    return data ? toFarmUser(data) : null;
+    if (!usersCache) loadCacheFromStorage();
+    if (usersCache && Date.now() - usersCacheAt < CACHE_TTL) {
+      const cached = usersCache.find(u => u.id === id);
+      if (cached) return cached;
+    }
+    try {
+      const { data } = await supabase
+        .from('profiles').select('*').eq('id', id).maybeSingle();
+      return data ? toFarmUser(data) : null;
+    } catch {
+      if (usersCache) return usersCache.find(u => u.id === id) ?? null;
+      return null;
+    }
   },
 
   async create(d: Omit<FarmUser, 'id' | 'createdAt'>): Promise<FarmUser> {
@@ -72,15 +134,17 @@ export const userService = {
     const userId = await adminCreateAuthUser(d.email, d.password, d.name, d.role);
 
     // Trigger cria o perfil; atualiza com os dados extras
+    const ids = d.farmIds?.length ? d.farmIds : (d.farmId ? [d.farmId] : []);
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .update({
-        name:    d.name,
-        email:   d.email,
-        role:    d.role,
-        farm_id: d.farmId ?? null,
-        modules: d.modules,
-        active:  d.active,
+        name:     d.name,
+        email:    d.email,
+        role:     d.role,
+        farm_id:  ids[0] ?? null,
+        farm_ids: ids,
+        modules:  d.modules,
+        active:   d.active,
       })
       .eq('id', userId)
       .select().single();
@@ -93,7 +157,13 @@ export const userService = {
     if (d.name    !== undefined) patch.name    = d.name;
     if (d.email   !== undefined) patch.email   = d.email;
     if (d.role    !== undefined) patch.role    = d.role;
-    if (d.farmId  !== undefined) patch.farm_id = d.farmId ?? null;
+    if (d.farmIds !== undefined) {
+      patch.farm_ids = d.farmIds;
+      patch.farm_id  = d.farmIds[0] ?? null;
+    } else if (d.farmId !== undefined) {
+      patch.farm_id  = d.farmId ?? null;
+      patch.farm_ids = d.farmId ? [d.farmId] : [];
+    }
     if (d.modules !== undefined) patch.modules = d.modules;
     if (d.active  !== undefined) patch.active  = d.active;
 

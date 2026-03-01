@@ -97,10 +97,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) { setActiveFarmId(''); return; }
 
-    // Cliente: usa o farmId já presente no perfil (vem do AuthContext)
+    // Cliente: determina fazenda ativa
     if (!isAdmin) {
-      // Só atualiza se realmente mudou — evita reload desnecessário em troca de aba
-      setActiveFarmId(prev => (prev === (user.farmId || '') ? prev : user.farmId || ''));
+      const farmIds = user.farmIds ?? [];
+      if (farmIds.length > 1) {
+        // Multi-fazenda: restaura seleção salva ou usa a primeira
+        const key   = `suplementoControlClientFarm_${user.id}`;
+        const saved = localStorage.getItem(key);
+        const active = saved && farmIds.includes(saved) ? saved : farmIds[0] ?? '';
+        setActiveFarmId(prev => prev === active ? prev : active);
+      } else {
+        const active = farmIds[0] ?? user.farmId ?? '';
+        setActiveFarmId(prev => prev === active ? prev : active);
+      }
       return;
     }
 
@@ -122,7 +131,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       });
     }
-  }, [user?.id, user?.farmId, isAdmin]);
+  }, [user?.id, user?.farmId, user?.farmIds?.join(','), isAdmin]);
 
   /* Recarrega quando o tab volta ao foco após 30s+ de inatividade */
   const hiddenAtRef = useRef<number | null>(null);
@@ -152,7 +161,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Libera loading só quando definitivamente não há fazenda para carregar.
       // Enquanto user ainda não carregou (null), mantém loading=true para não
       // piscar estado vazio antes do skeleton aparecer.
-      if (user && !isAdmin && !user.farmId) setLoading(false);
+      if (user && !isAdmin && !user.farmId && !user.farmIds?.length) setLoading(false);
       return;
     }
 
@@ -191,9 +200,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [activeFarmId, refreshTick]);
 
   function selectFarm(farmId: string) {
-    if (!isAdmin) return;
     setActiveFarmId(farmId);
-    localStorage.setItem('suplementoControlActiveFarm', farmId);
+    if (isAdmin) {
+      localStorage.setItem('suplementoControlActiveFarm', farmId);
+    } else if (user?.farmIds?.includes(farmId)) {
+      localStorage.setItem(`suplementoControlClientFarm_${user.id}`, farmId);
+    }
   }
 
   function updateClientInfo(info: ClientInfo) {
