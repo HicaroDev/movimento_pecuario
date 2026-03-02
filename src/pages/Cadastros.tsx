@@ -89,13 +89,15 @@ function SimpleEditRow({ item, onSave, onCancel }: {
 }
 
 function SimpleTab({
-  table, label, icon: Icon, emptyText, newLabel,
+  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems,
 }: {
   table: string; label: string; icon: React.ElementType;
   emptyText: string; newLabel: string;
+  onDataChange?: (items: SimpleItem[]) => void;
+  initialItems?: SimpleItem[];
 }) {
   const { activeFarmId } = useData();
-  const [items, setItems] = useState<SimpleItem[]>([]);
+  const [items, setItems] = useState<SimpleItem[]>(initialItems ?? []);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -105,8 +107,15 @@ function SimpleTab({
     if (!activeFarmId) return;
     setLoading(true);
     supabase.from(table).select('*').eq('farm_id', activeFarmId).order('nome')
-      .then(({ data }) => { setItems(data ?? []); setLoading(false); });
+      .then(({ data }) => {
+        const list = data ?? [];
+        setItems(list);
+        onDataChange?.(list);
+        setLoading(false);
+      });
   }, [activeFarmId, table]);
+
+  function notify(list: SimpleItem[]) { setItems(list); onDataChange?.(list); }
 
   async function onAdd(data: SimpleForm) {
     if (!activeFarmId) return;
@@ -114,7 +123,7 @@ function SimpleTab({
       .insert({ nome: data.nome, observacoes: data.observacoes || null, farm_id: activeFarmId })
       .select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
-    setItems(prev => [...prev, row].sort((a, b) => a.nome.localeCompare(b.nome)));
+    notify([...items, row].sort((a, b) => a.nome.localeCompare(b.nome)));
     toast.success(`${label} adicionado!`, { description: data.nome });
     reset(); setShowAdd(false);
   }
@@ -122,7 +131,7 @@ function SimpleTab({
   async function onEditSave(id: string, data: SimpleForm) {
     const { error } = await supabase.from(table).update({ nome: data.nome, observacoes: data.observacoes || null }).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    setItems(prev => prev.map(i => i.id === id ? { ...i, ...data } : i));
+    notify(items.map(i => i.id === id ? { ...i, ...data } : i));
     toast.success(`${label} atualizado!`); setEditingId(null);
   }
 
@@ -130,7 +139,7 @@ function SimpleTab({
     if (!window.confirm(`Remover "${nome}"?`)) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) { toast.error('Erro ao remover.'); return; }
-    setItems(prev => prev.filter(i => i.id !== id));
+    notify(items.filter(i => i.id !== id));
     toast.success(`${label} removido.`);
   }
 
@@ -438,6 +447,8 @@ function AnimaisTab() {
               icon={Tag}
               emptyText="Nenhuma categoria cadastrada"
               newLabel="Nova Categoria"
+              initialItems={categories}
+              onDataChange={(list) => { _acatCache = list as AnimalCategory[]; setCategories(_acatCache); }}
             />
           </div>
         )}
