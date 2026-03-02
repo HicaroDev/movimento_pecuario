@@ -9,7 +9,7 @@ import { Relatorio } from './pages/Relatorio';
 import { Formulario } from './pages/Formulario';
 import { Fazendas } from './pages/Fazendas';
 import { Usuarios } from './pages/Usuarios';
-import { Pastos } from './pages/Pastos';
+import { Cadastros } from './pages/Cadastros';
 
 const router = createBrowserRouter([
   { path: '/login', Component: Login },
@@ -25,8 +25,8 @@ const router = createBrowserRouter([
           children: [{ path: 'formulario', Component: Formulario }],
         },
         {
-          element: <ModuleRoute module="pastos" />,
-          children: [{ path: 'pastos', Component: Pastos }],
+          element: <ModuleRoute module="cadastros" />,
+          children: [{ path: 'cadastros', Component: Cadastros }],
         },
         {
           element: <ModuleRoute module="fazendas" />,

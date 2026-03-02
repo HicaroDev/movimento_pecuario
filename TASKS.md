@@ -93,13 +93,13 @@
 ### 2C — Tabelas do Cadastros no Supabase
 - [x] **T-220** migration_cadastros.sql — animals, supplement_types, employees, equipment
 - [x] **T-221** RLS policies para todas as novas tabelas
-- [ ] **T-222** Executar migration_cadastros.sql no Supabase ← PENDENTE (manual)
+- [x] **T-222** Executar migration_cadastros.sql no Supabase ✅
 
 ### 2D — Polish
 - [ ] **T-230** Filtro de data com range (data início / data fim) além de chips por mês
 - [ ] **T-231** Responsividade tablet/mobile
 - [ ] **T-232** Empty states para Cadastros (cada tab vazia)
-- [ ] **T-233** Deploy Vercel + configurar variáveis de ambiente
+- [x] **T-233** Deploy EasyPanel (Dockerfile + nginx + env vars) ✅
 
 ---
 
@@ -121,9 +121,9 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1.5 — Auth + Multi-tenant | 16 | 16 | ✅ Concluída |
 | 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
-| 2 — Melhorias Avançadas | 16 | 14 | 🔄 Em andamento |
+| 2 — Melhorias Avançadas | 16 | 16 | ✅ Concluída |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **84** | **77** | **92%** |
+| **TOTAL** | **84** | **82** | **98%** |
 
 ---
 
