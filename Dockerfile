@@ -1,7 +1,5 @@
-# Build acontece no startup para que o EasyPanel já tenha escrito o .env
-FROM node:20-alpine
-
-RUN apk add --no-cache nginx
+# ── Stage 1: Build ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -10,11 +8,14 @@ RUN npm ci
 
 COPY . .
 
-# Substitui o nginx.conf completo (events + http + server)
-COPY nginx.conf /etc/nginx/nginx.conf
+RUN npm run build
 
-RUN mkdir -p /usr/share/nginx/html /run/nginx
+# ── Stage 2: Serve ──────────────────────────────────────────────────────────
+FROM nginx:alpine
+
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD sh -c "npm run build && cp -r /app/dist/* /usr/share/nginx/html/ && nginx -g 'daemon off;'"
+CMD ["nginx", "-g", "daemon off;"]
