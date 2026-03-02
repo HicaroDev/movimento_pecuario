@@ -98,19 +98,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Em alguns casos (multi-tab / refresh), o evento vem sem session.
-        // Confirma se realmente não há sessão antes de limpar o usuário.
-        const { data: { session: current } } = await supabase.auth.getSession();
-        if (current?.user) {
-          const profile = await fetchProfile(current.user.id);
-          if (profile) {
-            setUser(prev => (prev?.id === profile.id ? prev : profile));
-            writeCachedProfile(profile);
+        // Sem sessão: só limpa o usuário em SIGNED_OUT explícito.
+        // Outros eventos sem sessão (ex: durante refresh de token ao restaurar janela)
+        // são transitórios — confirma e mantém o usuário atual se ainda há sessão válida.
+        if (event !== 'SIGNED_OUT') {
+          const { data: { session: current } } = await supabase.auth.getSession();
+          if (current?.user) {
+            const profile = await fetchProfile(current.user.id);
+            if (profile) {
+              setUser(prev => (prev?.id === profile.id ? prev : profile));
+              writeCachedProfile(profile);
+            }
           }
-        } else {
-          setUser(null);
-          writeCachedProfile(null);
+          // Evento transitório sem sessão confirmada: mantém usuário atual.
+          return;
         }
+
+        // SIGNED_OUT explícito — limpa tudo.
+        setUser(null);
+        writeCachedProfile(null);
       }
     );
 

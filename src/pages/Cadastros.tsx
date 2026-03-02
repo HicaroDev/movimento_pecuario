@@ -104,6 +104,7 @@ function SimpleTab({
     if (!activeFarmId) return;
     let mounted = true;
     setLoading(true);
+    const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
         const { data } = await supabase.from(table).select('*').eq('farm_id', activeFarmId).order('nome');
@@ -112,10 +113,11 @@ function SimpleTab({
         setItems(list);
         onDataChange?.(list);
       } finally {
+        clearTimeout(tid);
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => { mounted = false; clearTimeout(tid); };
   }, [activeFarmId, table]);
 
   function notify(list: SimpleItem[]) { setItems(list); onDataChange?.(list); }
@@ -503,6 +505,7 @@ function AnimaisTab() {
     if (!activeFarmId) return;
     let mounted = true;
     setLoading(true);
+    const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
         const [animRes, catRes] = await Promise.all([
@@ -513,10 +516,11 @@ function AnimaisTab() {
         _animaisCache = animRes.data ?? []; setItems(_animaisCache);
         _acatCache = catRes.data ?? []; setCategories(_acatCache);
       } finally {
+        clearTimeout(tid);
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => { mounted = false; clearTimeout(tid); };
   }, [activeFarmId]);
 
   async function onAdd(data: AnimalForm) {
@@ -710,17 +714,19 @@ function SuplementosTab() {
 
   useEffect(() => {
     if (!activeFarmId) return;
-    setLoading(true);
     let mounted = true;
+    setLoading(true);
+    const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
         const { data } = await supabase.from('supplement_types').select('*').eq('farm_id', activeFarmId).order('nome');
         if (mounted) { _suplementosCache = data ?? []; setItems(_suplementosCache); }
       } finally {
+        clearTimeout(tid);
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => { mounted = false; clearTimeout(tid); };
   }, [activeFarmId]);
 
   async function onAdd(data: SupplementForm) {
@@ -819,17 +825,19 @@ function FuncionariosTab() {
 
   useEffect(() => {
     if (!activeFarmId) return;
-    setLoading(true);
     let mounted = true;
+    setLoading(true);
+    const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
         const { data } = await supabase.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
         if (mounted) { _funcionariosCache = data ?? []; setItems(_funcionariosCache); }
       } finally {
+        clearTimeout(tid);
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => { mounted = false; clearTimeout(tid); };
   }, [activeFarmId]);
 
   async function onAdd(data: EmployeeForm) {
