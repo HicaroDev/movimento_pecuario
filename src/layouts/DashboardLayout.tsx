@@ -11,8 +11,8 @@ import type { Farm } from '../types/farm';
 const navItems = [
   { path: '/',           label: 'Relatório',  icon: BarChart3,     module: 'relatorio'  as Module },
   { path: '/formulario', label: 'Lançamento', icon: FileText,      module: 'formulario' as Module },
-  { path: '/cadastros',  label: 'Cadastros',  icon: FolderOpen,    module: 'cadastros'  as Module },
   { path: '/manejos',    label: 'Manejos',    icon: ClipboardList, module: 'manejos'    as Module },
+  { path: '/cadastros',  label: 'Cadastros',  icon: FolderOpen,    module: 'cadastros'  as Module },
   { path: '/fazendas',   label: 'Fazendas',   icon: Building2,     module: 'fazendas'   as Module },
   { path: '/usuarios',   label: 'Usuários',   icon: Users,         module: 'usuarios'   as Module },
 ];
