@@ -1,6 +1,6 @@
 # Plano de Migração — Suplemento Control
 
-> Última atualização: 2026-02-25
+> Última atualização: 2026-03-01
 
 ---
 
@@ -9,19 +9,15 @@
 | Fase | Descrição | Stack | Status |
 |------|-----------|-------|--------|
 | **0** | Protótipo HTML/JS vanilla | HTML + CSS + JS | ✅ Concluída |
-| **1** | SPA React standalone (localStorage) | React + Vite + Tailwind + Recharts | ✅ **Concluída** |
-| **2** | Migração para SaaS com backend | Next.js + Supabase + Auth | ⬜ Planejada |
+| **1** | SPA React standalone (localStorage) | React + Vite + Tailwind + Recharts | ✅ Concluída |
+| **1.5** | Auth + Multi-tenant + Gestão | Supabase Auth + Profiles + Multi-farm | ✅ Concluída |
+| **1.6** | Migração Supabase completa | Supabase DB (data_entries, pastures, farms) | ✅ Concluída |
+| **2** | Melhorias avançadas (em curso) | SheetJS + novos CRUDs + filtros | 🔄 Em andamento |
+| **3** | SaaS Escala | Planos, billing, multi-org | ⬜ Futuro |
 
 ---
 
-## FASE ATUAL: Fase 1 — SPA React Standalone
-
-### Objetivo
-Migrar o app vanilla HTML/JS para React + TypeScript + Vite + Tailwind CSS,
-mantendo localStorage como fonte de dados, seguindo o design do Figma (`Recriação de site` + melhorias do export `modelo`).
-A seção de relatório é idêntica ao app original.
-
-### Stack Utilizada
+## Stack Atual (Fase 1.6+)
 
 | Camada | Tecnologia |
 |--------|------------|
@@ -34,198 +30,124 @@ A seção de relatório é idêntica ao app original.
 | Animações | Motion (motion/react) |
 | Notificações | Sonner |
 | Ícones | Lucide React |
-| Persistência | localStorage (3 chaves) |
+| Backend/Auth | Supabase (self-hosted EasyPanel) |
+| Import/Export | SheetJS (xlsx) |
 
-### Estrutura Final do Projeto
+---
+
+## Estrutura do Projeto
 
 ```
 suplemento-control/
 ├── package.json
 ├── vite.config.ts
-├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
-├── index.html                    ← entry point Vite
+├── index.html
+├── supabase/
+│   ├── schema.sql              ← schema base (farms, profiles, pastures, data_entries)
+│   ├── patch.sql               ← patches (email, sacos, trigger)
+│   ├── migration_cadastros.sql ← ← animals, supplement_types, employees, equipment
+│   └── seed.sql                ← dados de exemplo
 └── src/
+    ├── App.tsx                 ← Router + Providers + Toaster
     ├── main.tsx
-    ├── App.tsx                   ← Router + DataProvider + Toaster
-    ├── vite-env.d.ts
-    ├── styles/
-    │   └── index.css             ← Tailwind + variáveis CSS + @media print
     ├── lib/
-    │   ├── data.ts               ← DataEntry, STORAGE_KEY, sampleRows (29 linhas), loadData/saveData
-    │   └── utils.ts              ← fmt, fmtInt, groupByType, averageConsumo, sumQuantidade
+    │   ├── supabase.ts         ← cliente Supabase
+    │   ├── data.ts             ← DataEntry, sampleRows, supplementOrder/Colors
+    │   └── utils.ts            ← fmt, fmtInt, groupByType, averageConsumo
     ├── context/
-    │   └── DataContext.tsx       ← entries + clientInfo + pastures, persistência automática
+    │   ├── AuthContext.tsx     ← supabase.auth + fetchProfile + hasModule
+    │   └── DataContext.tsx     ← entries + pastures + clientInfo via Supabase
+    ├── types/
+    │   ├── user.ts             ← Role, Module, FarmUser, AuthUser
+    │   └── farm.ts             ← Farm
+    ├── services/
+    │   ├── farmService.ts      ← CRUD farms
+    │   └── userService.ts      ← CRUD profiles
     ├── layouts/
-    │   └── DashboardLayout.tsx   ← sidebar gradient #1a1f2e → #2d3548 (Figma), 3 nav itens
+    │   └── DashboardLayout.tsx ← sidebar glassmorphism + AdminFarmSelector
     ├── pages/
-    │   ├── Relatorio.tsx         ← Header + Filtros card + KPIs + Gráficos + Seções por suplemento
-    │   ├── Formulario.tsx        ← Formulário de lançamento + tabela de registros
-    │   └── Cliente.tsx           ← Cadastro de fazenda + logo upload + gestão de pastos
+    │   ├── Login.tsx           ← split-screen + supabase.auth
+    │   ├── Relatorio.tsx       ← filtros (mês, suplemento, pasto) + export PDF/Excel
+    │   ├── Formulario.tsx      ← lançamentos + import Excel
+    │   ├── Cadastros.tsx       ← 5 tabs: Pastos/Animais/Suplementos/Funcionários/Equipamentos
+    │   ├── Fazendas.tsx        ← CRUD fazendas
+    │   └── Usuarios.tsx        ← CRUD usuários (admin)
     └── components/
-        ├── StatsOverview.tsx     ← 4 KPI cards (azul/verde/roxo/laranja)
-        ├── MetricCard.tsx        ← card gradiente com ícone, valor e trend badge colorido
-        ├── SummaryChart.tsx      ← card com legenda + Recharts BarChart (motion animado)
-        └── SupplementSection.tsx ← seção completa: cabeçalho verde, tabela 7 colunas, totais, gráfico com ReferenceLine vermelha
+        ├── ProtectedRoute.tsx  ← ProtectedRoute + ModuleRoute
+        ├── StatsOverview.tsx   ← 4 KPI cards
+        ├── MetricCard.tsx      ← card com trend badge
+        ├── SummaryChart.tsx    ← legenda lateral + BarChart
+        ├── SupplementSection.tsx ← header colorido + tabela + gráfico
+        ├── Skeleton.tsx        ← loading skeletons
+        └── ImportExcelModal.tsx ← upload + mapping + import em batch
 ```
 
-### Rotas
+---
 
-| Rota | Componente | Descrição |
-|------|-----------|-----------|
-| `/` | `Relatorio` | Página principal: header + filtros card + KPIs + gráficos + seções por suplemento |
-| `/formulario` | `Formulario` | Adicionar/remover/carregar registros |
-| `/cliente` | `Cliente` | Cadastro de fazenda, logo, contato e lista de pastos |
+## Banco de Dados Supabase
 
-### Persistência (localStorage)
+### Tabelas Existentes
 
-| Chave | Conteúdo |
-|-------|----------|
-| `suplementoControlData` | Array de `DataEntry` (registros de consumo) |
-| `suplementoControlClient` | Objeto `ClientInfo` (dados da fazenda/cliente) |
-| `suplementoControlPastures` | Array de `Pasture` (lista de pastos cadastrados) |
+| Tabela | Descrição |
+|--------|-----------|
+| `farms` | Fazendas (id, nome_fazenda, ativo, ...) |
+| `profiles` | Usuários (id, name, email, role, modules[], farm_id, farm_ids[], active) |
+| `pastures` | Pastos (id, farm_id, nome, area, observacoes) |
+| `data_entries` | Lançamentos (id, farm_id, data, pasto_nome, suplemento, quantidade, periodo, sacos, kg, consumo) |
 
-- Compatibilidade com dados do app HTML antigo (chave `suplementoControlData`)
-- Suporte a legacy arrays-of-arrays (conversão automática em `loadData()`)
-- Auto-persistência via `useEffect` no `DataContext`
+### Tabelas para Migrar (migration_cadastros.sql)
 
-### Melhorias do Figma export (`modelo`) — implementadas
-
-- **Relatorio**: header com title + description + badge "Admin"; filtros em card branco 4-colunas; botão "Limpar filtros"; aviso de resultado vazio dentro do card; botão "Exportar PDF" com ícone `FileDown`; `ChevronDown` nos selects; animações `motion`
-- **SummaryChart**: tornou-se card completo com motion, legenda lateral esquerda + gráfico, aceita `title` e `subtitle`
-- **MetricCard**: trend badge com background colorido (`bg-green-50` / `bg-red-50`)
-- **Formulario**: `pasto` agora é select dinâmico populado da lista de pastos do contexto; `kg = sacos × 25` é auto-calculado
-- **DataContext**: extendido com `ClientInfo` + `Pasture` + CRUD completo (`addPasture`, `deletePasture`, `updatePasture`, `updateClientInfo`)
-- **DashboardLayout**: 3º item de navegação "Cliente" com ícone `Building2`
-- **Cliente**: página completa de cadastro de fazenda com upload de logo (FileReader → base64) e gestão de pastos
-
-### O que NÃO mudou
-- Conteúdo textual do relatório (títulos, colunas, totais)
-- Lógica de cálculo (médias, somas, agrupamentos)
-- Escala dos gráficos por tipo (Energético max=1.5, Mineral max=0.2, Creep max=1.0)
-- Cabeçalho verde "CONTROLE DE CONSUMO..." com "MOVIMENTO PECUÁRIO"
-- Linha de referência vermelha tracejada nos gráficos
-- Suporte a impressão/PDF via `@media print`
+| Tabela | Descrição |
+|--------|-----------|
+| `animals` | Animais (id, farm_id, nome, quantidade, raca, observacoes) |
+| `supplement_types` | Tipos de suplemento (id, farm_id, nome, unidade, observacoes) |
+| `employees` | Funcionários (id, farm_id, nome, funcao, contato) |
+| `equipment` | Equipamentos (id, farm_id, nome, tipo, quantidade, observacoes) |
 
 ---
 
-## FASE PRÓXIMA: Fase 2 — SaaS com Backend
+## Módulos e Rotas
 
-### Objetivo
-Evoluir o app React para um SaaS multi-tenant com banco de dados real, autenticação e deploy em nuvem.
-
-### Stack Planejada
-
-| Camada | Tecnologia | Justificativa |
-|--------|------------|---------------|
-| Framework | Next.js 15 (App Router) | SSR, routing, API routes |
-| Backend/DB | Supabase (PostgreSQL) | Auth, DB, RLS, free tier |
-| UI Base | shadcn/ui | Componentes acessíveis |
-| Import Excel | SheetJS (xlsx) | Migração de planilhas históricas |
-| Hospedagem | Vercel + Supabase | Deploy automático, free tier |
-
-### Banco de Dados (PostgreSQL via Supabase)
-
-```sql
-CREATE TABLE organizations (id UUID PRIMARY KEY, name TEXT, created_at TIMESTAMPTZ);
-CREATE TABLE farms (id UUID PRIMARY KEY, org_id UUID REFERENCES organizations, name TEXT);
-CREATE TABLE divisions (id UUID PRIMARY KEY, farm_id UUID REFERENCES farms, name TEXT);
-CREATE TABLE pastures (id UUID PRIMARY KEY, division_id UUID REFERENCES divisions, name TEXT);
-CREATE TABLE supplements (id UUID PRIMARY KEY, org_id UUID REFERENCES organizations, name TEXT, type TEXT);
-CREATE TABLE forage_types (id UUID PRIMARY KEY, org_id UUID REFERENCES organizations, name TEXT);
-CREATE TABLE consumption_records (
-  id UUID PRIMARY KEY,
-  org_id UUID REFERENCES organizations,
-  farm_id UUID REFERENCES farms,
-  division_id UUID REFERENCES divisions,
-  pasture_id UUID REFERENCES pastures,
-  supplement_id UUID REFERENCES supplements,
-  forage_type_id UUID REFERENCES forage_types,
-  closing_date DATE NOT NULL,
-  lot_size INTEGER,
-  days_count INTEGER DEFAULT 30,
-  sacks_25kg INTEGER,
-  kg_consumed NUMERIC(10,2),
-  consumption_per_head_day NUMERIC(8,4),
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE TABLE profiles (id UUID PRIMARY KEY, user_id UUID REFERENCES auth.users, org_id UUID REFERENCES organizations, role TEXT, name TEXT);
-```
-
-### Fases Detalhadas
-
-#### Fase 2A — Setup + Fundação
-- Criar projeto Next.js 15 com TypeScript + Tailwind
-- Configurar Supabase (projeto + banco + auth)
-- Criar migrations SQL + executar no Supabase
-- Deploy inicial no Vercel
-
-#### Fase 2B — Auth + Layout
-- Login / Registro via Supabase Auth
-- Layout dashboard (Sidebar + Header)
-- Middleware de proteção de rotas
-
-#### Fase 2C — CRUDs Base
-- CRUD Fazendas, Retiros, Pastos, Suplementos, Forragens
-- Seed: Fazenda Malhada Grande com dados de exemplo
-
-#### Fase 2D — Lançamento de Consumo
-- Formulário de lançamento com selects cascata
-- Tabela de registros com paginação e edição inline
-
-#### Fase 2E — Dashboard + Gráficos
-- KPI Cards, FilterBar, gráficos Recharts idênticos à Fase 1
-- Tabelas por suplemento com totais
-
-#### Fase 2F — Relatórios + Import/Export
-- Import de planilha Excel (.xlsx)
-- Export PDF (window.print) + Export Excel/CSV
-
-#### Fase 2G — Polish + Deploy
-- Loading states, responsividade mobile, performance
-- Deploy final Vercel + Supabase produção
+| Rota | Componente | Módulo |
+|------|-----------|--------|
+| `/` | Relatorio | relatorio |
+| `/formulario` | Formulario | formulario |
+| `/cadastros` | Cadastros | cadastros |
+| `/fazendas` | Fazendas | fazendas |
+| `/usuarios` | Usuarios | usuarios |
 
 ---
 
-## Mapeamento: Código Atual → Fase 2 (Next.js)
+## Supabase (self-hosted)
 
-| Fase 1 (React/Vite) | Fase 2 (Next.js/Supabase) |
-|---------------------|---------------------------|
-| `loadData()` localStorage | Supabase queries (`lib/queries/`) |
-| `saveData()` localStorage | Supabase `INSERT`/`UPDATE` |
-| `ClientInfo` localStorage | tabela `farms` + `organizations` |
-| `Pasture[]` localStorage | tabela `pastures` |
-| `groupByType()` em memória | GROUP BY na query SQL |
-| `averageConsumo()` em memória | AVG() na query SQL |
-| `DataContext` state React | Supabase realtime |
-| `window.print()` | API route ou print CSS |
-| Filtros React state | SQL WHERE clauses |
+- **URL:** `https://saas-supabase.bj3amt.easypanel.host`
+- **Admin user:** `admin@suplemento.com` / `admin123`
+- **Client user:** `cliente@malhada.com` / `malhada123`
+- **Farm:** Fazenda Malhada Grande (ID: `10000000-0000-4000-8000-000000000001`)
 
 ---
 
-## Riscos e Mitigações
+## Próximos Passos
 
-| Risco | Mitigação |
-|-------|-----------|
-| Path com Unicode quebra ferramentas | Fase 1 funciona no path atual ✅ |
-| Cliente perde dados na migração | Import de Excel mantém dados históricos |
-| Supabase free tier limitado | 500MB DB + 50K auth users é suficiente para MVP |
-| Gráficos diferentes do Excel | Customização exata em Fase 1 serve como referência |
+1. Executar `supabase/migration_cadastros.sql` no SQL Editor do Supabase
+2. Implementar filtro de data com range (data início / data fim)
+3. Responsividade tablet/mobile
+4. Deploy Vercel
 
 ---
 
 ## Comandos
 
 ```bash
-# Rodar Fase 1 (React + Vite)
+# Desenvolvimento
 cd "suplemento-control"
-npm install       # se necessário
+npm install
 npm run dev       # http://localhost:5173
+
+# Verificação TypeScript
+npx tsc --noEmit
 
 # Build de produção
 npm run build
 npm run preview
-
-# Fase 2 (futuro)
-npx create-next-app@latest suplemento-control-v2 --typescript --tailwind --app --src-dir
 ```

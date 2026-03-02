@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   UserCog, Plus, Pencil, Trash2, Save, X, Eye, EyeOff,
-  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, Leaf, Building2,
+  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -18,13 +18,13 @@ const inputClass =
   'w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
-const ALL_MODULES: Module[] = ['relatorio', 'formulario', 'pastos', 'fazendas', 'usuarios'];
+const ALL_MODULES: Module[] = ['relatorio', 'formulario', 'cadastros', 'fazendas', 'usuarios'];
 const MODULE_LABELS: Record<Module, string> = {
-  relatorio: 'Relatório', formulario: 'Formulário', pastos: 'Pastos',
+  relatorio: 'Relatório', formulario: 'Formulário', cadastros: 'Cadastros',
   fazendas: 'Fazendas', usuarios: 'Usuários',
 };
 const MODULE_ICONS: Record<Module, React.ElementType> = {
-  relatorio: BarChart3, formulario: FileText, pastos: Leaf,
+  relatorio: BarChart3, formulario: FileText, cadastros: FolderOpen,
   fazendas: Building2, usuarios: UserCog,
 };
 

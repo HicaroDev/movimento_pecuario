@@ -1,5 +1,5 @@
 export type Role = 'admin' | 'client';
-export type Module = 'relatorio' | 'formulario' | 'pastos' | 'fazendas' | 'usuarios';
+export type Module = 'relatorio' | 'formulario' | 'cadastros' | 'fazendas' | 'usuarios';
 
 export interface FarmUser {
   id: string;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, Leaf, Users, ChevronDown } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -11,7 +11,7 @@ import type { Farm } from '../types/farm';
 const navItems = [
   { path: '/',           label: 'Relatório',  icon: BarChart3,  module: 'relatorio'  as Module },
   { path: '/formulario', label: 'Formulário', icon: FileText,   module: 'formulario' as Module },
-  { path: '/pastos',     label: 'Pastos',     icon: Leaf,       module: 'pastos'     as Module },
+  { path: '/cadastros',  label: 'Cadastros',  icon: FolderOpen,  module: 'cadastros'  as Module },
   { path: '/fazendas',   label: 'Fazendas',   icon: Building2,  module: 'fazendas'   as Module },
   { path: '/usuarios',   label: 'Usuários',   icon: Users,      module: 'usuarios'   as Module },
 ];

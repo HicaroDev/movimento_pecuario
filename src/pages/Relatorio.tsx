@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { FileDown, ChevronDown, Filter } from 'lucide-react';
+import { FileDown, FileSpreadsheet, ChevronDown, Filter, CalendarDays } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { StatsOverview } from '../components/StatsOverview';
 import { MetricCard } from '../components/MetricCard';
 import { SummaryChart } from '../components/SummaryChart';
@@ -11,21 +13,44 @@ import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { groupByType, averageConsumo, sumQuantidade, fmt } from '../lib/utils';
 import { supplementOrder, supplementColors } from '../lib/data';
 
+const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+const MONTH_FULL  = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_SHORT[m - 1]}/${String(y).slice(2)}`;
+}
+
+function periodFull(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_FULL[m - 1]} ${y}`;
+}
+
 export function Relatorio() {
-  const { entries, loading } = useData();
+  const { entries, loading, clientInfo } = useData();
+  const { user, isAdmin } = useAuth();
 
   const [filterSupplement, setFilterSupplement] = useState('');
-  const [filterPasto, setFilterPasto] = useState('');
-  const [filterPeriodo, setFilterPeriodo] = useState('');
+  const [filterPasto,      setFilterPasto]      = useState('');
+  const [filterPeriodo,    setFilterPeriodo]    = useState('');
+  const [filterMonth,      setFilterMonth]      = useState('');
 
-  const hasFilters = !!filterSupplement || !!filterPasto || !!filterPeriodo;
+  const hasFilters = !!filterSupplement || !!filterPasto || !!filterPeriodo || !!filterMonth;
 
   const clearFilters = () => {
-    setFilterSupplement('');
-    setFilterPasto('');
-    setFilterPeriodo('');
+    setFilterSupplement(''); setFilterPasto('');
+    setFilterPeriodo('');    setFilterMonth('');
     toast.info('Filtros limpos');
   };
+
+  /* ── Month chips derived from entries ── */
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e.data) set.add(e.data.slice(0, 7)); // YYYY-MM
+    }
+    return Array.from(set).sort((a, b) => b.localeCompare(a)); // newest first
+  }, [entries]);
 
   /* ── Unique filter options ── */
   const pastoOptions = useMemo(
@@ -42,25 +67,26 @@ export function Relatorio() {
     () =>
       entries.filter((e) => {
         if (filterSupplement && e.tipo !== filterSupplement) return false;
-        if (filterPasto && e.pasto !== filterPasto) return false;
-        if (filterPeriodo && String(e.periodo) !== filterPeriodo) return false;
+        if (filterPasto      && e.pasto !== filterPasto)     return false;
+        if (filterPeriodo    && String(e.periodo) !== filterPeriodo) return false;
+        if (filterMonth      && (!e.data || !e.data.startsWith(filterMonth))) return false;
         return true;
       }),
-    [entries, filterSupplement, filterPasto, filterPeriodo]
+    [entries, filterSupplement, filterPasto, filterPeriodo, filterMonth]
   );
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);
 
   /* ── KPI stats ── */
-  const totalEntries = filtered.length;
-  const totalAnimals = sumQuantidade(filtered);
-  const totalPastos = new Set(filtered.map((e) => e.pasto)).size;
+  const totalEntries   = filtered.length;
+  const totalAnimals   = sumQuantidade(filtered);
+  const totalPastos    = new Set(filtered.map((e) => e.pasto)).size;
   const avgConsumption = averageConsumo(filtered);
 
   /* ── Per-supplement averages for MetricCards ── */
   const energeticoAvg = averageConsumo(groups['Energético 0,3%'] ?? []);
-  const mineralAvg = averageConsumo(groups['Mineral Adensado Águas'] ?? []);
-  const creepAvg = averageConsumo(groups['Ração Creep'] ?? []);
+  const mineralAvg    = averageConsumo(groups['Mineral Adensado Águas'] ?? []);
+  const creepAvg      = averageConsumo(groups['Ração Creep'] ?? []);
 
   /* ── Summary chart data ── */
   const summaryData = supplementOrder.map((name) => ({
@@ -69,9 +95,34 @@ export function Relatorio() {
     color: supplementColors[name] ?? '#0b6b45',
   }));
 
+  /* ── Dynamic subtitle (farm + month) ── */
+  const farmName   = clientInfo?.nomeFazenda ?? '';
+  const periodoStr = filterMonth ? periodFull(filterMonth) : '';
+  const subtitle   = [farmName, periodoStr].filter(Boolean).join(' — ');
+
+  /* ── Actions ── */
   const handleExportPDF = () => {
     toast.success('Exportando relatório...', { description: 'O PDF será gerado em breve' });
     window.print();
+  };
+
+  const handleExportExcel = () => {
+    const rows = filtered.map((e) => ({
+      DATA:                   e.data ?? '',
+      PASTO:                  e.pasto,
+      QUANTIDADE:             e.quantidade,
+      'TIPO DE SUPLEMENTO':   e.tipo,
+      'PERÍODO (dias)':       e.periodo,
+      'SACOS (25 kg)':        e.sacos,
+      'KG CONSUMIDOS':        e.kg,
+      'CONSUMO (kg/cab dia)': Number(e.consumo.toFixed(3)),
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Relatorio');
+    const tag = farmName.replace(/\s+/g, '_') || 'relatorio';
+    XLSX.writeFile(wb, `relatorio_${tag}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Excel exportado!');
   };
 
   return (
@@ -97,7 +148,7 @@ export function Relatorio() {
             transition={{ duration: 0.5 }}
             className="px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl text-sm font-semibold shadow-lg no-print"
           >
-            Admin
+            {isAdmin ? 'Admin' : user?.name ?? 'Cliente'}
           </motion.span>
         </div>
 
@@ -120,6 +171,31 @@ export function Relatorio() {
               </button>
             )}
           </div>
+
+          {/* Month chips */}
+          {monthOptions.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarDays className="w-4 h-4 text-gray-400" />
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Período</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {monthOptions.map((ym) => (
+                  <button
+                    key={ym}
+                    onClick={() => setFilterMonth(filterMonth === ym ? '' : ym)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                      filterMonth === ym
+                        ? 'bg-gray-900 text-white shadow-md scale-105'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                    }`}
+                  >
+                    {monthLabel(ym)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Suplemento */}
@@ -170,19 +246,27 @@ export function Relatorio() {
               <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
 
-            {/* Export button (4th column) */}
-            <div className="flex items-end">
+            {/* Export buttons (4th column) */}
+            <div className="flex items-end gap-2">
+              <button
+                onClick={handleExportExcel}
+                disabled={filtered.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                Excel
+              </button>
               <button
                 onClick={handleExportPDF}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg font-medium"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg font-medium text-sm"
               >
                 <FileDown className="w-4 h-4" />
-                Exportar PDF
+                PDF
               </button>
             </div>
           </div>
 
-          {filtered.length === 0 && (
+          {filtered.length === 0 && !loading && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
               Nenhum registro encontrado com os filtros selecionados
             </div>
@@ -237,7 +321,7 @@ export function Relatorio() {
           </div>
         )}
 
-        {/* ── Summary page (table + chart) ── */}
+        {/* ── Summary chart ── */}
         {loading ? (
           <div className="mb-8"><SkeletonChart /></div>
         ) : filtered.length > 0 && (
@@ -245,7 +329,7 @@ export function Relatorio() {
             <SummaryChart
               data={summaryData}
               title="CONSUMO KG/CAB DIA — MÉDIAS CONSUMO"
-              subtitle="FAZENDA MALHADA GRANDE — MAR/25"
+              subtitle={subtitle.toUpperCase() || undefined}
             />
           </div>
         )}
@@ -266,7 +350,8 @@ export function Relatorio() {
                     tipo={tipo}
                     color={color}
                     entries={sectionEntries}
-                    periodo="MARÇO 2025"
+                    periodo={periodoStr.toUpperCase() || 'TODOS OS PERÍODOS'}
+                    farmName={farmName}
                   />
                 );
               })}

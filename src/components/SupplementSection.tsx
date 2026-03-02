@@ -17,6 +17,7 @@ interface SupplementSectionProps {
   color: string;
   entries: DataEntry[];
   periodo?: string;
+  farmName?: string;
 }
 
 const CHART_SCALES: Record<string, { max: number; step: number }> = {
@@ -25,7 +26,7 @@ const CHART_SCALES: Record<string, { max: number; step: number }> = {
   'Ração Creep':            { max: 1.0,  step: 0.25 },
 };
 
-export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025' }: SupplementSectionProps) {
+export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025', farmName = 'FAZENDA MALHADA GRANDE' }: SupplementSectionProps) {
   const avg      = averageConsumo(entries);
   const totalQtd = sumQuantidade(entries);
 
@@ -52,7 +53,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
         style={{ backgroundColor: color }}
       >
         <span className="text-white text-sm font-bold tracking-wide">
-          CONTROLE DE CONSUMO SUPLEMENTOS - FAZENDA MALHADA GRANDE 2025
+          CONTROLE DE CONSUMO SUPLEMENTOS — {farmName.toUpperCase()}
         </span>
         <span className="text-white text-xs font-bold border border-white/40 px-2 py-0.5 rounded">
           MOVIMENTO PECUÁRIO

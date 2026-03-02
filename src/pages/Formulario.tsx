@@ -1,12 +1,14 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2 } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
 import type { DataEntry } from '../lib/data';
 import { supplementOrder } from '../lib/data';
 import { fmt, fmtInt } from '../lib/utils';
+import { ImportExcelModal } from '../components/ImportExcelModal';
 
 interface FormFields {
   pasto: string;
@@ -22,6 +24,7 @@ const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 
 export function Formulario() {
   const { entries, addEntry, removeEntry, clearAll, loadSample, pastures, loading } = useData();
+  const [showImport, setShowImport] = useState(false);
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormFields>({
     defaultValues: { periodo: 30 },
@@ -97,6 +100,14 @@ export function Formulario() {
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900">Novo Registro</h2>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                Importar Excel
+              </button>
               <button
                 type="button"
                 onClick={handleLoadSample}
@@ -286,6 +297,8 @@ export function Formulario() {
           )}
         </motion.div>
       </motion.div>
+
+      {showImport && <ImportExcelModal onClose={() => setShowImport(false)} />}
     </div>
   );
 }
