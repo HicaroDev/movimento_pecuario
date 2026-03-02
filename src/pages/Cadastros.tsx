@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
-import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag } from 'lucide-react';
+import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag, Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useData } from '../context/DataContext';
@@ -259,6 +259,8 @@ function PastosTab() {
   const [showRetiros, setShowRetiros] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [filterRetiro, setFilterRetiro] = useState('');
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PastureForm>();
   const { activeFarmId } = useData();
 
@@ -273,6 +275,12 @@ function PastosTab() {
   }, [activeFarmId]);
 
   function getRetiroName(id?: string) { return retiros.find(r => r.id === id)?.nome; }
+
+  const filteredPastures = pastures.filter(p => {
+    const matchText = !filterText || p.nome.toLowerCase().includes(filterText.toLowerCase());
+    const matchRetiro = !filterRetiro || p.retiro_id === filterRetiro;
+    return matchText && matchRetiro;
+  });
 
   function onAdd(data: PastureForm) {
     addPasture({ nome: data.nome, area: data.area, retiro_id: data.retiro_id || undefined, observacoes: data.observacoes });
@@ -320,7 +328,32 @@ function PastosTab() {
 
       {/* ── Lista de Pastos ── */}
       <div>
-        <div className="flex justify-end mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Filtrar por nome do pasto..."
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              className="w-full h-9 pl-8 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+            />
+          </div>
+          {/* Filtro por retiro */}
+          <div className="relative">
+            <select
+              value={filterRetiro}
+              onChange={e => setFilterRetiro(e.target.value)}
+              className="h-9 pl-3 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer transition-colors"
+              style={{ minWidth: 140 }}
+            >
+              <option value="">Todos os retiros</option>
+              {retiros.map(r => (
+                <option key={r.id} value={r.id}>{r.nome}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
           <AddBtn label="Novo Pasto" onClick={() => setShowAddForm(v => !v)} />
         </div>
         {showAddForm && (
@@ -379,7 +412,13 @@ function PastosTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {pastures.map(p =>
+                    {filteredPastures.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center text-sm text-gray-400">
+                          Nenhum pasto encontrado para "{filterText}"
+                        </td>
+                      </tr>
+                    ) : filteredPastures.map(p =>
                       editingId === p.id ? (
                         <PastureEditRow key={p.id} pasture={p} retiros={retiros}
                           onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
@@ -398,6 +437,16 @@ function PastosTab() {
                       )
                     )}
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={5} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+                        {filterText
+                          ? `${filteredPastures.length} de ${pastures.length} pastos`
+                          : `${pastures.length} pasto${pastures.length !== 1 ? 's' : ''} cadastrado${pastures.length !== 1 ? 's' : ''}`
+                        }
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
