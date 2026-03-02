@@ -13,8 +13,6 @@ const inputClass =
 const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
 /* ── Local types ── */
-interface Retiro          { id: string; farm_id: string; nome: string; observacoes?: string; }
-interface ForageType      { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; observacoes?: string; }
 interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; observacoes?: string; }
@@ -400,7 +398,7 @@ function AnimaisTab() {
     const payload = { nome: data.nome, quantidade: data.quantidade, raca: data.raca || null, categoria_id: data.categoria_id || null, observacoes: data.observacoes || null };
     const { error } = await supabase.from('animals').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, ...payload } : a); setItems(_animaisCache);
+    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, nome: data.nome, quantidade: data.quantidade, raca: data.raca || undefined, categoria_id: data.categoria_id || undefined, observacoes: data.observacoes || undefined } : a); setItems(_animaisCache);
     toast.success('Lote atualizado!'); setEditingId(null);
   }
 
