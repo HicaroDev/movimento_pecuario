@@ -105,14 +105,20 @@ function SimpleTab({
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let mounted = true;
     setLoading(true);
-    supabase.from(table).select('*').eq('farm_id', activeFarmId).order('nome')
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase.from(table).select('*').eq('farm_id', activeFarmId).order('nome');
+        if (!mounted) return;
         const list = data ?? [];
         setItems(list);
         onDataChange?.(list);
-        setLoading(false);
-      });
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [activeFarmId, table]);
 
   function notify(list: SimpleItem[]) { setItems(list); onDataChange?.(list); }
@@ -382,15 +388,22 @@ function AnimaisTab() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let mounted = true;
     setLoading(true);
-    Promise.all([
-      supabase.from('animals').select('*').eq('farm_id', activeFarmId).order('nome'),
-      supabase.from('animal_categories').select('*').eq('farm_id', activeFarmId).order('nome'),
-    ]).then(([animRes, catRes]) => {
-      _animaisCache = animRes.data ?? []; setItems(_animaisCache);
-      _acatCache = catRes.data ?? []; setCategories(_acatCache);
-      setLoading(false);
-    });
+    (async () => {
+      try {
+        const [animRes, catRes] = await Promise.all([
+          supabase.from('animals').select('*').eq('farm_id', activeFarmId).order('nome'),
+          supabase.from('animal_categories').select('*').eq('farm_id', activeFarmId).order('nome'),
+        ]);
+        if (!mounted) return;
+        _animaisCache = animRes.data ?? []; setItems(_animaisCache);
+        _acatCache = catRes.data ?? []; setCategories(_acatCache);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [activeFarmId]);
 
   async function onAdd(data: AnimalForm) {
@@ -585,8 +598,16 @@ function SuplementosTab() {
   useEffect(() => {
     if (!activeFarmId) return;
     setLoading(true);
-    supabase.from('supplement_types').select('*').eq('farm_id', activeFarmId).order('nome')
-      .then(({ data }) => { _suplementosCache = data ?? []; setItems(_suplementosCache); setLoading(false); });
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('supplement_types').select('*').eq('farm_id', activeFarmId).order('nome');
+        if (mounted) { _suplementosCache = data ?? []; setItems(_suplementosCache); }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [activeFarmId]);
 
   async function onAdd(data: SupplementForm) {
@@ -686,8 +707,16 @@ function FuncionariosTab() {
   useEffect(() => {
     if (!activeFarmId) return;
     setLoading(true);
-    supabase.from('employees').select('*').eq('farm_id', activeFarmId).order('nome')
-      .then(({ data }) => { _funcionariosCache = data ?? []; setItems(_funcionariosCache); setLoading(false); });
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
+        if (mounted) { _funcionariosCache = data ?? []; setItems(_funcionariosCache); }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [activeFarmId]);
 
   async function onAdd(data: EmployeeForm) {
@@ -786,8 +815,16 @@ function EquipamentosTab() {
   useEffect(() => {
     if (!activeFarmId) return;
     setLoading(true);
-    supabase.from('equipment').select('*').eq('farm_id', activeFarmId).order('nome')
-      .then(({ data }) => { _equipamentosCache = data ?? []; setItems(_equipamentosCache); setLoading(false); });
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('equipment').select('*').eq('farm_id', activeFarmId).order('nome');
+        if (mounted) { _equipamentosCache = data ?? []; setItems(_equipamentosCache); }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [activeFarmId]);
 
   async function onAdd(data: EquipmentForm) {
