@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
-import { Leaf, Beef, Package, Users, Wrench, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag } from 'lucide-react';
+import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useData } from '../context/DataContext';
@@ -17,17 +17,14 @@ interface AnimalCategory  { id: string; farm_id: string; nome: string; observaco
 interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; observacoes?: string; }
 interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
-interface Equipment       { id: string; farm_id: string; nome: string; tipo?: string; quantidade: number; observacoes?: string; }
 
 /* ── Tab definition ── */
 const TABS = [
   { key: 'pastos',       label: 'Pastos',       icon: Leaf    },
-  { key: 'retiros',      label: 'Retiros',      icon: MapPin  },
   { key: 'animais',      label: 'Animais',      icon: Beef    },
   { key: 'forragens',    label: 'Forragens',    icon: Sprout  },
   { key: 'suplementos',  label: 'Suplementos',  icon: Package },
   { key: 'funcionarios', label: 'Funcionários', icon: Users   },
-  { key: 'equipamentos', label: 'Equipamentos', icon: Wrench  },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -230,19 +227,26 @@ function SimpleTab({
 /* ═══════════════════════════════════════════════════════════════
    PastosTab — reutiliza DataContext
 ═══════════════════════════════════════════════════════════════ */
-interface PastureForm { nome: string; area: number; observacoes: string; }
+interface PastureForm { nome: string; area: number; retiro_id: string; observacoes: string; }
 
-function PastureEditRow({ pasture, onSave, onCancel }: {
-  pasture: { id: string; nome: string; area?: number; observacoes?: string };
+function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
+  pasture: { id: string; nome: string; area?: number; retiro_id?: string; observacoes?: string };
+  retiros: SimpleItem[];
   onSave: (data: PastureForm) => void; onCancel: () => void;
 }) {
   const { register, handleSubmit } = useForm<PastureForm>({
-    defaultValues: { nome: pasture.nome, area: pasture.area ?? 0, observacoes: pasture.observacoes || '' },
+    defaultValues: { nome: pasture.nome, area: pasture.area ?? 0, retiro_id: pasture.retiro_id || '', observacoes: pasture.observacoes || '' },
   });
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} placeholder="Nome" /></td>
       <td className="px-4 py-2"><input type="number" step="0.01" {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} placeholder="0.0" /></td>
+      <td className="px-4 py-2">
+        <select {...register('retiro_id')} className={inputClass}>
+          <option value="">— Sem retiro —</option>
+          {retiros.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} placeholder="Observações" /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
@@ -251,16 +255,33 @@ function PastureEditRow({ pasture, onSave, onCancel }: {
 
 function PastosTab() {
   const { pastures, addPasture, deletePasture, updatePasture, loading } = useData();
+  const [retiros, setRetiros] = useState<SimpleItem[]>([]);
+  const [showRetiros, setShowRetiros] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PastureForm>();
+  const { activeFarmId } = useData();
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    let mounted = true;
+    (async () => {
+      const { data } = await supabase.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome');
+      if (mounted) setRetiros(data ?? []);
+    })();
+    return () => { mounted = false; };
+  }, [activeFarmId]);
+
+  function getRetiroName(id?: string) { return retiros.find(r => r.id === id)?.nome; }
 
   function onAdd(data: PastureForm) {
-    addPasture(data); toast.success('Pasto adicionado!', { description: data.nome });
+    addPasture({ nome: data.nome, area: data.area, retiro_id: data.retiro_id || undefined, observacoes: data.observacoes });
+    toast.success('Pasto adicionado!', { description: data.nome });
     reset(); setShowAddForm(false);
   }
   function onEditSave(id: string, data: PastureForm) {
-    updatePasture(id, data); toast.success('Pasto atualizado!'); setEditingId(null);
+    updatePasture(id, { nome: data.nome, area: data.area, retiro_id: data.retiro_id || undefined, observacoes: data.observacoes });
+    toast.success('Pasto atualizado!'); setEditingId(null);
   }
   function onDelete(p: { id: string; nome: string }) {
     if (!window.confirm(`Remover o pasto "${p.nome}"?`)) return;
@@ -268,78 +289,121 @@ function PastosTab() {
   }
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <AddBtn label="Novo Pasto" onClick={() => setShowAddForm(v => !v)} />
+    <div className="space-y-6">
+      {/* ── Sub-seção Retiros (expansível) ── */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowRetiros(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <MapPin className="w-4 h-4 text-teal-600" />
+            Retiros
+            <span className="text-xs font-normal text-gray-400 ml-1">({retiros.length} cadastrados)</span>
+          </div>
+          <span className="text-gray-400 text-xs">{showRetiros ? '▲ Recolher' : '▼ Expandir'}</span>
+        </button>
+        {showRetiros && (
+          <div className="border-t border-gray-100 p-5">
+            <SimpleTab
+              table="retiros"
+              label="Retiro"
+              icon={MapPin}
+              emptyText="Nenhum retiro cadastrado"
+              newLabel="Novo Retiro"
+              initialItems={retiros}
+              onDataChange={list => setRetiros(list)}
+            />
+          </div>
+        )}
       </div>
-      {showAddForm && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
-          <h2 className="text-base font-bold text-gray-900 mb-4">Adicionar Pasto</h2>
-          <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Nome *</label>
-              <input placeholder="Ex: Lagoa Verde" {...register('nome', { required: true })}
-                className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
-            </div>
-            <div>
-              <label className={labelClass}>Área (ha)</label>
-              <input type="number" step="0.01" placeholder="10.5"
-                {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Observações</label>
-              <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
-            </div>
-            <div className="col-span-3 flex gap-3">
-              <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
-                <Plus className="w-4 h-4" /> Adicionar
-              </button>
-              <button type="button" onClick={() => { setShowAddForm(false); reset(); }}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      )}
-      {loading ? <SkeletonTable rows={4} cols={4} /> : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {pastures.length === 0 ? (
-            <div className="py-16 text-center">
-              <Leaf className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">Nenhum pasto cadastrado</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Nome do Pasto', 'Área (ha)', 'Observações', 'Ações'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {pastures.map(p =>
-                    editingId === p.id ? (
-                      <PastureEditRow key={p.id} pasture={p}
-                        onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
-                    ) : (
-                      <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-900"><div className="flex items-center gap-2"><Leaf className="w-3.5 h-3.5 text-teal-500" />{p.nome}</div></td>
-                        <td className="px-4 py-3 text-gray-600">{p.area ? `${p.area} ha` : '—'}</td>
-                        <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.observacoes || '—'}</td>
-                        <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(p.id)} onDelete={() => onDelete(p)} /></td>
-                      </motion.tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+
+      {/* ── Lista de Pastos ── */}
+      <div>
+        <div className="flex justify-end mb-4">
+          <AddBtn label="Novo Pasto" onClick={() => setShowAddForm(v => !v)} />
         </div>
-      )}
+        {showAddForm && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
+            <h2 className="text-base font-bold text-gray-900 mb-4">Adicionar Pasto</h2>
+            <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Nome *</label>
+                <input placeholder="Ex: Lagoa Verde" {...register('nome', { required: true })}
+                  className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+              </div>
+              <div>
+                <label className={labelClass}>Área (ha)</label>
+                <input type="number" step="0.01" placeholder="10.5"
+                  {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Retiro <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <select {...register('retiro_id')} className={`${inputClass} cursor-pointer`}>
+                  <option value="">— Sem retiro —</option>
+                  {retiros.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Observações</label>
+                <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
+              </div>
+              <div className="col-span-2 flex gap-3">
+                <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
+                  <Plus className="w-4 h-4" /> Adicionar
+                </button>
+                <button type="button" onClick={() => { setShowAddForm(false); reset(); }}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+        {loading ? <SkeletonTable rows={4} cols={5} /> : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {pastures.length === 0 ? (
+              <div className="py-16 text-center">
+                <Leaf className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">Nenhum pasto cadastrado</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {['Nome do Pasto', 'Área (ha)', 'Retiro', 'Observações', 'Ações'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pastures.map(p =>
+                      editingId === p.id ? (
+                        <PastureEditRow key={p.id} pasture={p} retiros={retiros}
+                          onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
+                      ) : (
+                        <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-900"><div className="flex items-center gap-2"><Leaf className="w-3.5 h-3.5 text-teal-500" />{p.nome}</div></td>
+                          <td className="px-4 py-3 text-gray-600">{p.area ? `${p.area} ha` : '—'}</td>
+                          <td className="px-4 py-3">
+                            {getRetiroName(p.retiro_id)
+                              ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700">{getRetiroName(p.retiro_id)}</span>
+                              : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.observacoes || '—'}</td>
+                          <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(p.id)} onDelete={() => onDelete(p)} /></td>
+                        </motion.tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -783,115 +847,6 @@ function FuncionariosTab() {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   EquipamentosTab
-═══════════════════════════════════════════════════════════════ */
-let _equipamentosCache: Equipment[] = [];
-interface EquipmentForm { nome: string; tipo: string; quantidade: number; observacoes: string; }
-
-function EquipEditRow({ item, onSave, onCancel }: { item: Equipment; onSave: (d: EquipmentForm) => void; onCancel: () => void; }) {
-  const { register, handleSubmit } = useForm<EquipmentForm>({
-    defaultValues: { nome: item.nome, tipo: item.tipo || '', quantidade: item.quantidade, observacoes: item.observacoes || '' },
-  });
-  return (
-    <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('tipo')} className={inputClass} /></td>
-      <td className="px-4 py-2"><input type="number" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} /></td>
-      <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
-    </tr>
-  );
-}
-
-function EquipamentosTab() {
-  const { activeFarmId } = useData();
-  const [items, setItems] = useState<Equipment[]>(_equipamentosCache);
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EquipmentForm>({ defaultValues: { quantidade: 1 } });
-
-  useEffect(() => {
-    if (!activeFarmId) return;
-    setLoading(true);
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await supabase.from('equipment').select('*').eq('farm_id', activeFarmId).order('nome');
-        if (mounted) { _equipamentosCache = data ?? []; setItems(_equipamentosCache); }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [activeFarmId]);
-
-  async function onAdd(data: EquipmentForm) {
-    if (!activeFarmId) return;
-    const { data: row, error } = await supabase.from('equipment').insert({ ...data, farm_id: activeFarmId }).select().single();
-    if (error) { toast.error('Erro ao adicionar.'); return; }
-    _equipamentosCache = [..._equipamentosCache, row]; setItems(_equipamentosCache);
-    toast.success('Equipamento adicionado!', { description: data.nome });
-    reset({ quantidade: 1 }); setShowAddForm(false);
-  }
-  async function onEditSave(id: string, data: EquipmentForm) {
-    const { error } = await supabase.from('equipment').update(data).eq('id', id);
-    if (error) { toast.error('Erro ao atualizar.'); return; }
-    _equipamentosCache = _equipamentosCache.map(e => e.id === id ? { ...e, ...data } : e); setItems(_equipamentosCache);
-    toast.success('Equipamento atualizado!'); setEditingId(null);
-  }
-  async function onDelete(id: string, nome: string) {
-    if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabase.from('equipment').delete().eq('id', id);
-    if (error) { toast.error('Erro ao remover.'); return; }
-    _equipamentosCache = _equipamentosCache.filter(e => e.id !== id); setItems(_equipamentosCache);
-    toast.success('Equipamento removido.');
-  }
-
-  return (
-    <div>
-      <div className="flex justify-end mb-4"><AddBtn label="Novo Equipamento" onClick={() => setShowAddForm(v => !v)} /></div>
-      {showAddForm && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
-          <h2 className="text-base font-bold text-gray-900 mb-4">Adicionar Equipamento</h2>
-          <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
-            <div><label className={labelClass}>Nome *</label>
-              <input placeholder="Ex: Trator" {...register('nome', { required: true })} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} /></div>
-            <div><label className={labelClass}>Tipo</label><input placeholder="Maquinário" {...register('tipo')} className={inputClass} /></div>
-            <div><label className={labelClass}>Quantidade</label><input type="number" placeholder="1" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} /></div>
-            <div><label className={labelClass}>Observações</label><input placeholder="Info adicional" {...register('observacoes')} className={inputClass} /></div>
-            <div className="col-span-2 flex gap-3">
-              <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"><Plus className="w-4 h-4" /> Adicionar</button>
-              <button type="button" onClick={() => { setShowAddForm(false); reset({ quantidade: 1 }); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
-            </div>
-          </form>
-        </motion.div>
-      )}
-      {loading ? <SkeletonTable rows={4} cols={5} /> : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {items.length === 0 ? (<div className="py-16 text-center"><Wrench className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">Nenhum equipamento cadastrado</p></div>) : (
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead><tr className="bg-gray-50 border-b border-gray-200">{['Nome', 'Tipo', 'Qtd', 'Obs', 'Ações'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>))}</tr></thead>
-              <tbody className="divide-y divide-gray-100">{items.map(item => editingId === item.id ? (
-                <EquipEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-              ) : (
-                <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.tipo || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.quantidade}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
-                  <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
-                </motion.tr>
-              ))}</tbody>
-            </table></div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════
    Cadastros — página principal
@@ -933,12 +888,10 @@ export function Cadastros() {
 
         {/* Tab content */}
         {activeTab === 'pastos'       && <PastosTab />}
-        {activeTab === 'retiros'      && <SimpleTab table="retiros" label="Retiro" icon={MapPin} emptyText="Nenhum retiro cadastrado" newLabel="Novo Retiro" />}
         {activeTab === 'animais'      && <AnimaisTab />}
         {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" />}
         {activeTab === 'suplementos'  && <SuplementosTab />}
         {activeTab === 'funcionarios' && <FuncionariosTab />}
-        {activeTab === 'equipamentos' && <EquipamentosTab />}
 
       </motion.div>
     </div>

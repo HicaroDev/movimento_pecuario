@@ -14,6 +14,7 @@ export interface Pasture {
   nome: string;
   area?: number;
   observacoes?: string;
+  retiro_id?: string;
 }
 
 export type ClientInfo = Farm;
@@ -40,6 +41,7 @@ function toPasture(row: Record<string, unknown>): Pasture {
     nome:        row.nome as string,
     area:        (row.area as number) ?? undefined,
     observacoes: (row.observacoes as string) ?? undefined,
+    retiro_id:   (row.retiro_id as string) ?? undefined,
   };
 }
 
@@ -267,6 +269,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     supabase.from('pastures').insert({
       farm_id: activeFarmId, nome: p.nome,
       area: p.area ?? null, observacoes: p.observacoes ?? null,
+      retiro_id: p.retiro_id ?? null,
     }).select().single().then(({ data, error }) => {
       if (data) setPastures(prev => prev.map(x => x.id === tempId ? toPasture(data) : x));
       if (error) setPastures(prev => prev.filter(x => x.id !== tempId));
@@ -284,6 +287,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(patch.nome        !== undefined && { nome:        patch.nome }),
       ...(patch.area        !== undefined && { area:        patch.area ?? null }),
       ...(patch.observacoes !== undefined && { observacoes: patch.observacoes ?? null }),
+      ...(patch.retiro_id   !== undefined && { retiro_id:   patch.retiro_id ?? null }),
     }).eq('id', id);
   }
 
