@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
-  X, Save, RefreshCw, ChevronDown, AlertTriangle, History,
+  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -26,6 +26,8 @@ const TIPO_LABELS: Record<string, string> = {
   alocacao:           'Alocação',
   transferencia:      'Transferência',
   evolucao_categoria: 'Evolução',
+  paricao:            'Parição',
+  manejo_bezerros:    'Bezerros',
   abate:              'Saída',
   ajuste_quantidade:  'Ajuste',
 };
@@ -33,6 +35,8 @@ const TIPO_COLORS: Record<string, string> = {
   alocacao:           'bg-blue-50 text-blue-700',
   transferencia:      'bg-indigo-50 text-indigo-700',
   evolucao_categoria: 'bg-amber-50 text-amber-700',
+  paricao:            'bg-pink-50 text-pink-700',
+  manejo_bezerros:    'bg-orange-50 text-orange-700',
   abate:              'bg-red-50 text-red-700',
   ajuste_quantidade:  'bg-gray-100 text-gray-600',
 };
@@ -69,15 +73,57 @@ function HistoricoTable({ events, loading }: { events: ManejoEvent[]; loading: b
 ══════════════════════════════════════════════════════════════ */
 
 function LotesTab({
-  animals, pastures, categories, onReload,
+  animals, pastures, categories, farmId, onReload,
 }: {
   animals: Animal[]; pastures: Pasture[]; categories: AnimalCategory[];
-  onReload: () => void;
+  farmId: string; onReload: () => void;
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
   const [dataAlocacao, setDataAlocacao] = useState(() => new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
+
+  // ── Filter ──
+  const [search, setSearch] = useState('');
+
+  // ── Histórico drawer ──
+  const [showHistorico, setShowHistorico] = useState(false);
+  const [historicoEvents, setHistoricoEvents] = useState<ManejoEvent[]>([]);
+  const [loadingH, setLoadingH] = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const [dataInicio, setDataInicio] = useState(firstOfMonth);
+  const [dataFim, setDataFim] = useState(todayStr);
+
+  // Month chips — last 6 months
+  const monthChips = useMemo(() => {
+    const chips: { label: string; start: string; end: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const start = d.toISOString().split('T')[0];
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+      chips.push({ label, start, end });
+    }
+    return chips;
+  }, []);
+
+  // Fetch when drawer opens
+  useEffect(() => {
+    if (!showHistorico) return;
+    setLoadingH(true);
+    manejoService.listarHistorico(farmId, undefined, 300)
+      .then(setHistoricoEvents).catch(() => {}).finally(() => setLoadingH(false));
+  }, [showHistorico, farmId]);
+
+  // Client-side date filter
+  const filteredEvents = useMemo(() =>
+    historicoEvents.filter(e => {
+      const d = e.created_at.split('T')[0];
+      return d >= dataInicio && d <= dataFim;
+    }),
+  [historicoEvents, dataInicio, dataFim]);
 
   const catMap = useMemo(
     () => Object.fromEntries(categories.map(c => [c.id, c.nome])),
@@ -90,17 +136,27 @@ function LotesTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
+  // Search filter on active animals
+  const ativosFiltrados = useMemo(() => {
+    if (!search.trim()) return ativos;
+    const q = search.toLowerCase();
+    return ativos.filter(a =>
+      a.nome.toLowerCase().includes(q) ||
+      (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q))
+    );
+  }, [ativos, search, catMap]);
+
   const byPasto = useMemo(() => {
     const map: Record<string, Animal[]> = {};
-    for (const a of ativos) {
+    for (const a of ativosFiltrados) {
       if (a.pasto_id) {
         map[a.pasto_id] = [...(map[a.pasto_id] ?? []), a];
       }
     }
     return map;
-  }, [ativos]);
+  }, [ativosFiltrados]);
 
-  const semPasto = ativos.filter(a => !a.pasto_id);
+  const semPasto = ativosFiltrados.filter(a => !a.pasto_id);
   const pastosComLotes = pastures.filter(p => byPasto[p.id]?.length);
 
   async function confirmarAlocacao() {
@@ -168,6 +224,37 @@ function LotesTab({
 
   return (
     <>
+      {/* Toolbar: search + Histórico */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filtrar lotes por nome ou categoria…"
+            className="w-full h-9 pl-9 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {search && (
+          <span className="text-xs text-gray-500 flex-shrink-0">
+            {ativosFiltrados.length} lote{ativosFiltrados.length !== 1 ? 's' : ''}
+          </span>
+        )}
+        <button
+          onClick={() => setShowHistorico(true)}
+          className="ml-auto flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-500 hover:text-teal-600 hover:border-teal-300 transition-colors shadow-sm">
+          <History className="w-4 h-4" />
+          Histórico
+        </button>
+      </div>
+
       <div className="space-y-6">
         {pastosComLotes.map(p => (
           <section key={p.id}>
@@ -200,6 +287,71 @@ function LotesTab({
           </section>
         )}
       </div>
+
+      {/* Histórico drawer */}
+      <AnimatePresence>
+        {showHistorico && (
+          <div className="fixed inset-0 z-50 flex">
+            <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowHistorico(false)} />
+            <motion.div
+              className="relative ml-auto bg-white w-full max-w-lg h-full flex flex-col shadow-2xl z-10"
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-teal-600" />
+                  <h3 className="font-bold text-gray-900">Histórico de movimentações</h3>
+                </div>
+                <button onClick={() => setShowHistorico(false)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Date filter */}
+              <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 space-y-3">
+                {/* Month chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {monthChips.map(chip => {
+                    const active = dataInicio === chip.start && dataFim === chip.end;
+                    return (
+                      <button key={chip.start}
+                        onClick={() => { setDataInicio(chip.start); setDataFim(chip.end); }}
+                        className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors capitalize ${
+                          active
+                            ? 'bg-teal-600 text-white border-teal-600'
+                            : 'border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 bg-white'
+                        }`}>
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Custom date range */}
+                <div className="flex items-center gap-2">
+                  <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}
+                    className="flex-1 h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <span className="text-xs text-gray-400 flex-shrink-0">até</span>
+                  <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
+                    className="flex-1 h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                </div>
+                <p className="text-xs text-gray-400">
+                  {filteredEvents.length} evento{filteredEvents.length !== 1 ? 's' : ''} no período
+                </p>
+              </div>
+
+              {/* Events list */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <HistoricoTable events={filteredEvents} loading={loadingH} />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal alocar */}
       <AnimatePresence>
@@ -383,129 +535,364 @@ function TransferirTab({
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TAB 3 — Evolução de Categoria
+   TAB 3 — Evolução (Categoria · Parição · Bezerros)
 ══════════════════════════════════════════════════════════════ */
+
+type SubOp = 'categoria' | 'paricao' | 'bezerros';
+type DestinoTipo = 'existente' | 'novo';
 
 function EvolucaoTab({
   animals, categories, farmId, onReload,
 }: {
   animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [novaCatId, setNovaCatId] = useState('');
-  const [pesoMedio, setPesoMedio] = useState('');
+  const [subOp, setSubOp]         = useState<SubOp>('categoria');
   const [saving, setSaving]       = useState(false);
   const [events, setEvents]       = useState<ManejoEvent[]>([]);
   const [loadingH, setLoadingH]   = useState(true);
 
+  /* ── Categoria ── */
+  const [selected, setSelected]   = useState<Set<string>>(new Set());
+  const [novaCatId, setNovaCatId] = useState('');
+  const [catPeso, setCatPeso]     = useState('');
+
+  /* ── Parição ── */
+  const [parLoteMaeId, setParLoteMaeId]   = useState('');
+  const [parQtd, setParQtd]               = useState('');
+  const [parPeso, setParPeso]             = useState('');
+  const [parData, setParData]             = useState(() => new Date().toISOString().split('T')[0]);
+  const [parDestino, setParDestino]       = useState<DestinoTipo>('novo');
+  const [parLoteDestId, setParLoteDestId] = useState('');
+  const [parNovoNome, setParNovoNome]     = useState('');
+  const [parNovoCatId, setParNovoCatId]   = useState('');
+
+  /* ── Bezerros ── */
+  const [bezLoteId, setBezLoteId]         = useState('');
+  const [bezQtd, setBezQtd]               = useState('');
+  const [bezPeso, setBezPeso]             = useState('');
+  const [bezData, setBezData]             = useState(() => new Date().toISOString().split('T')[0]);
+  const [bezDestino, setBezDestino]       = useState<DestinoTipo>('novo');
+  const [bezLoteDestId, setBezLoteDestId] = useState('');
+  const [bezNovoNome, setBezNovoNome]     = useState('');
+  const [bezNovoCatId, setBezNovoCatId]   = useState('');
+
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
 
+  const EVOLUCAO_TIPOS = ['evolucao_categoria', 'paricao', 'manejo_bezerros'];
+
   useEffect(() => {
     setLoadingH(true);
-    manejoService.listarHistorico(farmId, 'evolucao_categoria', 20)
+    manejoService.listarHistorico(farmId, EVOLUCAO_TIPOS, 30)
       .then(setEvents).catch(() => {}).finally(() => setLoadingH(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmId]);
 
-  function toggle(id: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  async function reloadHistorico() {
+    const updated = await manejoService.listarHistorico(farmId, EVOLUCAO_TIPOS, 30);
+    setEvents(updated);
   }
 
+  /* checkboxes */
+  function toggle(id: string) {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
   const selectedAnimals = ativos.filter(a => selected.has(a.id));
   const totalCab = selectedAnimals.reduce((s, a) => s + a.quantidade, 0);
 
-  async function confirmar() {
+  /* ── Confirmar: Categoria ── */
+  async function confirmarCategoria() {
     if (selected.size === 0) { toast.error('Selecione pelo menos um lote.'); return; }
     if (!novaCatId) { toast.error('Selecione a nova categoria.'); return; }
     const catOrigemNomes = [...new Set(selectedAnimals.map(a => a.categoria_id ? (catMap[a.categoria_id] ?? 'sem categoria') : 'sem categoria'))].join(', ');
-    const catDestinoNome = catMap[novaCatId] ?? novaCatId;
     setSaving(true);
     try {
-      await manejoService.evoluirCategorias(
-        selectedAnimals, novaCatId,
-        catOrigemNomes, catDestinoNome,
-        pesoMedio ? Number(pesoMedio) : undefined,
-      );
-      toast.success(`${selected.size} lote(s) evoluído(s) para ${catDestinoNome}!`);
-      setSelected(new Set()); setNovaCatId(''); setPesoMedio('');
-      onReload();
-      const updated = await manejoService.listarHistorico(farmId, 'evolucao_categoria', 20);
-      setEvents(updated);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao evoluir categoria.');
-    } finally {
-      setSaving(false);
-    }
+      await manejoService.evoluirCategorias(selectedAnimals, novaCatId, catOrigemNomes, catMap[novaCatId] ?? novaCatId, catPeso ? Number(catPeso) : undefined);
+      toast.success(`${selected.size} lote(s) evoluído(s) para ${catMap[novaCatId]}!`);
+      setSelected(new Set()); setNovaCatId(''); setCatPeso('');
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Seleção + form */}
-      <div className="space-y-4">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-teal-600" />
-              <h3 className="font-semibold text-gray-900 text-sm">Selecione os lotes</h3>
-            </div>
-            {selected.size > 0 && (
-              <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
-                {selected.size} selecionado{selected.size !== 1 ? 's' : ''} · {totalCab} cab.
-              </span>
-            )}
-          </div>
-          <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
-            {ativos.length === 0 ? (
-              <p className="text-center py-8 text-sm text-gray-400">Nenhum lote ativo.</p>
-            ) : ativos.map(a => {
-              const on = selected.has(a.id);
-              return (
-                <label key={a.id}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${on ? 'bg-teal-50' : 'hover:bg-gray-50'}`}>
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${on ? 'bg-teal-500 border-teal-500' : 'border-gray-300'}`}>
-                    {on && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                  </div>
-                  <input type="checkbox" checked={on} onChange={() => toggle(a.id)} className="sr-only" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{a.nome}</p>
-                    <p className="text-xs text-gray-500">
-                      {a.categoria_id ? catMap[a.categoria_id] : 'sem categoria'} · {a.quantidade} cab.
-                    </p>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+  /* ── Confirmar: Parição ── */
+  async function confirmarParicao() {
+    if (!parLoteMaeId) { toast.error('Selecione o lote mãe.'); return; }
+    if (!parQtd || Number(parQtd) <= 0) { toast.error('Informe a quantidade de partos.'); return; }
+    if (parDestino === 'existente' && !parLoteDestId) { toast.error('Selecione o lote de destino.'); return; }
+    if (parDestino === 'novo' && !parNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
+    const loteMae = ativos.find(a => a.id === parLoteMaeId)!;
+    setSaving(true);
+    try {
+      await manejoService.registrarParicao({
+        loteMae, qtdPartos: Number(parQtd),
+        pesoMedio: parPeso ? Number(parPeso) : undefined,
+        data: parData,
+        destino: parDestino === 'existente'
+          ? { tipo: 'existente', loteId: parLoteDestId }
+          : { tipo: 'novo', nome: parNovoNome.trim(), categoriaId: parNovoCatId || undefined },
+        farmId,
+        loteDestinoNome: parDestino === 'existente' ? (ativos.find(a => a.id === parLoteDestId)?.nome ?? '') : undefined,
+      });
+      toast.success(`Parição registrada: ${parQtd} bezerro(s)!`);
+      setParLoteMaeId(''); setParQtd(''); setParPeso(''); setParLoteDestId(''); setParNovoNome(''); setParNovoCatId(''); setParDestino('novo');
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
+  }
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-          <div>
-            <label className={labelClass}>Nova categoria</label>
+  /* ── Confirmar: Bezerros ── */
+  async function confirmarBezerros() {
+    if (!bezLoteId) { toast.error('Selecione o lote de origem.'); return; }
+    if (!bezQtd || Number(bezQtd) <= 0) { toast.error('Informe a quantidade de bezerros.'); return; }
+    if (bezDestino === 'existente' && !bezLoteDestId) { toast.error('Selecione o lote de destino.'); return; }
+    if (bezDestino === 'novo' && !bezNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
+    const loteOrigem = ativos.find(a => a.id === bezLoteId)!;
+    setSaving(true);
+    try {
+      await manejoService.manejarBezerros({
+        loteOrigem, qtdBezerros: Number(bezQtd),
+        pesoMedio: bezPeso ? Number(bezPeso) : undefined,
+        data: bezData,
+        destino: bezDestino === 'existente'
+          ? { tipo: 'existente', loteId: bezLoteDestId }
+          : { tipo: 'novo', nome: bezNovoNome.trim(), categoriaId: bezNovoCatId || undefined },
+        farmId,
+        loteDestinoNome: bezDestino === 'existente' ? (ativos.find(a => a.id === bezLoteDestId)?.nome ?? '') : undefined,
+      });
+      toast.success(`Bezerros registrados: ${bezQtd} cab.!`);
+      setBezLoteId(''); setBezQtd(''); setBezPeso(''); setBezLoteDestId(''); setBezNovoNome(''); setBezNovoCatId(''); setBezDestino('novo');
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
+  }
+
+  /* ── helper: seletor de destino (reutilizado em Parição e Bezerros) ── */
+  function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId }: {
+    destino: DestinoTipo; setDestino: (v: DestinoTipo) => void;
+    loteDestId: string; setLoteDestId: (v: string) => void;
+    novoNome: string; setNovoNome: (v: string) => void;
+    novoCatId: string; setNovoCatId: (v: string) => void;
+    excludeId?: string;
+  }) {
+    return (
+      <div className="space-y-3">
+        <label className={labelClass}>Destino dos bezerros</label>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+          <button type="button" onClick={() => setDestino('novo')}
+            className={`flex-1 px-3 py-2 transition-colors ${destino === 'novo' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+            Criar novo lote
+          </button>
+          <button type="button" onClick={() => setDestino('existente')}
+            className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${destino === 'existente' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+            Agregar em lote existente
+          </button>
+        </div>
+        {destino === 'existente' ? (
+          <div className="relative">
+            <select value={loteDestId} onChange={e => setLoteDestId(e.target.value)} className={selectClass}>
+              <option value="">Selecione o lote…</option>
+              {ativos.filter(a => a.id !== excludeId).map(a => (
+                <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)}
+              placeholder="Nome do novo lote (ex: Bezerros Jan/26)"
+              className={inputClass} />
             <div className="relative">
-              <select value={novaCatId} onChange={e => setNovaCatId(e.target.value)} className={selectClass}>
-                <option value="">Selecione a categoria…</option>
+              <select value={novoCatId} onChange={e => setNovoCatId(e.target.value)} className={selectClass}>
+                <option value="">Categoria (opcional)…</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
           </div>
-          <div>
-            <label className={labelClass}>Novo peso médio (opcional)</label>
-            <input type="number" min="0" step="0.1" value={pesoMedio}
-              onChange={e => setPesoMedio(e.target.value)}
-              placeholder="Ex: 220 kg"
-              className={inputClass} />
-          </div>
-          <button onClick={confirmar} disabled={saving || selected.size === 0 || !novaCatId}
-            className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            <TrendingUp className="w-4 h-4" />
-            {saving ? 'Salvando...' : `Evoluir ${selected.size > 0 ? `${selected.size} lote(s) · ${totalCab} cab.` : 'selecionados'}`}
-          </button>
+        )}
+      </div>
+    );
+  }
+
+  const SUB_OPS = [
+    { id: 'categoria' as SubOp, label: 'Categoria',  icon: TrendingUp },
+    { id: 'paricao'   as SubOp, label: 'Parição',    icon: Baby },
+    { id: 'bezerros'  as SubOp, label: 'Bezerros',   icon: Milk },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Form */}
+      <div className="space-y-4">
+        {/* Seletor de sub-operação */}
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+          {SUB_OPS.map(s => {
+            const Icon = s.icon;
+            const active = subOp === s.id;
+            return (
+              <button key={s.id} onClick={() => setSubOp(s.id)}
+                className={`flex items-center gap-1.5 flex-1 justify-center px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  active ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}>
+                <Icon className="w-3.5 h-3.5" />
+                {s.label}
+              </button>
+            );
+          })}
         </div>
+
+        {/* ── Sub-op: Categoria ── */}
+        {subOp === 'categoria' && (
+          <>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-teal-600" />
+                  <h3 className="font-semibold text-gray-900 text-sm">Selecione os lotes</h3>
+                </div>
+                {selected.size > 0 && (
+                  <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
+                    {selected.size} sel. · {totalCab} cab.
+                  </span>
+                )}
+              </div>
+              <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                {ativos.length === 0 ? (
+                  <p className="text-center py-8 text-sm text-gray-400">Nenhum lote ativo.</p>
+                ) : ativos.map(a => {
+                  const on = selected.has(a.id);
+                  return (
+                    <label key={a.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${on ? 'bg-teal-50' : 'hover:bg-gray-50'}`}>
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${on ? 'bg-teal-500 border-teal-500' : 'border-gray-300'}`}>
+                        {on && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <input type="checkbox" checked={on} onChange={() => toggle(a.id)} className="sr-only" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{a.nome}</p>
+                        <p className="text-xs text-gray-500">{a.categoria_id ? catMap[a.categoria_id] : 'sem categoria'} · {a.quantidade} cab.</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div>
+                <label className={labelClass}>Nova categoria</label>
+                <div className="relative">
+                  <select value={novaCatId} onChange={e => setNovaCatId(e.target.value)} className={selectClass}>
+                    <option value="">Selecione…</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Novo peso médio (opcional)</label>
+                <input type="number" min="0" step="0.1" value={catPeso} onChange={e => setCatPeso(e.target.value)} placeholder="Ex: 220 kg" className={inputClass} />
+              </div>
+              <button onClick={confirmarCategoria} disabled={saving || selected.size === 0 || !novaCatId}
+                className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <TrendingUp className="w-4 h-4" />
+                {saving ? 'Salvando...' : `Evoluir ${selected.size > 0 ? `${selected.size} lote(s) · ${totalCab} cab.` : 'selecionados'}`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── Sub-op: Parição ── */}
+        {subOp === 'paricao' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Baby className="w-4 h-4 text-pink-500" />
+              <h3 className="font-semibold text-gray-900">Registrar parição</h3>
+            </div>
+            <div>
+              <label className={labelClass}>Lote mãe</label>
+              <div className="relative">
+                <select value={parLoteMaeId} onChange={e => setParLoteMaeId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o lote…</option>
+                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Qtd. de partos</label>
+                <input type="number" min="1" value={parQtd} onChange={e => setParQtd(e.target.value)} placeholder="Ex: 12" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Peso médio bezerros (kg)</label>
+                <input type="number" min="0" step="0.1" value={parPeso} onChange={e => setParPeso(e.target.value)} placeholder="Ex: 28" className={inputClass} />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Data</label>
+              <input type="date" value={parData} onChange={e => setParData(e.target.value)} className={inputClass} />
+            </div>
+            <DestinoSelector
+              destino={parDestino} setDestino={setParDestino}
+              loteDestId={parLoteDestId} setLoteDestId={setParLoteDestId}
+              novoNome={parNovoNome} setNovoNome={setParNovoNome}
+              novoCatId={parNovoCatId} setNovoCatId={setParNovoCatId}
+              excludeId={parLoteMaeId}
+            />
+            <button onClick={confirmarParicao} disabled={saving || !parLoteMaeId || !parQtd}
+              className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Baby className="w-4 h-4" />
+              {saving ? 'Registrando...' : 'Confirmar Parição'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Sub-op: Bezerros ── */}
+        {subOp === 'bezerros' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Milk className="w-4 h-4 text-orange-500" />
+              <h3 className="font-semibold text-gray-900">Manejar bezerros</h3>
+            </div>
+            <div>
+              <label className={labelClass}>Lote de origem</label>
+              <div className="relative">
+                <select value={bezLoteId} onChange={e => setBezLoteId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o lote…</option>
+                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Qtd. de bezerros</label>
+                <input type="number" min="1" value={bezQtd} onChange={e => setBezQtd(e.target.value)} placeholder="Ex: 20" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Peso médio (kg)</label>
+                <input type="number" min="0" step="0.1" value={bezPeso} onChange={e => setBezPeso(e.target.value)} placeholder="Ex: 95" className={inputClass} />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Data</label>
+              <input type="date" value={bezData} onChange={e => setBezData(e.target.value)} className={inputClass} />
+            </div>
+            <DestinoSelector
+              destino={bezDestino} setDestino={setBezDestino}
+              loteDestId={bezLoteDestId} setLoteDestId={setBezLoteDestId}
+              novoNome={bezNovoNome} setNovoNome={setBezNovoNome}
+              novoCatId={bezNovoCatId} setNovoCatId={setBezNovoCatId}
+              excludeId={bezLoteId}
+            />
+            <button onClick={confirmarBezerros} disabled={saving || !bezLoteId || !bezQtd}
+              className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Milk className="w-4 h-4" />
+              {saving ? 'Registrando...' : 'Confirmar Manejo de Bezerros'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Histórico */}
@@ -746,7 +1133,7 @@ export function Manejos() {
               exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {tab === 'lotes' && (
                 <LotesTab animals={animals} pastures={pastures} categories={categories}
-                  onReload={reload} />
+                  farmId={activeFarmId} onReload={reload} />
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
