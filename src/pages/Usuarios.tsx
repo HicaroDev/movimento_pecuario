@@ -377,14 +377,17 @@ let _farmsCache: Farm[]      = [];
 export function Usuarios() {
   const { user, isAdmin, hasModule } = useAuth();
   const [users, setUsers]         = useState<FarmUser[]>(_usersCache);
-  const [loading, setLoading]     = useState(_usersCache.length === 0);
+  const [loading, setLoading]     = useState(_usersCache.length === 0 && _farmUsersCache.length === 0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<FarmUser | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
   // Cliente: dados das suas fazendas
-  const [farmUsers, setFarmUsers] = useState<FarmUser[]>(_farmUsersCache);
-  const [farms, setFarms]         = useState<Farm[]>(_farmsCache);
+  const [farmUsers, setFarmUsers]   = useState<FarmUser[]>(_farmUsersCache);
+  const [farms, setFarms]           = useState<Farm[]>(_farmsCache);
+  const [selectedFarmId, setSelectedFarmId] = useState<string | null>(
+    _farmsCache[0]?.id ?? null
+  );
   // mapa id→nome para mostrar a fazenda de cada usuário
   const farmNameMap = useMemo(
     () => Object.fromEntries(farms.map(f => [f.id, f.nomeFazenda])),
@@ -429,40 +432,37 @@ export function Usuarios() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Effect 1: carrega lista de fazendas do cliente e auto-seleciona a primeira
   useEffect(() => {
-    if (isAdmin) {
-      refresh();
-    } else if (user?.id) {
-      if (_farmUsersCache.length === 0) setLoading(true);
-      // Coleta todas as fazendas do usuário
-      const ids = user.farmIds?.length ? user.farmIds : (user.farmId ? [user.farmId] : []);
-      if (ids.length === 0) { setLoading(false); return; }
-      Promise.all([
-        // usuários de todas as fazendas (sem duplicatas por id)
-        Promise.all(ids.map(id => userService.listByFarm(id))).then(lists => {
-          const seen = new Set<string>();
-          return lists.flat().filter(u => seen.has(u.id) ? false : (seen.add(u.id), true));
-        }),
-        // dados de todas as fazendas
-        Promise.all(ids.map(id => farmService.findById(id))).then(
-          list => list.filter((f): f is Farm => f !== null)
-        ),
-      ]).then(([fu, fs]) => {
-        _farmUsersCache = fu;
+    if (isAdmin) { refresh(); return; }
+    if (!user?.id) return;
+    const ids = user.farmIds?.length ? user.farmIds : (user.farmId ? [user.farmId] : []);
+    if (ids.length === 0) { setLoading(false); return; }
+    Promise.all(ids.map(id => farmService.findById(id)))
+      .then(list => {
+        const fs = list.filter((f): f is Farm => f !== null);
         _farmsCache = fs;
-        setFarmUsers(fu);
         setFarms(fs);
-        setLoading(false);
-      }).catch(() => setLoading(false));
-    }
+        // Auto-seleciona primeira fazenda apenas na primeira carga
+        setSelectedFarmId(prev => prev ?? (fs[0]?.id ?? null));
+        if (fs.length === 0) setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [user?.id, isAdmin, refreshTick]);
 
+  // Effect 2: carrega usuários da fazenda selecionada
+  useEffect(() => {
+    if (isAdmin || !selectedFarmId) return;
+    setLoading(true);
+    userService.listByFarm(selectedFarmId)
+      .then(fu => { _farmUsersCache = fu; setFarmUsers(fu); })
+      .catch(() => setFarmUsers(_farmUsersCache))
+      .finally(() => setLoading(false));
+  }, [selectedFarmId, isAdmin, refreshTick]);
+
   async function refreshFarmUsers() {
-    const ids = user?.farmIds?.length ? user.farmIds : (user?.farmId ? [user.farmId] : []);
-    if (ids.length === 0) return;
-    const lists = await Promise.all(ids.map(id => userService.listByFarm(id))).catch(() => [_farmUsersCache]);
-    const seen = new Set<string>();
-    const fu = lists.flat().filter(u => seen.has(u.id) ? false : (seen.add(u.id), true));
+    if (!selectedFarmId) return;
+    const fu = await userService.listByFarm(selectedFarmId).catch(() => _farmUsersCache);
     _farmUsersCache = fu;
     setFarmUsers(fu);
   }
@@ -531,15 +531,13 @@ export function Usuarios() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="max-w-4xl mx-auto">
 
-        <div className="mb-8 flex items-start justify-between">
+        <div className="mb-6 flex items-start justify-between">
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">Usuários</h1>
             <p className="text-sm text-gray-500">
-              {farms.length > 1
-                ? `${farms.length} fazendas`
-                : (farms[0]?.nomeFazenda || 'Minha fazenda')
-              } · {farmUsers.length} usuário{farmUsers.length !== 1 ? 's' : ''}
+              {farms.find(f => f.id === selectedFarmId)?.nomeFazenda || farms[0]?.nomeFazenda || 'Minha fazenda'}
+              {' '}· {farmUsers.length} usuário{farmUsers.length !== 1 ? 's' : ''}
             </p>
           </div>
           {hasModule('usuarios') && (
@@ -549,6 +547,26 @@ export function Usuarios() {
             </button>
           )}
         </div>
+
+        {/* Seletor de fazenda — visível quando cliente tem múltiplas fazendas */}
+        {farms.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {farms.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setSelectedFarmId(f.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  selectedFarmId === f.id
+                    ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-teal-400 hover:text-teal-700'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                {f.nomeFazenda}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <SkeletonTable rows={3} cols={4} />
@@ -579,12 +597,19 @@ export function Usuarios() {
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {u.active ? '● Ativo' : '○ Inativo'}
                         </span>
-                        {farms.length > 1 && u.farmId && farmNameMap[u.farmId] && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">
-                            <Building2 className="w-2.5 h-2.5" />
-                            {farmNameMap[u.farmId]}
-                          </span>
-                        )}
+                        {/* Badges de todas as fazendas do usuário — selecionada=teal, outras=amber */}
+                        {(u.farmIds?.length ? u.farmIds : (u.farmId ? [u.farmId] : []))
+                          .filter(fId => farmNameMap[fId])
+                          .map(fId => (
+                            <span key={fId} className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              fId === selectedFarmId
+                                ? 'bg-teal-100 text-teal-700'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              <Building2 className="w-2.5 h-2.5" />
+                              {farmNameMap[fId]}
+                            </span>
+                          ))}
                       </div>
                       <p className="text-xs text-gray-500 mb-2">{u.email}</p>
                       <div className="flex flex-wrap gap-1">

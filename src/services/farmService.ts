@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
 let farmsCache: Farm[] | null = null;
@@ -59,7 +59,7 @@ function toRow(d: Partial<Farm>) {
 export const farmService = {
   async list(): Promise<Farm[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('farms').select('*').order('nome_fazenda');
       if (error) throw new Error(error.message);
       const farms = (data ?? []).map(toFarm);
@@ -82,7 +82,7 @@ export const farmService = {
       if (cached) return cached;
     }
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('farms').select('*').eq('id', id).maybeSingle();
       if (error) throw new Error(error.message);
       return data ? toFarm(data) : null;

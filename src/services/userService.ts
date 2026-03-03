@@ -96,19 +96,27 @@ export const userService = {
 
   async listByFarm(farmId: string): Promise<FarmUser[]> {
     try {
-      const { data, error } = await supabase
-        .from('profiles').select('*')
-        .or(`farm_id.eq.${farmId},farm_ids.cs.{${farmId}}`)
-        .order('name');
-      if (error) throw new Error(error.message);
-      const users = (data ?? []).map(toFarmUser);
+      // Duas queries separadas para evitar sintaxe .or() com array — mais confiável
+      const [r1, r2] = await Promise.all([
+        supabaseAdmin.from('profiles').select('*').eq('farm_id', farmId).order('name'),
+        supabaseAdmin.from('profiles').select('*').contains('farm_ids', [farmId]).order('name'),
+      ]);
+      if (r1.error) throw new Error(r1.error.message);
+      if (r2.error) throw new Error(r2.error.message);
+
+      const seen = new Set<string>();
+      const users = [...(r1.data ?? []), ...(r2.data ?? [])]
+        .filter(row => { const id = row.id as string; return seen.has(id) ? false : (seen.add(id), true); })
+        .sort((a, b) => (a.name as string).localeCompare(b.name as string))
+        .map(toFarmUser);
+
       usersCache = usersCache ? [...usersCache.filter(u => u.farmId !== farmId), ...users] : users;
       usersCacheAt = Date.now();
       saveCacheToStorage(usersCache);
       return users;
     } catch (err) {
       if (!usersCache) loadCacheFromStorage();
-      if (usersCache) return usersCache.filter(u => u.farmId === farmId);
+      if (usersCache) return usersCache.filter(u => u.farmId === farmId || u.farmIds?.includes(farmId));
       throw err;
     }
   },

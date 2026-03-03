@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { farmService } from '../services/farmService';
 import { userService } from '../services/userService';
 import { SkeletonCard } from '../components/Skeleton';
@@ -325,16 +326,15 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
 /* ─────────────── Página principal ─────────────── */
 
 // Cache de módulo — persiste entre navegações sem precisar de contexto
-let _farmsCache: Farm[]    = [];
-let _myFarmCache: Farm | null = null;
+let _farmsCache: Farm[] = [];
 
 export function Fazendas() {
   const { user, isAdmin } = useAuth();
+  const { clientInfo }    = useData();
   const [farms, setFarms]         = useState<Farm[]>(_farmsCache);
   const [loading, setLoading]     = useState(_farmsCache.length === 0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Farm | null>(null);
-  const [myFarm, setMyFarm]       = useState<Farm | null>(_myFarmCache);
   const [refreshTick, setRefreshTick] = useState(0);
 
   async function refresh() {
@@ -369,18 +369,6 @@ export function Fazendas() {
   }, []);
 
   useEffect(() => { refresh(); }, [refreshTick]);
-
-  // Carrega fazenda do cliente
-  useEffect(() => {
-    if (!isAdmin && user?.id) {
-      userService.findById(user.id).then(profile => {
-        if (profile?.farmId) farmService.findById(profile.farmId).then(f => {
-          _myFarmCache = f;
-          setMyFarm(f);
-        });
-      });
-    }
-  }, [user?.id, isAdmin]);
 
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(f: Farm) { setEditing(f); setModalOpen(true); }
@@ -442,7 +430,7 @@ export function Fazendas() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Minha Fazenda</h1>
         </div>
-        <MyFarmView farm={myFarm} />
+        <MyFarmView farm={clientInfo} />
       </motion.div>
     </div>
   );

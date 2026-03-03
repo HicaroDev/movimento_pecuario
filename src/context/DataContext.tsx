@@ -4,7 +4,7 @@ import type { DataEntry } from '../lib/data';
 import { sampleRows } from '../lib/data';
 import { useAuth } from './AuthContext';
 import { farmService } from '../services/farmService';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
 /* ── Types ── */
@@ -182,8 +182,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }, 20_000);
 
     Promise.all([
-      supabase.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
-      supabase.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
+      supabaseAdmin.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
+      supabaseAdmin.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
       if (cancelled) return;
@@ -219,7 +219,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   function addEntry(entry: DataEntry) {
     const tempId = `temp-${Date.now()}`;
     setEntries(prev => [...prev, { ...entry, id: tempId }]);
-    supabase.from('data_entries').insert({
+    supabaseAdmin.from('data_entries').insert({
       farm_id:   activeFarmId,
       data:      entry.data || new Date().toISOString().split('T')[0],
       pasto_nome: entry.pasto,
@@ -239,13 +239,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const entry = entries[index];
     setEntries(prev => prev.filter((_, i) => i !== index));
     if (entry?.id && !entry.id.startsWith('temp-')) {
-      supabase.from('data_entries').delete().eq('id', entry.id);
+      supabaseAdmin.from('data_entries').delete().eq('id', entry.id);
     }
   }
 
   function clearAll() {
     setEntries([]);
-    if (activeFarmId) supabase.from('data_entries').delete().eq('farm_id', activeFarmId);
+    if (activeFarmId) supabaseAdmin.from('data_entries').delete().eq('farm_id', activeFarmId);
   }
 
   function loadSample() {
@@ -257,7 +257,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       sacos: r.sacos, kg: r.kg, consumo: r.consumo,
     }));
     setEntries(sampleRows.map((r, i) => ({ ...r, id: `temp-sample-${i}` })));
-    supabase.from('data_entries').insert(rows).select().then(({ data }) => {
+    supabaseAdmin.from('data_entries').insert(rows).select().then(({ data }) => {
       if (data) setEntries(data.map(toDataEntry));
     });
   }
@@ -266,7 +266,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   function addPasture(p: Omit<Pasture, 'id'>) {
     const tempId = `temp-${Date.now()}`;
     setPastures(prev => [...prev, { ...p, id: tempId }]);
-    supabase.from('pastures').insert({
+    supabaseAdmin.from('pastures').insert({
       farm_id: activeFarmId, nome: p.nome,
       area: p.area ?? null, observacoes: p.observacoes ?? null,
       retiro_id: p.retiro_id ?? null,
@@ -278,12 +278,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   function deletePasture(id: string) {
     setPastures(prev => prev.filter(p => p.id !== id));
-    supabase.from('pastures').delete().eq('id', id);
+    supabaseAdmin.from('pastures').delete().eq('id', id);
   }
 
   function updatePasture(id: string, patch: Partial<Pasture>) {
     setPastures(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
-    supabase.from('pastures').update({
+    supabaseAdmin.from('pastures').update({
       ...(patch.nome        !== undefined && { nome:        patch.nome }),
       ...(patch.area        !== undefined && { area:        patch.area ?? null }),
       ...(patch.observacoes !== undefined && { observacoes: patch.observacoes ?? null }),
