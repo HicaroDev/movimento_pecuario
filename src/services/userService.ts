@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { logger } from '../lib/logger';
 import type { FarmUser, Module } from '../types/user';
 
@@ -139,9 +139,9 @@ export const userService = {
     // Cria auth user via REST (sem segundo GoTrueClient), já confirmado
     const userId = await adminCreateAuthUser(d.email, d.password, d.name, d.role);
 
-    // Trigger cria o perfil; atualiza com os dados extras
+    // Trigger cria o perfil — atualiza com os dados extras usando service role (bypassa RLS)
     const ids = d.farmIds?.length ? d.farmIds : (d.farmId ? [d.farmId] : []);
-    const { data: profile, error: profileErr } = await supabase
+    const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
       .update({
         name:     d.name,
@@ -193,19 +193,8 @@ export const userService = {
 
     // Atualiza senha no auth.users se uma nova senha foi fornecida
     if (d.password) {
-      const pwRes = await adminFetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-        },
-        body: JSON.stringify({ password: d.password }),
-      });
-      if (!pwRes.ok) {
-        const pwJson = await pwRes.json().catch(() => ({}));
-        throw new Error(pwJson?.msg ?? pwJson?.message ?? 'Erro ao atualizar senha.');
-      }
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(id, { password: d.password });
+      if (pwErr) throw new Error(pwErr.message ?? 'Erro ao atualizar senha.');
     }
 
     return toFarmUser(json[0]);

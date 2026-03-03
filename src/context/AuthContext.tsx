@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { AuthUser, Module } from '../types/user';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 
 export type { Role, Module } from '../types/user';
 export type { AuthUser } from '../types/user';
@@ -42,7 +42,7 @@ function writeCachedProfile(p: AuthUser | null) {
 }
 
 async function fetchProfile(userId: string): Promise<AuthUser | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('profiles').select('*').eq('id', userId).maybeSingle();
   if (error || !data || !data.active) return null;
   const farmIds = (data.farm_ids as string[]) ?? [];
