@@ -174,22 +174,36 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
 
             {selectedRole === 'client' && (
               <div>
-                <label className={labelClass}>Fazendas vinculadas</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className={labelClass} style={{ marginBottom: 0 }}>Fazendas vinculadas</label>
+                  {selectedFarmIds.length > 0 && (
+                    <span className="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
+                      {selectedFarmIds.length} selecionada{selectedFarmIds.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
                 {farms.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-2 mt-1">
-                    {farms.map(f => {
-                      const on = selectedFarmIds.includes(f.id);
-                      return (
-                        <label key={f.id}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                            on ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                          }`}>
-                          <input type="checkbox" checked={on} onChange={() => toggleFarm(f.id)} className="sr-only" />
-                          <Building2 className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm font-medium">{f.nomeFazenda}</span>
-                        </label>
-                      );
-                    })}
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="max-h-36 overflow-y-auto divide-y divide-gray-100">
+                      {farms.map(f => {
+                        const on = selectedFarmIds.includes(f.id);
+                        return (
+                          <label key={f.id}
+                            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors select-none ${
+                              on ? 'bg-teal-50 text-teal-700' : 'bg-white text-gray-600 hover:bg-gray-50'
+                            }`}>
+                            <input type="checkbox" checked={on} onChange={() => toggleFarm(f.id)} className="sr-only" />
+                            <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
+                              on ? 'bg-teal-500 border-teal-500' : 'border-gray-300'
+                            }`}>
+                              {on && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                            </div>
+                            <Building2 className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+                            <span className="text-sm font-medium truncate">{f.nomeFazenda}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
