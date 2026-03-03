@@ -329,7 +329,7 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
 let _farmsCache: Farm[] = [];
 
 export function Fazendas() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const { clientInfo }    = useData();
   const [farms, setFarms]         = useState<Farm[]>(_farmsCache);
   const [loading, setLoading]     = useState(_farmsCache.length === 0);
