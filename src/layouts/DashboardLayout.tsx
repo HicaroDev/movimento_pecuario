@@ -133,7 +133,13 @@ export function DashboardLayout() {
           >
             <img src="/images/logo.png" alt="Movimento Pecuário" className="w-full h-auto" />
           </div>
-          <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
+              style={{ background: 'rgba(26,96,64,0.08)', color: '#1a6040', borderColor: 'rgba(26,96,64,0.18)' }}>
+              v1.15
+            </span>
+          </div>
           <p className="text-xs mt-0.5 truncate text-gray-400">{user?.name}</p>
         </motion.div>
 

@@ -31,6 +31,25 @@ const MODULE_ICONS: Record<string, React.ElementType> = {
   // nomes antigos do trigger (legado)
   pastos: FolderOpen, usuarios_old: UserCog,
 };
+const MODULE_COLORS: Record<string, string> = {
+  relatorio:  'bg-emerald-50 text-emerald-700 border-emerald-100',
+  formulario: 'bg-blue-50 text-blue-700 border-blue-100',
+  cadastros:  'bg-amber-50 text-amber-700 border-amber-100',
+  manejos:    'bg-purple-50 text-purple-700 border-purple-100',
+  fazendas:   'bg-indigo-50 text-indigo-700 border-indigo-100',
+  usuarios:   'bg-rose-50 text-rose-700 border-rose-100',
+  pastos:     'bg-sky-50 text-sky-700 border-sky-100',
+};
+
+function UserAvatar({ name, role }: { name: string; role: string }) {
+  const initials = name.trim().split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
+  const isAdmin = role === 'admin';
+  return (
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white ${isAdmin ? 'bg-teal-500' : 'bg-blue-500'}`}>
+      {initials}
+    </div>
+  );
+}
 
 /* ─────────────── Modal de usuário ─────────────── */
 
@@ -319,47 +338,59 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
   }
 
   return (
-    <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
+    <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50/70 transition-colors group">
       <td className="px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">{u.name}</p>
-          <p className="text-xs text-gray-500">{u.email}</p>
+        <div className="flex items-center gap-2.5">
+          <UserAvatar name={u.name} role={u.role} />
+          <div>
+            <p className="text-sm font-semibold text-gray-900 leading-tight">{u.name}</p>
+            <p className="text-xs text-gray-400">{u.email}</p>
+          </div>
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className={`text-xs font-bold px-2 py-1 rounded-full ${u.role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
           {u.role === 'admin' ? 'Admin' : 'Cliente'}
         </span>
       </td>
-      <td className="px-4 py-3">
-        <span className="text-xs text-gray-600">
-          {farmNames.length > 0 ? farmNames.join(', ') : <span className="text-gray-400 italic">—</span>}
-        </span>
+      <td className="px-4 py-3 max-w-[180px]">
+        {farmNames.length > 0
+          ? <span className="text-xs text-gray-600 leading-relaxed">{farmNames.join(', ')}</span>
+          : <span className="text-gray-300 italic text-xs">—</span>
+        }
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1">
-          {u.modules.map(m => (
-            <span key={m} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
-              {MODULE_LABELS[m]}
-            </span>
-          ))}
+          {u.modules.map(m => {
+            const Icon = MODULE_ICONS[m] ?? FolderOpen;
+            const colors = MODULE_COLORS[m] ?? 'bg-gray-50 text-gray-600 border-gray-100';
+            return (
+              <span key={m} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium ${colors}`}>
+                <Icon className="w-2.5 h-2.5" />
+                {MODULE_LABELS[m]}
+              </span>
+            );
+          })}
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-          {u.active ? '● Ativo' : '○ Inativo'}
+        <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full ${u.active ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${u.active ? 'bg-green-500' : 'bg-red-400'}`} />
+          {u.active ? 'Ativo' : 'Inativo'}
         </span>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-1">
-          <button onClick={() => onEdit(u)} className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Pencil className="w-4 h-4" /></button>
+        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
           <button onClick={toggleActive} disabled={u.id === currentUserId}
-            className={`p-1.5 rounded transition-colors disabled:opacity-30 ${u.active ? 'text-green-500 hover:bg-green-50' : 'text-red-400 hover:bg-red-50'}`}>
+            className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 ${u.active ? 'text-green-500 hover:bg-green-50' : 'text-red-400 hover:bg-red-50'}`}
+            title={u.active ? 'Desativar' : 'Ativar'}>
             {u.active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
           </button>
           <button onClick={onDelete} disabled={u.id === currentUserId}
-            className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-            <Trash2 className="w-4 h-4" />
+            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Excluir">
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </td>
