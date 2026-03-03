@@ -31,9 +31,15 @@ function saveCacheToStorage(items: FarmUser[]) {
   }
 }
 
+function adminFetch(url: string, init: RequestInit, timeoutMs = 15_000): Promise<Response> {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(tid));
+}
+
 // Chama a Admin REST API diretamente — sem criar segundo GoTrueClient no browser
 async function adminCreateAuthUser(email: string, password: string, name: string, role: string): Promise<string> {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+  const res = await adminFetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -170,7 +176,7 @@ export const userService = {
     logger.info('userService.update', `atualizando perfil ${id}`, patch);
 
     // Usa service role key para bypass de RLS (admin editando outro usuário)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
+    const res = await adminFetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -187,7 +193,7 @@ export const userService = {
 
     // Atualiza senha no auth.users se uma nova senha foi fornecida
     if (d.password) {
-      const pwRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+      const pwRes = await adminFetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +213,7 @@ export const userService = {
 
   async remove(id: string): Promise<void> {
     // Deleta o auth user via Admin API (cascade deleta o profile)
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+    const res = await adminFetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
       method: 'DELETE',
       headers: {
         'apikey': SERVICE_ROLE_KEY,
