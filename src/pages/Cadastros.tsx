@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
 import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag, Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 import { useData } from '../context/DataContext';
 import { SkeletonTable } from '../components/Skeleton';
 
@@ -14,7 +14,7 @@ const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
 /* ── Local types ── */
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
-interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; observacoes?: string; }
+interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
 interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
 
@@ -107,7 +107,7 @@ function SimpleTab({
     const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
-        const { data } = await supabase.from(table).select('*').eq('farm_id', activeFarmId).order('nome');
+        const { data } = await supabaseAdmin.from(table).select('*').eq('farm_id', activeFarmId).order('nome');
         if (!mounted) return;
         const list = data ?? [];
         setItems(list);
@@ -124,7 +124,7 @@ function SimpleTab({
 
   async function onAdd(data: SimpleForm) {
     if (!activeFarmId) return;
-    const { data: row, error } = await supabase.from(table)
+    const { data: row, error } = await supabaseAdmin.from(table)
       .insert({ nome: data.nome, observacoes: data.observacoes || null, farm_id: activeFarmId })
       .select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
@@ -134,7 +134,7 @@ function SimpleTab({
   }
 
   async function onEditSave(id: string, data: SimpleForm) {
-    const { error } = await supabase.from(table).update({ nome: data.nome, observacoes: data.observacoes || null }).eq('id', id);
+    const { error } = await supabaseAdmin.from(table).update({ nome: data.nome, observacoes: data.observacoes || null }).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
     notify(items.map(i => i.id === id ? { ...i, ...data } : i));
     toast.success(`${label} atualizado!`); setEditingId(null);
@@ -142,7 +142,7 @@ function SimpleTab({
 
   async function onDelete(id: string, nome: string) {
     if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
     if (error) { toast.error('Erro ao remover.'); return; }
     notify(items.filter(i => i.id !== id));
     toast.success(`${label} removido.`);
@@ -270,7 +270,7 @@ function PastosTab() {
     if (!activeFarmId) return;
     let mounted = true;
     (async () => {
-      const { data } = await supabase.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome');
+      const { data } = await supabaseAdmin.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome');
       if (mounted) setRetiros(data ?? []);
     })();
     return () => { mounted = false; };
@@ -465,28 +465,59 @@ function PastosTab() {
 let _animaisCache: Animal[] = [];
 let _acatCache: AnimalCategory[] = [];
 
-interface AnimalForm { nome: string; quantidade: number; raca: string; categoria_id: string; observacoes: string; }
+interface AnimalForm { nome: string; quantidade: number; raca: string; categoria_id: string; peso_medio: number; sexo: string; bezerros_quantidade: number; bezerros_peso_medio: number; observacoes: string; }
 
 function AnimalEditRow({ item, categories, onSave, onCancel }: {
   item: Animal; categories: AnimalCategory[];
   onSave: (d: AnimalForm) => void; onCancel: () => void;
 }) {
+  const [temBezerros, setTemBezerros] = useState(() => !!(item.bezerros_quantidade || item.bezerros_peso_medio));
   const { register, handleSubmit } = useForm<AnimalForm>({
-    defaultValues: { nome: item.nome, quantidade: item.quantidade, raca: item.raca || '', categoria_id: item.categoria_id || '', observacoes: item.observacoes || '' },
+    defaultValues: { nome: item.nome, quantidade: item.quantidade, raca: item.raca || '', categoria_id: item.categoria_id || '', peso_medio: item.peso_medio ?? 0, sexo: item.sexo || '', bezerros_quantidade: item.bezerros_quantidade ?? 0, bezerros_peso_medio: item.bezerros_peso_medio ?? 0, observacoes: item.observacoes || '' },
   });
+  function handleSave(data: AnimalForm) {
+    onSave(!temBezerros ? { ...data, bezerros_quantidade: 0, bezerros_peso_medio: 0 } : data);
+  }
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input type="number" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} /></td>
+      <td className="px-4 py-2"><input type="number" min="0" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} /></td>
       <td className="px-4 py-2">
         <select {...register('categoria_id')} className={inputClass}>
           <option value="">—</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
       </td>
+      <td className="px-4 py-2"><input type="number" min="0" step="0.1" placeholder="kg" {...register('peso_medio', { valueAsNumber: true })} className={inputClass} /></td>
       <td className="px-4 py-2"><input {...register('raca')} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <select {...register('sexo')} className={inputClass}>
+          <option value="">—</option>
+          <option value="Macho">Macho</option>
+          <option value="Fêmea">Fêmea</option>
+          <option value="Misto">Misto</option>
+        </select>
+      </td>
+      <td className="px-4 py-2">
+        <div className="space-y-1">
+          <div className="flex rounded border border-gray-200 overflow-hidden text-xs font-medium w-fit">
+            <button type="button" onClick={() => setTemBezerros(true)}
+              className={`px-2 py-1 transition-colors ${temBezerros ? 'bg-teal-600 text-white' : 'bg-white text-gray-500'}`}>Sim</button>
+            <button type="button" onClick={() => setTemBezerros(false)}
+              className={`px-2 py-1 border-l border-gray-200 transition-colors ${!temBezerros ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-500'}`}>Não</button>
+          </div>
+          <input type="number" min="0" placeholder="0" disabled={!temBezerros}
+            {...register('bezerros_quantidade', { valueAsNumber: true })}
+            className={`${inputClass} ${!temBezerros ? 'opacity-40 cursor-not-allowed' : ''}`} />
+        </div>
+      </td>
+      <td className="px-4 py-2">
+        <input type="number" min="0" step="0.1" placeholder="kg" disabled={!temBezerros}
+          {...register('bezerros_peso_medio', { valueAsNumber: true })}
+          className={`${inputClass} ${!temBezerros ? 'opacity-40 cursor-not-allowed' : ''}`} />
+      </td>
       <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} /></td>
-      <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
+      <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(handleSave)} onCancel={onCancel} /></td>
     </tr>
   );
 }
@@ -499,7 +530,10 @@ function AnimaisTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCatSection, setShowCatSection] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AnimalForm>();
+  const [temBezerros, setTemBezerros] = useState(false);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<AnimalForm>({
+    defaultValues: { quantidade: 0, peso_medio: 0, bezerros_quantidade: 0, bezerros_peso_medio: 0 },
+  });
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -509,8 +543,8 @@ function AnimaisTab() {
     (async () => {
       try {
         const [animRes, catRes] = await Promise.all([
-          supabase.from('animals').select('*').eq('farm_id', activeFarmId).order('nome'),
-          supabase.from('animal_categories').select('*').eq('farm_id', activeFarmId).order('nome'),
+          supabaseAdmin.from('animals').select('*').eq('farm_id', activeFarmId).order('nome'),
+          supabaseAdmin.from('animal_categories').select('*').eq('farm_id', activeFarmId).order('nome'),
         ]);
         if (!mounted) return;
         _animaisCache = animRes.data ?? []; setItems(_animaisCache);
@@ -525,25 +559,47 @@ function AnimaisTab() {
 
   async function onAdd(data: AnimalForm) {
     if (!activeFarmId) return;
-    const payload = { nome: data.nome, quantidade: data.quantidade, raca: data.raca || null, categoria_id: data.categoria_id || null, observacoes: data.observacoes || null, farm_id: activeFarmId };
-    const { data: row, error } = await supabase.from('animals').insert(payload).select().single();
+    const pesoMedio = data.peso_medio > 0 ? data.peso_medio : null;
+    const bezQtd    = temBezerros && data.bezerros_quantidade > 0 ? data.bezerros_quantidade : null;
+    const bezPeso   = temBezerros && data.bezerros_peso_medio > 0 ? data.bezerros_peso_medio : null;
+    const payload = {
+      nome: data.nome, quantidade: data.quantidade,
+      raca: data.raca || null, categoria_id: data.categoria_id || null,
+      observacoes: data.observacoes || null, farm_id: activeFarmId,
+      ...(data.sexo      && { sexo: data.sexo }),
+      ...(pesoMedio      && { peso_medio: pesoMedio }),
+      ...(bezQtd         && { bezerros_quantidade: bezQtd }),
+      ...(bezPeso        && { bezerros_peso_medio: bezPeso }),
+    };
+    const { data: row, error } = await supabaseAdmin.from('animals').insert(payload).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
     _animaisCache = [..._animaisCache, row]; setItems(_animaisCache);
     toast.success('Lote adicionado!', { description: data.nome });
-    reset(); setShowAddForm(false);
+    reset(); setTemBezerros(false); setShowAddForm(false);
   }
 
   async function onEditSave(id: string, data: AnimalForm) {
-    const payload = { nome: data.nome, quantidade: data.quantidade, raca: data.raca || null, categoria_id: data.categoria_id || null, observacoes: data.observacoes || null };
-    const { error } = await supabase.from('animals').update(payload).eq('id', id);
+    const pesoMedio = data.peso_medio         > 0 ? data.peso_medio         : null;
+    const bezQtd    = data.bezerros_quantidade > 0 ? data.bezerros_quantidade : null;
+    const bezPeso   = data.bezerros_peso_medio > 0 ? data.bezerros_peso_medio : null;
+    const payload = {
+      nome: data.nome, quantidade: data.quantidade,
+      raca: data.raca || null, categoria_id: data.categoria_id || null,
+      observacoes: data.observacoes || null,
+      ...(data.sexo && { sexo: data.sexo }),
+      ...(pesoMedio && { peso_medio: pesoMedio }),
+      ...(bezQtd    && { bezerros_quantidade: bezQtd }),
+      ...(bezPeso   && { bezerros_peso_medio: bezPeso }),
+    };
+    const { error } = await supabaseAdmin.from('animals').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, nome: data.nome, quantidade: data.quantidade, raca: data.raca || undefined, categoria_id: data.categoria_id || undefined, observacoes: data.observacoes || undefined } : a); setItems(_animaisCache);
+    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, nome: data.nome, quantidade: data.quantidade, raca: data.raca || undefined, categoria_id: data.categoria_id || undefined, peso_medio: pesoMedio ?? undefined, sexo: data.sexo || undefined, bezerros_quantidade: bezQtd ?? undefined, bezerros_peso_medio: bezPeso ?? undefined, observacoes: data.observacoes || undefined } : a); setItems(_animaisCache);
     toast.success('Lote atualizado!'); setEditingId(null);
   }
 
   async function onDelete(id: string, nome: string) {
     if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabase.from('animals').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('animals').delete().eq('id', id);
     if (error) { toast.error('Erro ao remover.'); return; }
     _animaisCache = _animaisCache.filter(a => a.id !== id); setItems(_animaisCache);
     toast.success('Lote removido.');
@@ -602,7 +658,7 @@ function AnimaisTab() {
               </div>
               <div>
                 <label className={labelClass}>Cabeças</label>
-                <input type="number" placeholder="100" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} />
+                <input type="number" min="0" placeholder="100" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Categoria</label>
@@ -615,6 +671,47 @@ function AnimaisTab() {
                 <label className={labelClass}>Raça</label>
                 <input placeholder="Nelore" {...register('raca')} className={inputClass} />
               </div>
+              <div>
+                <label className={labelClass}>Peso Médio (kg)</label>
+                <input type="number" min="0" step="0.1" placeholder="450" {...register('peso_medio', { valueAsNumber: true })} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Sexo</label>
+                <select {...register('sexo')} className={inputClass}>
+                  <option value="">—</option>
+                  <option value="Macho">Macho</option>
+                  <option value="Fêmea">Fêmea</option>
+                  <option value="Misto">Misto</option>
+                </select>
+              </div>
+              <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bezerros</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Possui bezerros?</span>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                      <button type="button" onClick={() => setTemBezerros(true)}
+                        className={`px-3 py-1.5 transition-colors ${temBezerros ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                        Sim
+                      </button>
+                      <button type="button" onClick={() => setTemBezerros(false)}
+                        className={`px-3 py-1.5 border-l border-gray-200 transition-colors ${!temBezerros ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                        Não
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className={`grid grid-cols-2 gap-4 transition-opacity ${!temBezerros ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                  <div>
+                    <label className={labelClass}>Quantidade de Animais</label>
+                    <input type="number" min="0" placeholder="0" {...register('bezerros_quantidade', { valueAsNumber: true })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Peso Médio (kg)</label>
+                    <input type="number" min="0" step="0.1" placeholder="0" {...register('bezerros_peso_medio', { valueAsNumber: true })} className={inputClass} />
+                  </div>
+                </div>
+              </div>
               <div className="col-span-2">
                 <label className={labelClass}>Observações</label>
                 <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
@@ -623,7 +720,7 @@ function AnimaisTab() {
                 <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
                   <Plus className="w-4 h-4" /> Adicionar
                 </button>
-                <button type="button" onClick={() => { setShowAddForm(false); reset(); }}
+                <button type="button" onClick={() => { setShowAddForm(false); reset(); setTemBezerros(false); }}
                   className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                   Cancelar
                 </button>
@@ -632,7 +729,7 @@ function AnimaisTab() {
           </motion.div>
         )}
 
-        {loading ? <SkeletonTable rows={4} cols={6} /> : (
+        {loading ? <SkeletonTable rows={4} cols={10} /> : (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             {items.length === 0 ? (
               <div className="py-16 text-center">
@@ -644,7 +741,7 @@ function AnimaisTab() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {['Lote', 'Cabeças', 'Categoria', 'Raça', 'Obs', 'Ações'].map(h => (
+                      {['Lote', 'Cabeças', 'Categoria', 'Peso Médio', 'Raça', 'Sexo', 'Bez. Qtd', 'Bez. Peso', 'Obs', 'Ações'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -663,7 +760,11 @@ function AnimaisTab() {
                               ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">{getCatName(item.categoria_id)}</span>
                               : <span className="text-gray-400">—</span>}
                           </td>
+                          <td className="px-4 py-3 text-gray-600">{item.peso_medio ? `${item.peso_medio} kg` : '—'}</td>
                           <td className="px-4 py-3 text-gray-600">{item.raca || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.sexo || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.bezerros_quantidade ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.bezerros_peso_medio ? `${item.bezerros_peso_medio} kg` : '—'}</td>
                           <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                           <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
                         </motion.tr>
@@ -719,7 +820,7 @@ function SuplementosTab() {
     const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
-        const { data } = await supabase.from('supplement_types').select('*').eq('farm_id', activeFarmId).order('nome');
+        const { data } = await supabaseAdmin.from('supplement_types').select('*').eq('farm_id', activeFarmId).order('nome');
         if (mounted) { _suplementosCache = data ?? []; setItems(_suplementosCache); }
       } finally {
         clearTimeout(tid);
@@ -731,21 +832,21 @@ function SuplementosTab() {
 
   async function onAdd(data: SupplementForm) {
     if (!activeFarmId) return;
-    const { data: row, error } = await supabase.from('supplement_types').insert({ ...data, farm_id: activeFarmId }).select().single();
+    const { data: row, error } = await supabaseAdmin.from('supplement_types').insert({ ...data, farm_id: activeFarmId }).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
     _suplementosCache = [..._suplementosCache, row]; setItems(_suplementosCache);
     toast.success('Suplemento adicionado!', { description: data.nome });
     reset({ unidade: 'kg' }); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: SupplementForm) {
-    const { error } = await supabase.from('supplement_types').update(data).eq('id', id);
+    const { error } = await supabaseAdmin.from('supplement_types').update(data).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
     _suplementosCache = _suplementosCache.map(s => s.id === id ? { ...s, ...data } : s); setItems(_suplementosCache);
     toast.success('Suplemento atualizado!'); setEditingId(null);
   }
   async function onDelete(id: string, nome: string) {
     if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabase.from('supplement_types').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('supplement_types').delete().eq('id', id);
     if (error) { toast.error('Erro ao remover.'); return; }
     _suplementosCache = _suplementosCache.filter(s => s.id !== id); setItems(_suplementosCache);
     toast.success('Suplemento removido.');
@@ -830,7 +931,7 @@ function FuncionariosTab() {
     const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
-        const { data } = await supabase.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
+        const { data } = await supabaseAdmin.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
         if (mounted) { _funcionariosCache = data ?? []; setItems(_funcionariosCache); }
       } finally {
         clearTimeout(tid);
@@ -842,21 +943,21 @@ function FuncionariosTab() {
 
   async function onAdd(data: EmployeeForm) {
     if (!activeFarmId) return;
-    const { data: row, error } = await supabase.from('employees').insert({ ...data, farm_id: activeFarmId }).select().single();
+    const { data: row, error } = await supabaseAdmin.from('employees').insert({ ...data, farm_id: activeFarmId }).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
     _funcionariosCache = [..._funcionariosCache, row]; setItems(_funcionariosCache);
     toast.success('Funcionário adicionado!', { description: data.nome });
     reset(); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: EmployeeForm) {
-    const { error } = await supabase.from('employees').update(data).eq('id', id);
+    const { error } = await supabaseAdmin.from('employees').update(data).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
     _funcionariosCache = _funcionariosCache.map(e => e.id === id ? { ...e, ...data } : e); setItems(_funcionariosCache);
     toast.success('Funcionário atualizado!'); setEditingId(null);
   }
   async function onDelete(id: string, nome: string) {
     if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabase.from('employees').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('employees').delete().eq('id', id);
     if (error) { toast.error('Erro ao remover.'); return; }
     _funcionariosCache = _funcionariosCache.filter(e => e.id !== id); setItems(_funcionariosCache);
     toast.success('Funcionário removido.');

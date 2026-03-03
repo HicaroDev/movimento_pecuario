@@ -100,6 +100,11 @@
 - [ ] **T-231** Responsividade tablet/mobile
 - [ ] **T-232** Empty states para Cadastros (cada tab vazia)
 - [x] **T-233** Deploy EasyPanel (Dockerfile + nginx + env vars) ✅
+- [x] **T-234** Sync: refresh silencioso ao voltar ao foco (visibility + focus + online, threshold 5s) ✅
+
+### 2E — Deploy otimizado (tudo no VPS)
+- [ ] **T-240** GitHub Actions: build Docker no CI e push para ghcr.io → EasyPanel só puxa imagem pronta (~20s deploy)
+- [ ] **T-241** Alternativa Nixpacks: remover Dockerfile e usar Nixpacks nativo do EasyPanel (~1-2 min deploy)
 
 ---
 
@@ -121,9 +126,9 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1.5 — Auth + Multi-tenant | 16 | 16 | ✅ Concluída |
 | 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
-| 2 — Melhorias Avançadas | 16 | 16 | ✅ Concluída |
+| 2 — Melhorias Avançadas | 19 | 17 | 🔄 89% |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **84** | **82** | **98%** |
+| **TOTAL** | **88** | **85** | **97%** |
 
 ---
 

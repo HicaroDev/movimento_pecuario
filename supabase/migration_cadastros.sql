@@ -5,14 +5,26 @@
 
 -- ── Animais ────────────────────────────────────────────────
 create table if not exists public.animals (
-  id           uuid primary key default uuid_generate_v4(),
-  farm_id      uuid not null references public.farms(id) on delete cascade,
-  nome         text not null,
-  quantidade   integer not null default 0,
-  raca         text,
-  observacoes  text,
-  created_at   timestamptz not null default now()
+  id                    uuid primary key default uuid_generate_v4(),
+  farm_id               uuid not null references public.farms(id) on delete cascade,
+  nome                  text not null,
+  quantidade            integer not null default 0,
+  raca                  text,
+  categoria_id          uuid references public.animal_categories(id) on delete set null,
+  peso_medio            numeric,
+  sexo                  text,
+  bezerros_quantidade   integer,
+  bezerros_peso_medio   numeric,
+  observacoes           text,
+  created_at            timestamptz not null default now()
 );
+
+-- Adiciona colunas se a tabela já existia (idempotente)
+alter table public.animals add column if not exists categoria_id        uuid;
+alter table public.animals add column if not exists peso_medio          numeric;
+alter table public.animals add column if not exists sexo                text;
+alter table public.animals add column if not exists bezerros_quantidade integer;
+alter table public.animals add column if not exists bezerros_peso_medio numeric;
 
 -- ── Tipos de Suplemento ────────────────────────────────────
 create table if not exists public.supplement_types (

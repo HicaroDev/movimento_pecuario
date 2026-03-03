@@ -135,21 +135,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, user?.farmId, user?.farmIds?.join(','), isAdmin]);
 
-  /* Recarrega quando o tab volta ao foco após 30s+ de inatividade */
+  /* Recarrega quando o tab volta ao foco após 5s+ de inatividade */
   const hiddenAtRef = useRef<number | null>(null);
   useEffect(() => {
-    const THRESHOLD = 30_000; // só recarrega se ficou oculto 30+ segundos
+    const THRESHOLD = 5_000; // recarrega se ficou oculto 5+ segundos
+
+    function maybeRefresh() {
+      if (!activeFarmId) return;
+      const elapsed = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : Infinity;
+      if (elapsed > THRESHOLD) {
+        hiddenAtRef.current = null;
+        setRefreshTick(t => t + 1);
+      }
+    }
+
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         hiddenAtRef.current = Date.now();
-      } else if (document.visibilityState === 'visible' && activeFarmId) {
-        const elapsed = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0;
-        if (elapsed > THRESHOLD) setRefreshTick(t => t + 1);
-        hiddenAtRef.current = null;
+      } else if (document.visibilityState === 'visible') {
+        maybeRefresh();
       }
     };
+
+    // focus cobre casos onde visibilitychange não dispara (ex: alt+tab em alguns OS)
+    const onFocus = () => {
+      if (hiddenAtRef.current === null) hiddenAtRef.current = 0; // marca como "estava fora"
+      maybeRefresh();
+    };
+
+    // online: reconecta após queda de rede — sempre recarrega
+    const onOnline = () => {
+      if (activeFarmId) setRefreshTick(t => t + 1);
+    };
+
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+    };
   }, [activeFarmId]);
 
   /* Carrega dados quando a fazenda muda ou ao voltar ao foco */
