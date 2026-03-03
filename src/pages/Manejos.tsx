@@ -26,7 +26,7 @@ const TIPO_LABELS: Record<string, string> = {
   alocacao:           'Alocação',
   transferencia:      'Transferência',
   evolucao_categoria: 'Evolução',
-  abate:              'Abate',
+  abate:              'Saída',
   ajuste_quantidade:  'Ajuste',
 };
 const TIPO_COLORS: Record<string, string> = {
@@ -265,6 +265,7 @@ function TransferirTab({
   const [loteId, setLoteId]       = useState('');
   const [destId, setDestId]       = useState('');
   const [obs, setObs]             = useState('');
+  const [data, setData]           = useState(() => new Date().toISOString().split('T')[0]);
   const [saving, setSaving]       = useState(false);
   const [events, setEvents]       = useState<ManejoEvent[]>([]);
   const [loadingH, setLoadingH]   = useState(true);
@@ -286,9 +287,9 @@ function TransferirTab({
     try {
       const origemNome = lote.pasto_id ? (pastoMap[lote.pasto_id] ?? 'sem pasto') : 'sem pasto';
       const destNome   = pastoMap[destId] ?? destId;
-      await manejoService.transferir(lote, destId, origemNome, destNome, obs || undefined);
+      await manejoService.transferir(lote, destId, origemNome, destNome, data, obs || undefined);
       toast.success(`"${lote.nome}" transferido para ${destNome}!`);
-      setLoteId(''); setDestId(''); setObs('');
+      setLoteId(''); setDestId(''); setObs(''); setData(new Date().toISOString().split('T')[0]);
       onReload();
       const updated = await manejoService.listarHistorico(farmId, 'transferencia', 20);
       setEvents(updated);
@@ -341,6 +342,12 @@ function TransferirTab({
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Data da transferência</label>
+          <input type="date" value={data} onChange={e => setData(e.target.value)}
+            className={inputClass} />
         </div>
 
         <div>
@@ -546,13 +553,13 @@ function AbateTab({
     setSaving(true);
     try {
       await manejoService.registrarAbate(lote, qtdNum, peso ? Number(peso) : undefined, obs || undefined);
-      toast.success(`Abate de ${qtdNum} cab. registrado!${encerrar ? ' Lote encerrado.' : ''}`);
+      toast.success(`Saída de ${qtdNum} cab. registrada!${encerrar ? ' Lote encerrado.' : ''}`);
       setLoteId(''); setQtd(''); setPeso(''); setObs('');
       onReload();
       const updated = await manejoService.listarHistorico(farmId, 'abate', 20);
       setEvents(updated);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao registrar abate.');
+      toast.error(e instanceof Error ? e.message : 'Erro ao registrar saída.');
     } finally {
       setSaving(false);
     }
@@ -564,7 +571,7 @@ function AbateTab({
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <Scissors className="w-4 h-4 text-red-500" />
-          <h3 className="font-semibold text-gray-900">Registrar abate</h3>
+          <h3 className="font-semibold text-gray-900">Registrar saída</h3>
         </div>
 
         <div>
@@ -591,7 +598,7 @@ function AbateTab({
             <p className={`text-xs mt-1 font-medium ${restam <= 0 ? 'text-red-500' : 'text-gray-500'}`}>
               {restam <= 0
                 ? '⚠ O lote será encerrado (abatido)'
-                : `Restam ${restam} cabeças após o abate`}
+                : `Restam ${restam} cabeças após a saída`}
             </p>
           )}
         </div>
@@ -608,14 +615,14 @@ function AbateTab({
           <label className={labelClass}>Observação (opcional)</label>
           <input type="text"
             value={obs} onChange={e => setObs(e.target.value)}
-            placeholder="Ex: Abate programado — lote 01/03"
+            placeholder="Ex: Saída programada — lote 01/03"
             className={inputClass} disabled={!loteId} />
         </div>
 
         <button onClick={confirmar} disabled={saving || !loteId || !qtd || qtdNum <= 0}
           className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <Scissors className="w-4 h-4" />
-          {saving ? 'Registrando...' : 'Confirmar Abate'}
+          {saving ? 'Registrando...' : 'Confirmar Saída'}
         </button>
       </div>
 
@@ -623,7 +630,7 @@ function AbateTab({
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
           <History className="w-4 h-4 text-gray-400" />
-          <h3 className="font-semibold text-gray-700 text-sm">Histórico de abates</h3>
+          <h3 className="font-semibold text-gray-700 text-sm">Histórico de saídas</h3>
         </div>
         <HistoricoTable events={events} loading={loadingH} />
       </div>
@@ -641,7 +648,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'lotes',     label: 'Lotes por Pasto',    icon: MapPin },
   { id: 'transferir',label: 'Transferir',          icon: ArrowRight },
   { id: 'evolucao',  label: 'Evolução',            icon: TrendingUp },
-  { id: 'abate',     label: 'Abate',               icon: Scissors },
+  { id: 'abate',     label: 'Saída',               icon: Scissors },
 ];
 
 export function Manejos() {

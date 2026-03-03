@@ -140,6 +140,7 @@ export const manejoService = {
     pastoDestinoId: string,
     pastoOrigemNome: string,
     pastoDestinoNome: string,
+    data?: string,
     obs?: string,
   ): Promise<void> {
     const { error } = await supabaseAdmin
@@ -148,11 +149,12 @@ export const manejoService = {
       .eq('id', animal.id);
     if (error) throw new Error(error.message);
 
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
     await insertHistorico({
       farm_id:       animal.farm_id,
       animal_id:     animal.id,
       tipo:          'transferencia',
-      descricao:     `Lote "${animal.nome}" transferido de ${pastoOrigemNome} → ${pastoDestinoNome}${obs ? ` · ${obs}` : ''}`,
+      descricao:     `Lote "${animal.nome}" transferido de ${pastoOrigemNome} → ${pastoDestinoNome}${dataStr}${obs ? ` · ${obs}` : ''}`,
       pasto_origem:  animal.pasto_id ?? null,
       pasto_destino: pastoDestinoId,
     });
