@@ -19,13 +19,17 @@ const inputClass =
 const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
 const ALL_MODULES: Module[] = ['relatorio', 'formulario', 'cadastros', 'manejos', 'fazendas', 'usuarios'];
-const MODULE_LABELS: Record<Module, string> = {
+const MODULE_LABELS: Record<string, string> = {
   relatorio: 'Relatório', formulario: 'Lançamento', cadastros: 'Cadastros',
   manejos: 'Manejos', fazendas: 'Fazendas', usuarios: 'Usuários',
+  // nomes antigos (legado do trigger)
+  pastos: 'Pastos',
 };
-const MODULE_ICONS: Record<Module, React.ElementType> = {
+const MODULE_ICONS: Record<string, React.ElementType> = {
   relatorio: BarChart3, formulario: FileText, cadastros: FolderOpen,
   manejos: ClipboardList, fazendas: Building2, usuarios: UserCog,
+  // nomes antigos do trigger (legado)
+  pastos: FolderOpen, usuarios_old: UserCog,
 };
 
 /* ─────────────── Modal de usuário ─────────────── */
@@ -513,10 +517,10 @@ export function Usuarios() {
                       <p className="text-xs text-gray-500 mb-2">{u.email}</p>
                       <div className="flex flex-wrap gap-1">
                         {u.modules.map(m => {
-                          const Icon = MODULE_ICONS[m];
+                          const Icon = MODULE_ICONS[m] ?? FolderOpen;
                           return (
                             <span key={m} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
-                              <Icon className="w-3 h-3" /> {MODULE_LABELS[m]}
+                              <Icon className="w-3 h-3" /> {MODULE_LABELS[m] ?? m}
                             </span>
                           );
                         })}

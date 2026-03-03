@@ -36,16 +36,18 @@ do $$ begin
   end if;
 end $$;
 
--- Trigger atualizado com email
+-- Trigger atualizado com email e módulos corretos
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into public.profiles (id, name, email, role)
+  insert into public.profiles (id, name, email, role, modules, active)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', new.email),
     new.email,
-    coalesce(new.raw_user_meta_data->>'role', 'client')
+    coalesce(new.raw_user_meta_data->>'role', 'client'),
+    array['relatorio','formulario','cadastros','manejos','fazendas','usuarios'],
+    true
   );
   return new;
 end;
