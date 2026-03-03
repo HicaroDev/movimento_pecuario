@@ -85,7 +85,11 @@ export function DashboardLayout() {
   const visibleNavItems = navItems.filter(item => hasModule(item.module));
 
   async function handleLogout() {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // noop — logout() já é robusto, mas garante navegação mesmo em erros inesperados
+    }
     navigate('/login');
   }
 

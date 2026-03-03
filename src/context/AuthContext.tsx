@@ -152,8 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout(): Promise<void> {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignora erros de rede — limpa o estado local de qualquer forma
+    }
     setUser(null);
+    writeCachedProfile(null);
   }
 
   function hasModule(m: Module): boolean {

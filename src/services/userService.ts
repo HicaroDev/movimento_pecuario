@@ -184,6 +184,24 @@ export const userService = {
     logger.info('userService.update', `resposta ${res.status}`, json);
     if (!res.ok) throw new Error(json?.message ?? 'Erro ao atualizar usuário.');
     if (!json[0]) throw new Error('Usuário não encontrado.');
+
+    // Atualiza senha no auth.users se uma nova senha foi fornecida
+    if (d.password) {
+      const pwRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({ password: d.password }),
+      });
+      if (!pwRes.ok) {
+        const pwJson = await pwRes.json().catch(() => ({}));
+        throw new Error(pwJson?.msg ?? pwJson?.message ?? 'Erro ao atualizar senha.');
+      }
+    }
+
     return toFarmUser(json[0]);
   },
 
