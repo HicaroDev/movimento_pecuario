@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -39,17 +39,27 @@ let _modalFarmsCache: Farm[] = [];
 
 interface UserFormData { name: string; email: string; password: string; role: Role; }
 
-function UserModal({ editing, currentUserId, onClose, onSaved }: {
+function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, restrictModules, clientMode }: {
   editing: FarmUser | null;
   currentUserId: string;
   onClose: () => void;
   onSaved: () => void;
+  restrictFarmIds?: string[];  // cliente: só mostra fazendas dele
+  restrictModules?: Module[];  // cliente: só módulos que ele já tem
+  clientMode?: boolean;        // esconde selector de perfil, força role=client
 }) {
+  const availableModules = restrictModules ?? ALL_MODULES;
+
   const [farms, setFarms]         = useState<Farm[]>(_modalFarmsCache);
   const [selectedFarmIds, setSelectedFarmIds] = useState<string[]>(
-    editing?.farmIds?.length ? editing.farmIds : (editing?.farmId ? [editing.farmId] : [])
+    editing?.farmIds?.length ? editing.farmIds
+      : editing?.farmId       ? [editing.farmId]
+      : restrictFarmIds       ? restrictFarmIds   // novo usuário criado por cliente herda fazendas
+      : []
   );
-  const [modules, setModules]     = useState<Module[]>(editing?.modules ?? ALL_MODULES);
+  const [modules, setModules]     = useState<Module[]>(
+    editing?.modules?.filter(m => availableModules.includes(m as Module)) ?? availableModules
+  );
   const [active, setActive]       = useState<boolean>(editing?.active ?? true);
   const [showPwd, setShowPwd]     = useState(false);
   const [saving, setSaving]       = useState(false);
@@ -57,21 +67,25 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
   useEffect(() => {
     farmService.list()
       .then(list => {
-        const active = list.filter(f => f.active);
-        logger.info('UserModal', `fazendas carregadas: ${active.length}`);
-        _modalFarmsCache = active;
-        setFarms(active);
+        const activeFarms = list.filter(f => f.active);
+        const filtered = restrictFarmIds
+          ? activeFarms.filter(f => restrictFarmIds.includes(f.id))
+          : activeFarms;
+        logger.info('UserModal', `fazendas carregadas: ${filtered.length}`);
+        _modalFarmsCache = activeFarms;
+        setFarms(filtered);
       })
       .catch(err => {
         logger.error('UserModal', 'erro ao carregar fazendas', err);
         toast.error('Erro ao carregar fazendas.');
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<UserFormData>({
     defaultValues: {
       name: editing?.name ?? '', email: editing?.email ?? '',
-      password: '', role: editing?.role ?? 'client',
+      password: '', role: clientMode ? 'client' : (editing?.role ?? 'client'),
     },
   });
 
@@ -164,13 +178,15 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
               {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
             </div>
 
-            <div>
-              <label className={labelClass}>Perfil</label>
-              <select className={inputClass} {...register('role')}>
-                <option value="client">Cliente / Funcionário</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
+            {!clientMode && (
+              <div>
+                <label className={labelClass}>Perfil</label>
+                <select className={inputClass} {...register('role')}>
+                  <option value="client">Cliente / Funcionário</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+            )}
 
             {selectedRole === 'client' && (
               <div>
@@ -216,8 +232,8 @@ function UserModal({ editing, currentUserId, onClose, onSaved }: {
             <div>
               <label className={labelClass}>Módulos de acesso</label>
               <div className="grid grid-cols-2 gap-2 mt-1">
-                {ALL_MODULES.map(m => {
-                  const Icon = MODULE_ICONS[m];
+                {availableModules.map(m => {
+                  const Icon = MODULE_ICONS[m] ?? FolderOpen;
                   const on = modules.includes(m);
                   return (
                     <label key={m}
@@ -356,19 +372,30 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
 // Cache de módulo — persiste entre navegações sem precisar de contexto
 let _usersCache: FarmUser[]  = [];
 let _farmUsersCache: FarmUser[] = [];
-let _farmCache: Farm | null  = null;
+let _farmsCache: Farm[]      = [];
 
 export function Usuarios() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, hasModule } = useAuth();
   const [users, setUsers]         = useState<FarmUser[]>(_usersCache);
   const [loading, setLoading]     = useState(_usersCache.length === 0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<FarmUser | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Cliente: dados da sua fazenda
+  // Cliente: dados das suas fazendas
   const [farmUsers, setFarmUsers] = useState<FarmUser[]>(_farmUsersCache);
-  const [farm, setFarm]           = useState<Farm | null>(_farmCache);
+  const [farms, setFarms]         = useState<Farm[]>(_farmsCache);
+  // mapa id→nome para mostrar a fazenda de cada usuário
+  const farmNameMap = useMemo(
+    () => Object.fromEntries(farms.map(f => [f.id, f.nomeFazenda])),
+    [farms]
+  );
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [clientEditing, setClientEditing]     = useState<FarmUser | null>(null);
+
+  function openClientCreate() { setClientEditing(null); setClientModalOpen(true); }
+  function openClientEdit(u: FarmUser) { setClientEditing(u); setClientModalOpen(true); }
+  function closeClientModal() { setClientModalOpen(false); setClientEditing(null); }
 
   async function refresh() {
     // Só mostra skeleton se não há dados em cache
@@ -407,24 +434,38 @@ export function Usuarios() {
       refresh();
     } else if (user?.id) {
       if (_farmUsersCache.length === 0) setLoading(true);
-      userService.findById(user.id).then(profile => {
-        if (profile?.farmId) {
-          Promise.all([
-            userService.listByFarm(profile.farmId),
-            farmService.findById(profile.farmId),
-          ]).then(([fu, f]) => {
-            _farmUsersCache = fu;
-            _farmCache = f;
-            setFarmUsers(fu);
-            setFarm(f);
-            setLoading(false);
-          });
-        } else {
-          setLoading(false);
-        }
-      });
+      // Coleta todas as fazendas do usuário
+      const ids = user.farmIds?.length ? user.farmIds : (user.farmId ? [user.farmId] : []);
+      if (ids.length === 0) { setLoading(false); return; }
+      Promise.all([
+        // usuários de todas as fazendas (sem duplicatas por id)
+        Promise.all(ids.map(id => userService.listByFarm(id))).then(lists => {
+          const seen = new Set<string>();
+          return lists.flat().filter(u => seen.has(u.id) ? false : (seen.add(u.id), true));
+        }),
+        // dados de todas as fazendas
+        Promise.all(ids.map(id => farmService.findById(id))).then(
+          list => list.filter((f): f is Farm => f !== null)
+        ),
+      ]).then(([fu, fs]) => {
+        _farmUsersCache = fu;
+        _farmsCache = fs;
+        setFarmUsers(fu);
+        setFarms(fs);
+        setLoading(false);
+      }).catch(() => setLoading(false));
     }
   }, [user?.id, isAdmin, refreshTick]);
+
+  async function refreshFarmUsers() {
+    const ids = user?.farmIds?.length ? user.farmIds : (user?.farmId ? [user.farmId] : []);
+    if (ids.length === 0) return;
+    const lists = await Promise.all(ids.map(id => userService.listByFarm(id))).catch(() => [_farmUsersCache]);
+    const seen = new Set<string>();
+    const fu = lists.flat().filter(u => seen.has(u.id) ? false : (seen.add(u.id), true));
+    _farmUsersCache = fu;
+    setFarmUsers(fu);
+  }
 
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(u: FarmUser) { setEditing(u); setModalOpen(true); }
@@ -490,12 +531,23 @@ export function Usuarios() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="max-w-4xl mx-auto">
 
-        <div className="mb-8">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Usuários</h1>
-          <p className="text-sm text-gray-500">
-            {farm?.nomeFazenda || 'Minha fazenda'} · {farmUsers.length} usuário{farmUsers.length !== 1 ? 's' : ''}
-          </p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">Usuários</h1>
+            <p className="text-sm text-gray-500">
+              {farms.length > 1
+                ? `${farms.length} fazendas`
+                : (farms[0]?.nomeFazenda || 'Minha fazenda')
+              } · {farmUsers.length} usuário{farmUsers.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {hasModule('usuarios') && (
+            <button onClick={openClientCreate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
+              <Plus className="w-4 h-4" /> Novo Usuário
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -527,6 +579,12 @@ export function Usuarios() {
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {u.active ? '● Ativo' : '○ Inativo'}
                         </span>
+                        {farms.length > 1 && u.farmId && farmNameMap[u.farmId] && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">
+                            <Building2 className="w-2.5 h-2.5" />
+                            {farmNameMap[u.farmId]}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mb-2">{u.email}</p>
                       <div className="flex flex-wrap gap-1">
@@ -540,6 +598,15 @@ export function Usuarios() {
                         })}
                       </div>
                     </div>
+                    {hasModule('usuarios') && u.id !== user!.id && (
+                      <button
+                        onClick={() => openClientEdit(u)}
+                        className="p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
+                        title="Editar usuário"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
@@ -548,6 +615,20 @@ export function Usuarios() {
         </motion.div>
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {clientModalOpen && (
+          <UserModal
+            editing={clientEditing}
+            currentUserId={user!.id}
+            onClose={closeClientModal}
+            onSaved={refreshFarmUsers}
+            restrictFarmIds={user?.farmIds?.length ? user.farmIds : (user?.farmId ? [user.farmId] : [])}
+            restrictModules={(user?.modules ?? []) as Module[]}
+            clientMode
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
