@@ -9,7 +9,7 @@ RUN npm ci
 COPY . .
 
 ENV NODE_OPTIONS="--max-old-space-size=512"
-RUN npm run build
+RUN npx vite build
 
 # ── Stage 2: Serve ──────────────────────────────────────────────────────────
 FROM nginx:alpine
