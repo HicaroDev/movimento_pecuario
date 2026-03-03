@@ -127,11 +127,7 @@ export function Relatorio() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8 no-print-padding">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div>
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-8">
           <motion.div
@@ -365,7 +361,7 @@ export function Relatorio() {
             )}
           </>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

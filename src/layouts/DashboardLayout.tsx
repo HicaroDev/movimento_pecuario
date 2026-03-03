@@ -230,7 +230,7 @@ export function DashboardLayout() {
       {/* Main */}
       <main
         className="flex-1 overflow-auto"
-        style={{ background: '#f8fafc' }}
+        style={{ background: '#f8fafc', isolation: 'isolate' }}
       >
         <Outlet />
       </main>
