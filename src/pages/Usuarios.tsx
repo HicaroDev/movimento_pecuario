@@ -41,15 +41,6 @@ const MODULE_COLORS: Record<string, string> = {
   pastos:     'bg-sky-50 text-sky-700 border-sky-100',
 };
 
-function UserAvatar({ name, role }: { name: string; role: string }) {
-  const initials = name.trim().split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
-  const isAdmin = role === 'admin';
-  return (
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white ${isAdmin ? 'bg-teal-500' : 'bg-blue-500'}`}>
-      {initials}
-    </div>
-  );
-}
 
 /* ─────────────── Modal de usuário ─────────────── */
 
@@ -340,16 +331,13 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
   return (
     <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50/70 transition-colors group">
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <UserAvatar name={u.name} role={u.role} />
-          <div>
-            <p className="text-sm font-semibold text-gray-900 leading-tight">{u.name}</p>
-            <p className="text-xs text-gray-400">{u.email}</p>
-          </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-900 leading-tight">{u.name}</p>
+          <p className="text-xs text-gray-400">{u.email}</p>
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
+        <span className="text-xs font-medium text-gray-600">
           {u.role === 'admin' ? 'Admin' : 'Cliente'}
         </span>
       </td>
