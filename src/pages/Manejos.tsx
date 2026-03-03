@@ -76,6 +76,7 @@ function LotesTab({
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
+  const [dataAlocacao, setDataAlocacao] = useState(() => new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
 
   const catMap = useMemo(
@@ -106,9 +107,10 @@ function LotesTab({
     if (!alocarAnimal || !pastoSel) return;
     setSaving(true);
     try {
-      await manejoService.alocarPasto(alocarAnimal, pastoSel, pastoMap[pastoSel] ?? pastoSel);
+      await manejoService.alocarPasto(alocarAnimal, pastoSel, pastoMap[pastoSel] ?? pastoSel, dataAlocacao);
       toast.success(`Lote "${alocarAnimal.nome}" alocado!`);
       setAlocarAnimal(null);
+      setDataAlocacao(new Date().toISOString().split('T')[0]);
       onReload();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erro ao alocar lote.');
@@ -232,6 +234,10 @@ function LotesTab({
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Data</label>
+                  <input type="date" value={dataAlocacao} onChange={e => setDataAlocacao(e.target.value)} className={inputClass} />
                 </div>
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
@@ -526,6 +532,7 @@ function AbateTab({
   const [loteId, setLoteId]     = useState('');
   const [qtd, setQtd]           = useState('');
   const [peso, setPeso]         = useState('');
+  const [dataSaida, setDataSaida] = useState(() => new Date().toISOString().split('T')[0]);
   const [obs, setObs]           = useState('');
   const [saving, setSaving]     = useState(false);
   const [events, setEvents]     = useState<ManejoEvent[]>([]);
@@ -552,9 +559,9 @@ function AbateTab({
 
     setSaving(true);
     try {
-      await manejoService.registrarAbate(lote, qtdNum, peso ? Number(peso) : undefined, obs || undefined);
+      await manejoService.registrarAbate(lote, qtdNum, peso ? Number(peso) : undefined, dataSaida, obs || undefined);
       toast.success(`Saída de ${qtdNum} cab. registrada!${encerrar ? ' Lote encerrado.' : ''}`);
-      setLoteId(''); setQtd(''); setPeso(''); setObs('');
+      setLoteId(''); setQtd(''); setPeso(''); setDataSaida(new Date().toISOString().split('T')[0]); setObs('');
       onReload();
       const updated = await manejoService.listarHistorico(farmId, 'abate', 20);
       setEvents(updated);
@@ -608,6 +615,12 @@ function AbateTab({
           <input type="number" min="0" step="0.1"
             value={peso} onChange={e => setPeso(e.target.value)}
             placeholder="Ex: 420 kg"
+            className={inputClass} disabled={!loteId} />
+        </div>
+
+        <div>
+          <label className={labelClass}>Data da saída</label>
+          <input type="date" value={dataSaida} onChange={e => setDataSaida(e.target.value)}
             className={inputClass} disabled={!loteId} />
         </div>
 

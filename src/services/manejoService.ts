@@ -117,6 +117,7 @@ export const manejoService = {
     animal: Animal,
     pastoId: string | null,
     pastoNome: string,
+    data?: string,
   ): Promise<void> {
     const { error } = await supabaseAdmin
       .from('animals')
@@ -124,12 +125,13 @@ export const manejoService = {
       .eq('id', animal.id);
     if (error) throw new Error(error.message);
 
-    const acao = pastoId ? `alocado em ${pastoNome}` : 'removido do pasto';
+    const acao    = pastoId ? `alocado em ${pastoNome}` : 'removido do pasto';
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
     await insertHistorico({
       farm_id:       animal.farm_id,
       animal_id:     animal.id,
       tipo:          'alocacao',
-      descricao:     `Lote "${animal.nome}" ${acao}`,
+      descricao:     `Lote "${animal.nome}" ${acao}${dataStr}`,
       pasto_origem:  animal.pasto_id ?? null,
       pasto_destino: pastoId,
     });
@@ -197,6 +199,7 @@ export const manejoService = {
     animal: Animal,
     quantidade: number,
     pesoMedio?: number,
+    data?: string,
     obs?: string,
   ): Promise<void> {
     const novaQtd = animal.quantidade - quantidade;
@@ -210,11 +213,12 @@ export const manejoService = {
     if (error) throw new Error(error.message);
 
     const encerrado = novaQtd <= 0 ? ' — lote encerrado' : '';
+    const dataStr   = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
     await insertHistorico({
       farm_id:    animal.farm_id,
       animal_id:  animal.id,
       tipo:       'abate',
-      descricao:  `Abate de ${quantidade} cab. do lote "${animal.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${obs ? ` · ${obs}` : ''}${encerrado}`,
+      descricao:  `Saída de ${quantidade} cab. do lote "${animal.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr}${obs ? ` · ${obs}` : ''}${encerrado}`,
       quantidade,
       peso_medio: pesoMedio ?? null,
     });
