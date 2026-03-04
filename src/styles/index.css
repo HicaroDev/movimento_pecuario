@@ -24,6 +24,7 @@
 @layer base {
   * {
     box-sizing: border-box;
+    text-transform: uppercase;
   }
 
   body {
@@ -31,7 +32,6 @@
     font-family: system-ui, -apple-system, sans-serif;
     background: #f9fafb;
     color: #111827;
-    text-transform: uppercase;
   }
 }
 
