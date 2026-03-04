@@ -1191,28 +1191,29 @@ function HistoricoTab({ farmId, animals, pastures }: {
           })}
         </div>
 
-        {/* Pasture filter */}
+        {/* Pasture filter — select */}
         {pastures.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Pasto:</span>
-            <button onClick={() => setPastoFiltro('')}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
-                !pastoFiltro
-                  ? 'bg-teal-600 text-white border-teal-600'
-                  : 'border-gray-200 text-gray-600 hover:border-teal-300 bg-white'
-              }`}>
-              Todos
-            </button>
-            {pastures.map(p => (
-              <button key={p.id} onClick={() => setPastoFiltro(prev => prev === p.id ? '' : p.id)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
-                  pastoFiltro === p.id
-                    ? 'bg-teal-600 text-white border-teal-600'
-                    : 'border-gray-200 text-gray-600 hover:border-teal-300 bg-white'
-                }`}>
-                {p.nome}
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">Pasto:</label>
+            <div className="relative flex-1 max-w-xs">
+              <select
+                value={pastoFiltro}
+                onChange={e => setPastoFiltro(e.target.value)}
+                className="w-full h-9 pl-3 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none transition-colors"
+              >
+                <option value="">Todos os pastos</option>
+                {pastures.map(p => (
+                  <option key={p.id} value={p.id}>{p.nome}{p.area ? ` (${p.area} ha)` : ''}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            </div>
+            {pastoFiltro && (
+              <button onClick={() => setPastoFiltro('')}
+                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors flex-shrink-0">
+                <X className="w-3 h-3" /> Limpar
               </button>
-            ))}
+            )}
           </div>
         )}
       </div>
