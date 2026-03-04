@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
-  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search,
+  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -28,7 +28,9 @@ const TIPO_LABELS: Record<string, string> = {
   evolucao_categoria: 'Evolução',
   paricao:            'Parição',
   manejo_bezerros:    'Bezerros',
-  abate:              'Saída',
+  abate:              'Abate',
+  venda:              'Venda',
+  desagrupamento:     'Desagrupamento',
   ajuste_quantidade:  'Ajuste',
 };
 const TIPO_COLORS: Record<string, string> = {
@@ -38,6 +40,8 @@ const TIPO_COLORS: Record<string, string> = {
   paricao:            'bg-pink-50 text-pink-700',
   manejo_bezerros:    'bg-orange-50 text-orange-700',
   abate:              'bg-red-50 text-red-700',
+  venda:              'bg-purple-50 text-purple-700',
+  desagrupamento:     'bg-cyan-50 text-cyan-700',
   ajuste_quantidade:  'bg-gray-100 text-gray-600',
 };
 
@@ -73,10 +77,10 @@ function HistoricoTable({ events, loading }: { events: ManejoEvent[]; loading: b
 ══════════════════════════════════════════════════════════════ */
 
 function LotesTab({
-  animals, pastures, categories, farmId, onReload,
+  animals, pastures, categories, onReload,
 }: {
   animals: Animal[]; pastures: Pasture[]; categories: AnimalCategory[];
-  farmId: string; onReload: () => void;
+  onReload: () => void;
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
@@ -85,45 +89,6 @@ function LotesTab({
 
   // ── Filter ──
   const [search, setSearch] = useState('');
-
-  // ── Histórico drawer ──
-  const [showHistorico, setShowHistorico] = useState(false);
-  const [historicoEvents, setHistoricoEvents] = useState<ManejoEvent[]>([]);
-  const [loadingH, setLoadingH] = useState(false);
-  const todayStr = new Date().toISOString().split('T')[0];
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-  const [dataInicio, setDataInicio] = useState(firstOfMonth);
-  const [dataFim, setDataFim] = useState(todayStr);
-
-  // Month chips — last 6 months
-  const monthChips = useMemo(() => {
-    const chips: { label: string; start: string; end: string }[] = [];
-    const now = new Date();
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-      const start = d.toISOString().split('T')[0];
-      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-      chips.push({ label, start, end });
-    }
-    return chips;
-  }, []);
-
-  // Fetch when drawer opens
-  useEffect(() => {
-    if (!showHistorico) return;
-    setLoadingH(true);
-    manejoService.listarHistorico(farmId, undefined, 300)
-      .then(setHistoricoEvents).catch(() => {}).finally(() => setLoadingH(false));
-  }, [showHistorico, farmId]);
-
-  // Client-side date filter
-  const filteredEvents = useMemo(() =>
-    historicoEvents.filter(e => {
-      const d = e.created_at.split('T')[0];
-      return d >= dataInicio && d <= dataFim;
-    }),
-  [historicoEvents, dataInicio, dataFim]);
 
   const catMap = useMemo(
     () => Object.fromEntries(categories.map(c => [c.id, c.nome])),
@@ -247,12 +212,6 @@ function LotesTab({
             {ativosFiltrados.length} lote{ativosFiltrados.length !== 1 ? 's' : ''}
           </span>
         )}
-        <button
-          onClick={() => setShowHistorico(true)}
-          className="ml-auto flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-500 hover:text-teal-600 hover:border-teal-300 transition-colors shadow-sm">
-          <History className="w-4 h-4" />
-          Histórico
-        </button>
       </div>
 
       <div className="space-y-6">
@@ -287,71 +246,6 @@ function LotesTab({
           </section>
         )}
       </div>
-
-      {/* Histórico drawer */}
-      <AnimatePresence>
-        {showHistorico && (
-          <div className="fixed inset-0 z-50 flex">
-            <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowHistorico(false)} />
-            <motion.div
-              className="relative ml-auto bg-white w-full max-w-lg h-full flex flex-col shadow-2xl z-10"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}>
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-teal-600" />
-                  <h3 className="font-bold text-gray-900">Histórico de movimentações</h3>
-                </div>
-                <button onClick={() => setShowHistorico(false)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Date filter */}
-              <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 space-y-3">
-                {/* Month chips */}
-                <div className="flex flex-wrap gap-1.5">
-                  {monthChips.map(chip => {
-                    const active = dataInicio === chip.start && dataFim === chip.end;
-                    return (
-                      <button key={chip.start}
-                        onClick={() => { setDataInicio(chip.start); setDataFim(chip.end); }}
-                        className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors capitalize ${
-                          active
-                            ? 'bg-teal-600 text-white border-teal-600'
-                            : 'border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 bg-white'
-                        }`}>
-                        {chip.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Custom date range */}
-                <div className="flex items-center gap-2">
-                  <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}
-                    className="flex-1 h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                  <span className="text-xs text-gray-400 flex-shrink-0">até</span>
-                  <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
-                    className="flex-1 h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                </div>
-                <p className="text-xs text-gray-400">
-                  {filteredEvents.length} evento{filteredEvents.length !== 1 ? 's' : ''} no período
-                </p>
-              </div>
-
-              {/* Events list */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <HistoricoTable events={filteredEvents} loading={loadingH} />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Modal alocar */}
       <AnimatePresence>
@@ -555,6 +449,7 @@ function EvolucaoTab({
   const [selected, setSelected]   = useState<Set<string>>(new Set());
   const [novaCatId, setNovaCatId] = useState('');
   const [catPeso, setCatPeso]     = useState('');
+  const [catData, setCatData]     = useState(() => new Date().toISOString().split('T')[0]);
 
   /* ── Parição ── */
   const [parLoteMaeId, setParLoteMaeId]   = useState('');
@@ -607,9 +502,9 @@ function EvolucaoTab({
     const catOrigemNomes = [...new Set(selectedAnimals.map(a => a.categoria_id ? (catMap[a.categoria_id] ?? 'sem categoria') : 'sem categoria'))].join(', ');
     setSaving(true);
     try {
-      await manejoService.evoluirCategorias(selectedAnimals, novaCatId, catOrigemNomes, catMap[novaCatId] ?? novaCatId, catPeso ? Number(catPeso) : undefined);
+      await manejoService.evoluirCategorias(selectedAnimals, novaCatId, catOrigemNomes, catMap[novaCatId] ?? novaCatId, catPeso ? Number(catPeso) : undefined, catData);
       toast.success(`${selected.size} lote(s) evoluído(s) para ${catMap[novaCatId]}!`);
-      setSelected(new Set()); setNovaCatId(''); setCatPeso('');
+      setSelected(new Set()); setNovaCatId(''); setCatPeso(''); setCatData(new Date().toISOString().split('T')[0]);
       onReload(); await reloadHistorico();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setSaving(false); }
@@ -793,6 +688,10 @@ function EvolucaoTab({
                 <label className={labelClass}>Novo peso médio (opcional)</label>
                 <input type="number" min="0" step="0.1" value={catPeso} onChange={e => setCatPeso(e.target.value)} placeholder="Ex: 220 kg" className={inputClass} />
               </div>
+              <div>
+                <label className={labelClass}>Data da evolução</label>
+                <input type="date" value={catData} onChange={e => setCatData(e.target.value)} className={inputClass} />
+              </div>
               <button onClick={confirmarCategoria} disabled={saving || selected.size === 0 || !novaCatId}
                 className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 <TrendingUp className="w-4 h-4" />
@@ -911,119 +810,230 @@ function EvolucaoTab({
    TAB 4 — Abate
 ══════════════════════════════════════════════════════════════ */
 
-function AbateTab({
-  animals, farmId, onReload,
-}: {
-  animals: Animal[]; farmId: string; onReload: () => void;
-}) {
-  const [loteId, setLoteId]     = useState('');
-  const [qtd, setQtd]           = useState('');
-  const [peso, setPeso]         = useState('');
-  const [dataSaida, setDataSaida] = useState(() => new Date().toISOString().split('T')[0]);
-  const [obs, setObs]           = useState('');
-  const [saving, setSaving]     = useState(false);
-  const [events, setEvents]     = useState<ManejoEvent[]>([]);
-  const [loadingH, setLoadingH] = useState(true);
+type TipoSaida = 'abate' | 'venda' | 'desagrupar';
 
-  const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
-  const lote = ativos.find(a => a.id === loteId);
-  const qtdNum = Number(qtd);
-  const restam = lote ? lote.quantidade - qtdNum : 0;
+function AbateTab({
+  animals, categories, farmId, onReload,
+}: {
+  animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
+}) {
+  const [tipoSaida, setTipoSaida] = useState<TipoSaida>('abate');
+  const [loteId, setLoteId]       = useState('');
+  const [qtd, setQtd]             = useState('');
+  const [peso, setPeso]           = useState('');
+  const [dataSaida, setDataSaida] = useState(() => new Date().toISOString().split('T')[0]);
+  const [obs, setObs]             = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [events, setEvents]       = useState<ManejoEvent[]>([]);
+  const [loadingH, setLoadingH]   = useState(true);
+
+  /* Desagrupar destino */
+  const [desDestino,     setDesDestino]     = useState<DestinoTipo>('novo');
+  const [desLoteDestId,  setDesLoteDestId]  = useState('');
+  const [desNovoNome,    setDesNovoNome]    = useState('');
+  const [desNovoCatId,   setDesNovoCatId]   = useState('');
+
+  const ativos  = animals.filter(a => a.status === 'ativo' || !a.status);
+  const lote    = ativos.find(a => a.id === loteId);
+  const qtdNum  = Number(qtd);
+  const restam  = lote ? lote.quantidade - qtdNum : 0;
+
+  const SAIDA_TIPOS: { id: TipoSaida; label: string; color: string }[] = [
+    { id: 'abate',      label: 'Abate (abatedor)',  color: 'bg-red-600 hover:bg-red-700' },
+    { id: 'venda',      label: 'Venda direta',      color: 'bg-purple-600 hover:bg-purple-700' },
+    { id: 'desagrupar', label: 'Desagrupar bezerros', color: 'bg-cyan-600 hover:bg-cyan-700' },
+  ];
+
+  const SAIDA_HISTORICO_TIPOS = ['abate', 'venda', 'desagrupamento'];
 
   useEffect(() => {
     setLoadingH(true);
-    manejoService.listarHistorico(farmId, 'abate', 20)
+    manejoService.listarHistorico(farmId, SAIDA_HISTORICO_TIPOS, 25)
       .then(setEvents).catch(() => {}).finally(() => setLoadingH(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmId]);
 
-  async function confirmar() {
+  function resetForm() {
+    setLoteId(''); setQtd(''); setPeso(''); setDataSaida(new Date().toISOString().split('T')[0]); setObs('');
+    setDesDestino('novo'); setDesLoteDestId(''); setDesNovoNome(''); setDesNovoCatId('');
+  }
+
+  async function confirmarSaida() {
     if (!lote) { toast.error('Selecione um lote.'); return; }
-    if (!qtd || qtdNum <= 0) { toast.error('Informe a quantidade de cabeças abatidas.'); return; }
+    if (!qtd || qtdNum <= 0) { toast.error('Informe a quantidade de cabeças.'); return; }
     if (qtdNum > lote.quantidade) { toast.error(`Máximo ${lote.quantidade} cabeças para este lote.`); return; }
-
     const encerrar = qtdNum >= lote.quantidade;
-    if (encerrar && !window.confirm(`Atenção: isso vai encerrar o lote "${lote.nome}" (todas as ${lote.quantidade} cabeças serão marcadas como abatidas). Confirmar?`)) return;
-
+    if (encerrar && !window.confirm(`Atenção: isso vai encerrar o lote "${lote.nome}". Confirmar?`)) return;
     setSaving(true);
     try {
-      await manejoService.registrarAbate(lote, qtdNum, peso ? Number(peso) : undefined, dataSaida, obs || undefined);
-      toast.success(`Saída de ${qtdNum} cab. registrada!${encerrar ? ' Lote encerrado.' : ''}`);
-      setLoteId(''); setQtd(''); setPeso(''); setDataSaida(new Date().toISOString().split('T')[0]); setObs('');
+      await manejoService.registrarSaida(lote, qtdNum, tipoSaida as 'abate' | 'venda', peso ? Number(peso) : undefined, dataSaida, obs || undefined);
+      toast.success(`${TIPO_LABELS[tipoSaida]}: ${qtdNum} cab. registrado!${encerrar ? ' Lote encerrado.' : ''}`);
+      resetForm();
       onReload();
-      const updated = await manejoService.listarHistorico(farmId, 'abate', 20);
+      const updated = await manejoService.listarHistorico(farmId, SAIDA_HISTORICO_TIPOS, 25);
       setEvents(updated);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erro ao registrar saída.');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
+
+  async function confirmarDesagrupar() {
+    if (!lote) { toast.error('Selecione o lote de origem.'); return; }
+    if (!qtd || qtdNum <= 0) { toast.error('Informe a quantidade de bezerros.'); return; }
+    if (qtdNum > lote.quantidade) { toast.error(`Máximo ${lote.quantidade} cabeças.`); return; }
+    if (desDestino === 'existente' && !desLoteDestId) { toast.error('Selecione o lote de destino.'); return; }
+    if (desDestino === 'novo' && !desNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
+    setSaving(true);
+    try {
+      await manejoService.desagruparLote({
+        loteOrigem: lote, qtd: qtdNum,
+        pesoMedio: peso ? Number(peso) : undefined,
+        data: dataSaida,
+        destino: desDestino === 'existente'
+          ? { tipo: 'existente', loteId: desLoteDestId }
+          : { tipo: 'novo', nome: desNovoNome.trim(), categoriaId: desNovoCatId || undefined },
+        farmId,
+        loteDestinoNome: desDestino === 'existente' ? (ativos.find(a => a.id === desLoteDestId)?.nome ?? '') : undefined,
+      });
+      toast.success(`Desagrupamento de ${qtdNum} cab. registrado!`);
+      resetForm();
+      onReload();
+      const updated = await manejoService.listarHistorico(farmId, SAIDA_HISTORICO_TIPOS, 25);
+      setEvents(updated);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao desagrupar.');
+    } finally { setSaving(false); }
+  }
+
+  const activeColor = SAIDA_TIPOS.find(t => t.id === tipoSaida)?.color ?? 'bg-red-600';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Form */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Scissors className="w-4 h-4 text-red-500" />
-          <h3 className="font-semibold text-gray-900">Registrar saída</h3>
+      <div className="space-y-4">
+        {/* Seletor de tipo */}
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+          {SAIDA_TIPOS.map(t => {
+            const active = tipoSaida === t.id;
+            return (
+              <button key={t.id} onClick={() => { setTipoSaida(t.id); setLoteId(''); setQtd(''); }}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  active ? t.color + ' text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}>
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        <div>
-          <label className={labelClass}>Lote</label>
-          <div className="relative">
-            <select value={loteId} onChange={e => { setLoteId(e.target.value); setQtd(''); }} className={selectClass}>
-              <option value="">Selecione um lote…</option>
-              {ativos.map(a => (
-                <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Scissors className="w-4 h-4 text-gray-500" />
+            <h3 className="font-semibold text-gray-900 text-sm">
+              {tipoSaida === 'abate' ? 'Abate (venda para abatedor)' :
+               tipoSaida === 'venda' ? 'Venda direta' :
+               'Desagrupar bezerros do lote'}
+            </h3>
           </div>
-        </div>
 
-        <div>
-          <label className={labelClass}>Cabeças abatidas</label>
-          <input type="number" min="1" max={lote?.quantidade}
-            value={qtd} onChange={e => setQtd(e.target.value)}
-            placeholder={lote ? `Máx. ${lote.quantidade}` : '0'}
-            className={inputClass}
-            disabled={!loteId} />
-          {lote && qtdNum > 0 && (
-            <p className={`text-xs mt-1 font-medium ${restam <= 0 ? 'text-red-500' : 'text-gray-500'}`}>
-              {restam <= 0
-                ? '⚠ O lote será encerrado (abatido)'
-                : `Restam ${restam} cabeças após a saída`}
-            </p>
+          <div>
+            <label className={labelClass}>Lote de origem</label>
+            <div className="relative">
+              <select value={loteId} onChange={e => { setLoteId(e.target.value); setQtd(''); }} className={selectClass}>
+                <option value="">Selecione um lote…</option>
+                {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>
+                {tipoSaida === 'desagrupar' ? 'Qtd. bezerros' : 'Cabeças'}
+              </label>
+              <input type="number" min="1" max={lote?.quantidade}
+                value={qtd} onChange={e => setQtd(e.target.value)}
+                placeholder={lote ? `Máx. ${lote.quantidade}` : '0'}
+                className={inputClass} disabled={!loteId} />
+              {lote && qtdNum > 0 && tipoSaida !== 'desagrupar' && (
+                <p className={`text-xs mt-1 font-medium ${restam <= 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                  {restam <= 0 ? '⚠ Lote será encerrado' : `Restam ${restam} cab.`}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className={labelClass}>Peso médio (opcional)</label>
+              <input type="number" min="0" step="0.1"
+                value={peso} onChange={e => setPeso(e.target.value)}
+                placeholder="kg" className={inputClass} disabled={!loteId} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Data</label>
+            <input type="date" value={dataSaida} onChange={e => setDataSaida(e.target.value)}
+              className={inputClass} disabled={!loteId} />
+          </div>
+
+          {tipoSaida !== 'desagrupar' && (
+            <div>
+              <label className={labelClass}>Observação (opcional)</label>
+              <input type="text" value={obs} onChange={e => setObs(e.target.value)}
+                placeholder="Ex: Saída programada — março/26"
+                className={inputClass} disabled={!loteId} />
+            </div>
           )}
-        </div>
 
-        <div>
-          <label className={labelClass}>Peso médio (opcional)</label>
-          <input type="number" min="0" step="0.1"
-            value={peso} onChange={e => setPeso(e.target.value)}
-            placeholder="Ex: 420 kg"
-            className={inputClass} disabled={!loteId} />
-        </div>
+          {/* Destino para desagrupar */}
+          {tipoSaida === 'desagrupar' && (
+            <div className="space-y-3">
+              <label className={labelClass}>Destino dos bezerros</label>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                <button type="button" onClick={() => setDesDestino('novo')}
+                  className={`flex-1 px-3 py-2 transition-colors ${desDestino === 'novo' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                  Criar novo lote
+                </button>
+                <button type="button" onClick={() => setDesDestino('existente')}
+                  className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${desDestino === 'existente' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                  Agregar em lote existente
+                </button>
+              </div>
+              {desDestino === 'existente' ? (
+                <div className="relative">
+                  <select value={desLoteDestId} onChange={e => setDesLoteDestId(e.target.value)} className={selectClass}>
+                    <option value="">Selecione o lote…</option>
+                    {ativos.filter(a => a.id !== loteId).map(a => (
+                      <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input type="text" value={desNovoNome} onChange={e => setDesNovoNome(e.target.value)}
+                    placeholder="Nome do novo lote (ex: Bezerros Mar/26)"
+                    className={inputClass} />
+                  <div className="relative">
+                    <select value={desNovoCatId} onChange={e => setDesNovoCatId(e.target.value)} className={selectClass}>
+                      <option value="">Categoria (opcional)…</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-        <div>
-          <label className={labelClass}>Data da saída</label>
-          <input type="date" value={dataSaida} onChange={e => setDataSaida(e.target.value)}
-            className={inputClass} disabled={!loteId} />
+          <button
+            onClick={tipoSaida === 'desagrupar' ? confirmarDesagrupar : confirmarSaida}
+            disabled={saving || !loteId || !qtd || qtdNum <= 0}
+            className={`flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${activeColor}`}>
+            <Scissors className="w-4 h-4" />
+            {saving ? 'Registrando...' : `Confirmar ${TIPO_LABELS[tipoSaida] ?? 'Saída'}`}
+          </button>
         </div>
-
-        <div>
-          <label className={labelClass}>Observação (opcional)</label>
-          <input type="text"
-            value={obs} onChange={e => setObs(e.target.value)}
-            placeholder="Ex: Saída programada — lote 01/03"
-            className={inputClass} disabled={!loteId} />
-        </div>
-
-        <button onClick={confirmar} disabled={saving || !loteId || !qtd || qtdNum <= 0}
-          className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-          <Scissors className="w-4 h-4" />
-          {saving ? 'Registrando...' : 'Confirmar Saída'}
-        </button>
       </div>
 
       {/* Histórico */}
@@ -1042,13 +1052,239 @@ function AbateTab({
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════════════════════════ */
 
-type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate';
+/* ══════════════════════════════════════════════════════════════
+   TAB 5 — Histórico Completo
+══════════════════════════════════════════════════════════════ */
+
+function HistoricoTab({ farmId, animals, pastures }: {
+  farmId: string; animals: Animal[]; pastures: Pasture[];
+}) {
+  const today      = new Date().toISOString().split('T')[0];
+  const fom        = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const [dataInicio, setDataInicio] = useState(fom);
+  const [dataFim,    setDataFim]    = useState(today);
+  const [tiposSel,   setTiposSel]   = useState<string[]>([]);
+  const [pastoFiltro, setPastoFiltro] = useState('');
+  const [events,     setEvents]     = useState<ManejoEvent[]>([]);
+  const [loading,    setLoading]    = useState(true);
+
+  // animal_id → pasto_id (current)
+  const animalPastoMap = useMemo(
+    () => Object.fromEntries(animals.filter(a => a.pasto_id).map(a => [a.id, a.pasto_id!])),
+    [animals]
+  );
+
+  // Last 12 months as quick chips
+  const monthChips = useMemo(() => {
+    const chips: { label: string; start: string; end: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d    = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const start = d.toISOString().split('T')[0];
+      const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+      chips.push({ label, start, end });
+    }
+    return chips;
+  }, []);
+
+  useEffect(() => {
+    if (!farmId) return;
+    setLoading(true);
+    manejoService.listarHistorico(farmId, undefined, 500)
+      .then(setEvents).catch(() => {}).finally(() => setLoading(false));
+  }, [farmId]);
+
+  const filtered = useMemo(() =>
+    events.filter(e => {
+      const d = e.created_at.split('T')[0];
+      const inRange = d >= dataInicio && d <= dataFim;
+      const inType  = tiposSel.length === 0 || tiposSel.includes(e.tipo);
+      const inPasto = !pastoFiltro ||
+        e.pasto_origem === pastoFiltro ||
+        e.pasto_destino === pastoFiltro ||
+        animalPastoMap[e.animal_id] === pastoFiltro;
+      return inRange && inType && inPasto;
+    }),
+  [events, dataInicio, dataFim, tiposSel, pastoFiltro, animalPastoMap]);
+
+  function toggleTipo(tipo: string) {
+    setTiposSel(prev => prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]);
+  }
+
+  const fmtPrintDate = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
+
+  return (
+    <div>
+      {/* ── Filters (hidden on print) ── */}
+      <div className="no-print space-y-4 mb-6">
+
+        {/* Period card */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-teal-600" />
+              <h3 className="font-semibold text-gray-800">Período</h3>
+            </div>
+            <button onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
+              <FileText className="w-4 h-4" />
+              Exportar PDF
+            </button>
+          </div>
+
+          {/* Month chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {monthChips.map(chip => {
+              const active = dataInicio === chip.start && dataFim === chip.end;
+              return (
+                <button key={chip.start}
+                  onClick={() => { setDataInicio(chip.start); setDataFim(chip.end); }}
+                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors capitalize ${
+                    active
+                      ? 'bg-teal-600 text-white border-teal-600'
+                      : 'border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 bg-white'
+                  }`}>
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Date range inputs */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <label className={labelClass}>De</label>
+              <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={inputClass} />
+            </div>
+            <div className="flex-1">
+              <label className={labelClass}>Até</label>
+              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+        </div>
+
+        {/* Type filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Tipo:</span>
+          <button onClick={() => setTiposSel([])}
+            className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
+              tiposSel.length === 0
+                ? 'bg-gray-800 text-white border-gray-800'
+                : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'
+            }`}>
+            Todos
+          </button>
+          {Object.keys(TIPO_LABELS).map(tipo => {
+            const sel = tiposSel.includes(tipo);
+            return (
+              <button key={tipo} onClick={() => toggleTipo(tipo)}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
+                  sel
+                    ? TIPO_COLORS[tipo] + ' border-current'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
+                }`}>
+                {TIPO_LABELS[tipo]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Pasture filter */}
+        {pastures.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Pasto:</span>
+            <button onClick={() => setPastoFiltro('')}
+              className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
+                !pastoFiltro
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'border-gray-200 text-gray-600 hover:border-teal-300 bg-white'
+              }`}>
+              Todos
+            </button>
+            {pastures.map(p => (
+              <button key={p.id} onClick={() => setPastoFiltro(prev => prev === p.id ? '' : p.id)}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
+                  pastoFiltro === p.id
+                    ? 'bg-teal-600 text-white border-teal-600'
+                    : 'border-gray-200 text-gray-600 hover:border-teal-300 bg-white'
+                }`}>
+                {p.nome}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Print-only header ── */}
+      <div className="print-only mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Histórico de Manejos</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Período: {fmtPrintDate(dataInicio)} a {fmtPrintDate(dataFim)}
+          {tiposSel.length > 0 && ` · ${tiposSel.map(t => TIPO_LABELS[t]).join(', ')}`}
+        </p>
+      </div>
+
+      {/* ── Stats bar ── */}
+      <div className="flex items-center gap-2 mb-4 no-print">
+        <span className="text-sm text-gray-500">
+          <strong className="text-gray-900">{filtered.length}</strong>{' '}
+          evento{filtered.length !== 1 ? 's' : ''} no período
+        </span>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {loading ? (
+          <SkeletonTable rows={8} cols={3} />
+        ) : filtered.length === 0 ? (
+          <div className="py-20 text-center">
+            <History className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">Nenhum evento neste período</p>
+            <p className="text-xs text-gray-400 mt-1">Tente ampliar o intervalo de datas</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap w-40">Data / Hora</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider w-28">Tipo</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Descrição</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(e => (
+                  <tr key={e.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.created_at)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${TIPO_COLORS[e.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {TIPO_LABELS[e.tipo] ?? e.tipo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-700 leading-relaxed">{e.descricao ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── tabs ── */
+
+type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate' | 'historico';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'lotes',     label: 'Lotes por Pasto',    icon: MapPin },
   { id: 'transferir',label: 'Transferir',          icon: ArrowRight },
   { id: 'evolucao',  label: 'Evolução',            icon: TrendingUp },
   { id: 'abate',     label: 'Saída',               icon: Scissors },
+  { id: 'historico', label: 'Histórico',           icon: History },
 ];
 
 export function Manejos() {
@@ -1133,7 +1369,7 @@ export function Manejos() {
               exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {tab === 'lotes' && (
                 <LotesTab animals={animals} pastures={pastures} categories={categories}
-                  farmId={activeFarmId} onReload={reload} />
+                  onReload={reload} />
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
@@ -1144,7 +1380,10 @@ export function Manejos() {
                   farmId={activeFarmId} onReload={reload} />
               )}
               {tab === 'abate' && (
-                <AbateTab animals={animals} farmId={activeFarmId} onReload={reload} />
+                <AbateTab animals={animals} categories={categories} farmId={activeFarmId} onReload={reload} />
+              )}
+              {tab === 'historico' && (
+                <HistoricoTab farmId={activeFarmId} animals={animals} pastures={pastures} />
               )}
             </motion.div>
           </AnimatePresence>

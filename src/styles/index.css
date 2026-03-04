@@ -35,6 +35,9 @@
 }
 
 /* ── Print styles ── */
+.print-only {
+  display: none;
+}
 @media print {
   html, body {
     background: white !important;
@@ -42,6 +45,9 @@
   }
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   .print-break {
     page-break-before: always;

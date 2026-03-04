@@ -31,6 +31,8 @@ export interface ManejoEvent {
   descricao?: string;
   quantidade?: number;
   peso_medio?: number;
+  pasto_origem?: string;
+  pasto_destino?: string;
   created_at: string;
 }
 
@@ -63,14 +65,16 @@ function toCategory(row: Record<string, unknown>): AnimalCategory {
 
 function toEvent(row: Record<string, unknown>): ManejoEvent {
   return {
-    id:         row.id as string,
-    farm_id:    row.farm_id as string,
-    animal_id:  row.animal_id as string,
-    tipo:       row.tipo as string,
-    descricao:  (row.descricao as string) ?? undefined,
-    quantidade: (row.quantidade as number) ?? undefined,
-    peso_medio: (row.peso_medio as number) ?? undefined,
-    created_at: row.created_at as string,
+    id:            row.id as string,
+    farm_id:       row.farm_id as string,
+    animal_id:     row.animal_id as string,
+    tipo:          row.tipo as string,
+    descricao:     (row.descricao as string) ?? undefined,
+    quantidade:    (row.quantidade as number) ?? undefined,
+    peso_medio:    (row.peso_medio as number) ?? undefined,
+    pasto_origem:  (row.pasto_origem as string) ?? undefined,
+    pasto_destino: (row.pasto_destino as string) ?? undefined,
+    created_at:    row.created_at as string,
   };
 }
 
@@ -168,6 +172,7 @@ export const manejoService = {
     categoriaOrigemNome: string,
     categoriaDestinoNome: string,
     pesoMedio?: number,
+    data?: string,
   ): Promise<void> {
     const ids = animals.map(a => a.id);
     const patch: Record<string, unknown> = { categoria_id: novaCategoriaId };
@@ -179,14 +184,15 @@ export const manejoService = {
       .in('id', ids);
     if (error) throw new Error(error.message);
 
-    const totalCab = animals.reduce((s, a) => s + a.quantidade, 0);
+    const totalCab   = animals.reduce((s, a) => s + a.quantidade, 0);
     const nomesLotes = animals.map(a => `"${a.nome}"`).join(', ');
+    const dataStr    = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
     await Promise.all(animals.map(a =>
       insertHistorico({
         farm_id:           a.farm_id,
         animal_id:         a.id,
         tipo:              'evolucao_categoria',
-        descricao:         `${nomesLotes}: ${categoriaOrigemNome} → ${categoriaDestinoNome} (${totalCab} cab.)`,
+        descricao:         `${nomesLotes}: ${categoriaOrigemNome} → ${categoriaDestinoNome} (${totalCab} cab.)${dataStr}`,
         categoria_origem:  a.categoria_id ?? null,
         categoria_destino: novaCategoriaId,
         quantidade:        a.quantidade,
@@ -195,16 +201,17 @@ export const manejoService = {
     ));
   },
 
-  async registrarAbate(
+  async registrarSaida(
     animal: Animal,
     quantidade: number,
+    tipoSaida: 'abate' | 'venda',
     pesoMedio?: number,
     data?: string,
     obs?: string,
   ): Promise<void> {
     const novaQtd = animal.quantidade - quantidade;
     const patch: Record<string, unknown> = { quantidade: novaQtd };
-    if (novaQtd <= 0) patch.status = 'abatido';
+    if (novaQtd <= 0) patch.status = tipoSaida === 'venda' ? 'vendido' : 'abatido';
 
     const { error } = await supabaseAdmin
       .from('animals')
@@ -214,24 +221,190 @@ export const manejoService = {
 
     const encerrado = novaQtd <= 0 ? ' — lote encerrado' : '';
     const dataStr   = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    const prefixo   = tipoSaida === 'venda' ? 'Venda' : 'Abate';
     await insertHistorico({
       farm_id:    animal.farm_id,
       animal_id:  animal.id,
-      tipo:       'abate',
-      descricao:  `Saída de ${quantidade} cab. do lote "${animal.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr}${obs ? ` · ${obs}` : ''}${encerrado}`,
+      tipo:       tipoSaida,
+      descricao:  `${prefixo}: ${quantidade} cab. do lote "${animal.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr}${obs ? ` · ${obs}` : ''}${encerrado}`,
       quantidade,
       peso_medio: pesoMedio ?? null,
     });
   },
 
-  async listarHistorico(farmId: string, tipo?: string, limit = 30): Promise<ManejoEvent[]> {
+  /** Mantido por compatibilidade com histórico antigo */
+  async registrarAbate(
+    animal: Animal,
+    quantidade: number,
+    pesoMedio?: number,
+    data?: string,
+    obs?: string,
+  ): Promise<void> {
+    return manejoService.registrarSaida(animal, quantidade, 'abate', pesoMedio, data, obs);
+  },
+
+  async desagruparLote(params: {
+    loteOrigem: Animal;
+    qtd: number;
+    pesoMedio?: number;
+    data?: string;
+    destino: { tipo: 'existente'; loteId: string } | { tipo: 'novo'; nome: string; categoriaId?: string };
+    farmId: string;
+    loteDestinoNome?: string;
+  }): Promise<void> {
+    const { loteOrigem, qtd, pesoMedio, data, destino, farmId, loteDestinoNome } = params;
+
+    // Reduz quantidade do lote de origem
+    const novaQtd = loteOrigem.quantidade - qtd;
+    const { error: errUpd } = await supabaseAdmin
+      .from('animals')
+      .update({ quantidade: novaQtd })
+      .eq('id', loteOrigem.id);
+    if (errUpd) throw new Error(errUpd.message);
+
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    let descrDestino = '';
+
+    if (destino.tipo === 'existente') {
+      const { data: loteAtual, error: errLer } = await supabaseAdmin
+        .from('animals').select('quantidade').eq('id', destino.loteId).single();
+      if (errLer) throw new Error(errLer.message);
+      const { error } = await supabaseAdmin
+        .from('animals')
+        .update({ quantidade: (loteAtual.quantidade as number) + qtd })
+        .eq('id', destino.loteId);
+      if (error) throw new Error(error.message);
+      descrDestino = `agregados ao lote "${loteDestinoNome ?? destino.loteId}"`;
+    } else {
+      const { error } = await supabaseAdmin.from('animals').insert({
+        farm_id:      farmId,
+        nome:         destino.nome,
+        quantidade:   qtd,
+        categoria_id: destino.categoriaId ?? null,
+        peso_medio:   pesoMedio ?? null,
+        pasto_id:     loteOrigem.pasto_id ?? null,
+        status:       'ativo',
+      });
+      if (error) throw new Error(error.message);
+      descrDestino = `novo lote "${destino.nome}" criado`;
+    }
+
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  loteOrigem.id,
+      tipo:       'desagrupamento',
+      descricao:  `Desagrupamento: ${qtd} cab. do lote "${loteOrigem.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr} — ${descrDestino}`,
+      quantidade: qtd,
+      peso_medio: pesoMedio ?? null,
+    });
+  },
+
+  async registrarParicao(params: {
+    loteMae: Animal;
+    qtdPartos: number;
+    pesoMedio?: number;
+    data?: string;
+    destino: { tipo: 'existente'; loteId: string } | { tipo: 'novo'; nome: string; categoriaId?: string };
+    farmId: string;
+    loteDestinoNome?: string;
+  }): Promise<void> {
+    const { loteMae, qtdPartos, pesoMedio, data, destino, farmId, loteDestinoNome } = params;
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    let descrDestino = '';
+
+    if (destino.tipo === 'existente') {
+      const { data: loteAtual, error: errLer } = await supabaseAdmin
+        .from('animals').select('quantidade').eq('id', destino.loteId).single();
+      if (errLer) throw new Error(errLer.message);
+      const { error } = await supabaseAdmin
+        .from('animals')
+        .update({ quantidade: (loteAtual.quantidade as number) + qtdPartos })
+        .eq('id', destino.loteId);
+      if (error) throw new Error(error.message);
+      descrDestino = `agregados ao lote "${loteDestinoNome ?? destino.loteId}"`;
+    } else {
+      const { error } = await supabaseAdmin.from('animals').insert({
+        farm_id:      farmId,
+        nome:         destino.nome,
+        quantidade:   qtdPartos,
+        categoria_id: destino.categoriaId ?? null,
+        peso_medio:   pesoMedio ?? null,
+        pasto_id:     loteMae.pasto_id ?? null,
+        status:       'ativo',
+      });
+      if (error) throw new Error(error.message);
+      descrDestino = `novo lote "${destino.nome}" criado`;
+    }
+
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  loteMae.id,
+      tipo:       'paricao',
+      descricao:  `Parição: ${qtdPartos} bezerro(s) do lote "${loteMae.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr} — ${descrDestino}`,
+      quantidade: qtdPartos,
+      peso_medio: pesoMedio ?? null,
+    });
+  },
+
+  async manejarBezerros(params: {
+    loteOrigem: Animal;
+    qtdBezerros: number;
+    pesoMedio?: number;
+    data?: string;
+    destino: { tipo: 'existente'; loteId: string } | { tipo: 'novo'; nome: string; categoriaId?: string };
+    farmId: string;
+    loteDestinoNome?: string;
+  }): Promise<void> {
+    const { loteOrigem, qtdBezerros, pesoMedio, data, destino, farmId, loteDestinoNome } = params;
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    let descrDestino = '';
+
+    if (destino.tipo === 'existente') {
+      const { data: loteAtual, error: errLer } = await supabaseAdmin
+        .from('animals').select('quantidade').eq('id', destino.loteId).single();
+      if (errLer) throw new Error(errLer.message);
+      const { error } = await supabaseAdmin
+        .from('animals')
+        .update({ quantidade: (loteAtual.quantidade as number) + qtdBezerros })
+        .eq('id', destino.loteId);
+      if (error) throw new Error(error.message);
+      descrDestino = `agregados ao lote "${loteDestinoNome ?? destino.loteId}"`;
+    } else {
+      const { error } = await supabaseAdmin.from('animals').insert({
+        farm_id:      farmId,
+        nome:         destino.nome,
+        quantidade:   qtdBezerros,
+        categoria_id: destino.categoriaId ?? null,
+        peso_medio:   pesoMedio ?? null,
+        pasto_id:     loteOrigem.pasto_id ?? null,
+        status:       'ativo',
+      });
+      if (error) throw new Error(error.message);
+      descrDestino = `novo lote "${destino.nome}" criado`;
+    }
+
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  loteOrigem.id,
+      tipo:       'manejo_bezerros',
+      descricao:  `Bezerros: ${qtdBezerros} cab. do lote "${loteOrigem.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr} — ${descrDestino}`,
+      quantidade: qtdBezerros,
+      peso_medio: pesoMedio ?? null,
+    });
+  },
+
+  async listarHistorico(farmId: string, tipo?: string | string[], limit = 30): Promise<ManejoEvent[]> {
     let q = supabaseAdmin
       .from('manejo_historico')
       .select('*')
       .eq('farm_id', farmId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    if (tipo) q = q.eq('tipo', tipo);
+    if (Array.isArray(tipo)) {
+      q = q.in('tipo', tipo);
+    } else if (tipo) {
+      q = q.eq('tipo', tipo);
+    }
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data ?? []).map(toEvent);
