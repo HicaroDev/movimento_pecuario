@@ -12,11 +12,36 @@ const inputClass =
   'w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
+/** Wraps an RHF register result to force UPPERCASE on typing */
+function upperReg<T extends { onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }>(reg: T): T & { style: { textTransform: 'uppercase' } } {
+  const { onChange, ...rest } = reg;
+  return {
+    ...rest,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.target.value = e.target.value.toUpperCase();
+      onChange(e);
+    },
+    style: { textTransform: 'uppercase' as const },
+  } as T & { style: { textTransform: 'uppercase' } };
+}
+
+/** Format phone number: (XX) XXXXX-XXXX */
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 11);
+  if (digits.length === 0) return '';
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 /* ── Local types ── */
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
-interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; observacoes?: string; }
+interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
+
+const RACAS = ['NELORE', 'CRUZAMENTO INDUSTRIAL', 'COMPOSTO'] as const;
+const QUALIDADES_FORRAGEM = ['REGULAR', 'BOA', 'ÓTIMA'] as const;
 
 /* ── Tab definition ── */
 const TABS = [
@@ -78,8 +103,8 @@ function SimpleEditRow({ item, onSave, onCancel }: {
   });
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -128,7 +153,7 @@ function SimpleTab({
       .insert({ nome: data.nome, observacoes: data.observacoes || null, farm_id: activeFarmId })
       .select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
-    notify([...items, row].sort((a, b) => a.nome.localeCompare(b.nome)));
+    notify([...items, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     toast.success(`${label} adicionado!`, { description: data.nome });
     reset(); setShowAdd(false);
   }
@@ -161,12 +186,12 @@ function SimpleTab({
           <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Nome *</label>
-              <input placeholder={`Ex: ${label}`} {...register('nome', { required: true })}
+              <input placeholder={`Ex.: ${label}`} {...upperReg(register('nome', { required: true }))}
                 className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
             </div>
             <div>
               <label className={labelClass}>Observações</label>
-              <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
+              <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
             </div>
             <div className="col-span-2 flex gap-3">
               <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
@@ -229,19 +254,27 @@ function SimpleTab({
 /* ═══════════════════════════════════════════════════════════════
    PastosTab — reutiliza DataContext
 ═══════════════════════════════════════════════════════════════ */
-interface PastureForm { nome: string; area: number; retiro_id: string; observacoes: string; }
+interface PastureForm { nome: string; area: number; retiro_id: string; forragem: string; qualidade_forragem: string; observacoes: string; }
 
-function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
-  pasture: { id: string; nome: string; area?: number; retiro_id?: string; observacoes?: string };
+function PastureEditRow({ pasture, retiros, forages, onSave, onCancel }: {
+  pasture: { id: string; nome: string; area?: number; retiro_id?: string; forragem?: string; qualidade_forragem?: string; observacoes?: string };
   retiros: SimpleItem[];
+  forages: SimpleItem[];
   onSave: (data: PastureForm) => void; onCancel: () => void;
 }) {
   const { register, handleSubmit } = useForm<PastureForm>({
-    defaultValues: { nome: pasture.nome, area: pasture.area ?? 0, retiro_id: pasture.retiro_id || '', observacoes: pasture.observacoes || '' },
+    defaultValues: {
+      nome: pasture.nome,
+      area: pasture.area ?? 0,
+      retiro_id: pasture.retiro_id || '',
+      forragem: pasture.forragem || '',
+      qualidade_forragem: pasture.qualidade_forragem || '',
+      observacoes: pasture.observacoes || '',
+    },
   });
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} placeholder="Nome" /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} placeholder="Nome" /></td>
       <td className="px-4 py-2"><input type="number" step="0.01" {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} placeholder="0.0" /></td>
       <td className="px-4 py-2">
         <select {...register('retiro_id')} className={inputClass}>
@@ -249,7 +282,19 @@ function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
           {retiros.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
         </select>
       </td>
-      <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} placeholder="Observações" /></td>
+      <td className="px-4 py-2">
+        <select {...register('forragem')} className={inputClass}>
+          <option value="">— Selecione —</option>
+          {forages.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+        </select>
+      </td>
+      <td className="px-4 py-2">
+        <select {...register('qualidade_forragem')} className={inputClass}>
+          <option value="">— Qualidade —</option>
+          {QUALIDADES_FORRAGEM.map(q => <option key={q} value={q}>{q}</option>)}
+        </select>
+      </td>
+      <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} placeholder="Observações" /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -258,6 +303,7 @@ function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
 function PastosTab() {
   const { pastures, addPasture, deletePasture, updatePasture, loading } = useData();
   const [retiros, setRetiros] = useState<SimpleItem[]>([]);
+  const [forages, setForages] = useState<SimpleItem[]>([]);
   const [showRetiros, setShowRetiros] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -270,8 +316,14 @@ function PastosTab() {
     if (!activeFarmId) return;
     let mounted = true;
     (async () => {
-      const { data } = await supabaseAdmin.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome');
-      if (mounted) setRetiros(data ?? []);
+      const [retRes, forRes] = await Promise.all([
+        supabaseAdmin.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome'),
+        supabaseAdmin.from('forage_types').select('*').eq('farm_id', activeFarmId).order('nome'),
+      ]);
+      if (mounted) {
+        setRetiros(retRes.data ?? []);
+        setForages(forRes.data ?? []);
+      }
     })();
     return () => { mounted = false; };
   }, [activeFarmId]);
@@ -285,12 +337,26 @@ function PastosTab() {
   });
 
   function onAdd(data: PastureForm) {
-    addPasture({ nome: data.nome, area: data.area, retiro_id: data.retiro_id || undefined, observacoes: data.observacoes });
+    addPasture({
+      nome: data.nome,
+      area: data.area > 0 ? data.area : undefined,   // NaN/0 vira undefined
+      retiro_id: data.retiro_id || undefined,
+      forragem: data.forragem || undefined,
+      qualidade_forragem: data.qualidade_forragem || undefined,
+      observacoes: data.observacoes,
+    });
     toast.success('Pasto adicionado!', { description: data.nome });
     reset(); setShowAddForm(false);
   }
   function onEditSave(id: string, data: PastureForm) {
-    updatePasture(id, { nome: data.nome, area: data.area, retiro_id: data.retiro_id || undefined, observacoes: data.observacoes });
+    updatePasture(id, {
+      nome: data.nome,
+      area: data.area > 0 ? data.area : undefined,
+      retiro_id: data.retiro_id || undefined,
+      forragem: data.forragem || undefined,
+      qualidade_forragem: data.qualidade_forragem || undefined,
+      observacoes: data.observacoes,
+    });
     toast.success('Pasto atualizado!'); setEditingId(null);
   }
   function onDelete(p: { id: string; nome: string }) {
@@ -365,12 +431,12 @@ function PastosTab() {
             <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Nome *</label>
-                <input placeholder="Ex: Lagoa Verde" {...register('nome', { required: true })}
+                <input placeholder="Ex.: Lagoa Verde" {...upperReg(register('nome', { required: true }))}
                   className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
               </div>
               <div>
                 <label className={labelClass}>Área (ha)</label>
-                <input type="number" step="0.01" placeholder="10.5"
+                <input type="number" step="0.01" placeholder="Ex.: 10.5"
                   {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} />
               </div>
               <div>
@@ -381,8 +447,22 @@ function PastosTab() {
                 </select>
               </div>
               <div>
+                <label className={labelClass}>Forragem</label>
+                <select {...register('forragem')} className={`${inputClass} cursor-pointer`}>
+                  <option value="">— Selecione —</option>
+                  {forages.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Qualidade da Forragem</label>
+                <select {...register('qualidade_forragem')} className={`${inputClass} cursor-pointer`}>
+                  <option value="">— Selecione —</option>
+                  {QUALIDADES_FORRAGEM.map(q => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className={labelClass}>Observações</label>
-                <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
+                <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
               </div>
               <div className="col-span-2 flex gap-3">
                 <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
@@ -396,7 +476,7 @@ function PastosTab() {
             </form>
           </motion.div>
         )}
-        {loading ? <SkeletonTable rows={4} cols={5} /> : (
+        {loading ? <SkeletonTable rows={4} cols={7} /> : (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             {pastures.length === 0 ? (
               <div className="py-16 text-center">
@@ -408,7 +488,7 @@ function PastosTab() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {['Nome do Pasto', 'Área (ha)', 'Retiro', 'Observações', 'Ações'].map(h => (
+                      {['Nome do Pasto', 'Área (ha)', 'Retiro', 'Forragem', 'Qualidade', 'Observações', 'Ações'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -416,13 +496,13 @@ function PastosTab() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredPastures.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-10 text-center text-sm text-gray-400">
+                        <td colSpan={7} className="py-10 text-center text-sm text-gray-400">
                           Nenhum pasto encontrado para "{filterText}"
                         </td>
                       </tr>
                     ) : filteredPastures.map(p =>
                       editingId === p.id ? (
-                        <PastureEditRow key={p.id} pasture={p} retiros={retiros}
+                        <PastureEditRow key={p.id} pasture={p} retiros={retiros} forages={forages}
                           onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
                       ) : (
                         <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
@@ -433,6 +513,16 @@ function PastosTab() {
                               ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700">{getRetiroName(p.retiro_id)}</span>
                               : <span className="text-gray-400">—</span>}
                           </td>
+                          <td className="px-4 py-3 text-gray-600">{p.forragem || '—'}</td>
+                          <td className="px-4 py-3">
+                            {p.qualidade_forragem
+                              ? <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  p.qualidade_forragem === 'ÓTIMA' ? 'bg-green-50 text-green-700' :
+                                  p.qualidade_forragem === 'BOA'   ? 'bg-teal-50 text-teal-700' :
+                                  'bg-yellow-50 text-yellow-700'
+                                }`}>{p.qualidade_forragem}</span>
+                              : <span className="text-gray-400">—</span>}
+                          </td>
                           <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.observacoes || '—'}</td>
                           <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(p.id)} onDelete={() => onDelete(p)} /></td>
                         </motion.tr>
@@ -441,7 +531,7 @@ function PastosTab() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={5} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+                      <td colSpan={7} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
                         {filterText
                           ? `${filteredPastures.length} de ${pastures.length} pastos`
                           : `${pastures.length} pasto${pastures.length !== 1 ? 's' : ''} cadastrado${pastures.length !== 1 ? 's' : ''}`
@@ -480,7 +570,7 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
   }
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
       <td className="px-4 py-2"><input type="number" min="0" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} /></td>
       <td className="px-4 py-2">
         <select {...register('categoria_id')} className={inputClass}>
@@ -489,13 +579,17 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
         </select>
       </td>
       <td className="px-4 py-2"><input type="number" min="0" step="0.1" placeholder="kg" {...register('peso_medio', { valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('raca')} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <select {...register('raca')} className={inputClass}>
+          <option value="">—</option>
+          {RACAS.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2">
         <select {...register('sexo')} className={inputClass}>
           <option value="">—</option>
-          <option value="Macho">Macho</option>
-          <option value="Fêmea">Fêmea</option>
-          <option value="Misto">Misto</option>
+          <option value="MACHO">MACHO</option>
+          <option value="FÊMEA">FÊMEA</option>
         </select>
       </td>
       <td className="px-4 py-2">
@@ -516,7 +610,7 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
           {...register('bezerros_peso_medio', { valueAsNumber: true })}
           className={`${inputClass} ${!temBezerros ? 'opacity-40 cursor-not-allowed' : ''}`} />
       </td>
-      <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(handleSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -653,12 +747,12 @@ function AnimaisTab() {
             <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Nome / Lote *</label>
-                <input placeholder="Ex: Lote A" {...register('nome', { required: true })}
+                <input placeholder="Ex.: Lote A" {...upperReg(register('nome', { required: true }))}
                   className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
               </div>
               <div>
                 <label className={labelClass}>Cabeças</label>
-                <input type="number" min="0" placeholder="100" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} />
+                <input type="number" min="0" placeholder="Ex.: 100" {...register('quantidade', { min: 0, valueAsNumber: true })} className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Categoria</label>
@@ -669,19 +763,21 @@ function AnimaisTab() {
               </div>
               <div>
                 <label className={labelClass}>Raça</label>
-                <input placeholder="Nelore" {...register('raca')} className={inputClass} />
+                <select {...register('raca')} className={inputClass}>
+                  <option value="">— Selecione —</option>
+                  {RACAS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
               <div>
                 <label className={labelClass}>Peso Médio (kg)</label>
-                <input type="number" min="0" step="0.1" placeholder="450" {...register('peso_medio', { valueAsNumber: true })} className={inputClass} />
+                <input type="number" min="0" step="0.1" placeholder="Ex.: 450" {...register('peso_medio', { valueAsNumber: true })} className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Sexo</label>
                 <select {...register('sexo')} className={inputClass}>
                   <option value="">—</option>
-                  <option value="Macho">Macho</option>
-                  <option value="Fêmea">Fêmea</option>
-                  <option value="Misto">Misto</option>
+                  <option value="MACHO">MACHO</option>
+                  <option value="FÊMEA">FÊMEA</option>
                 </select>
               </div>
               <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
@@ -704,17 +800,17 @@ function AnimaisTab() {
                 <div className={`grid grid-cols-2 gap-4 transition-opacity ${!temBezerros ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                   <div>
                     <label className={labelClass}>Quantidade de Animais</label>
-                    <input type="number" min="0" placeholder="0" {...register('bezerros_quantidade', { valueAsNumber: true })} className={inputClass} />
+                    <input type="number" min="0" placeholder="Ex.: 0" {...register('bezerros_quantidade', { valueAsNumber: true })} className={inputClass} />
                   </div>
                   <div>
                     <label className={labelClass}>Peso Médio (kg)</label>
-                    <input type="number" min="0" step="0.1" placeholder="0" {...register('bezerros_peso_medio', { valueAsNumber: true })} className={inputClass} />
+                    <input type="number" min="0" step="0.1" placeholder="Ex.: 0" {...register('bezerros_peso_medio', { valueAsNumber: true })} className={inputClass} />
                   </div>
                 </div>
               </div>
               <div className="col-span-2">
                 <label className={labelClass}>Observações</label>
-                <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
+                <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
               </div>
               <div className="col-span-2 flex gap-3">
                 <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
@@ -785,21 +881,24 @@ function AnimaisTab() {
    SuplementosTab
 ═══════════════════════════════════════════════════════════════ */
 let _suplementosCache: SupplementType[] = [];
-interface SupplementForm { nome: string; unidade: string; observacoes: string; }
+interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; observacoes: string; }
 
 function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: (d: SupplementForm) => void; onCancel: () => void; }) {
   const { register, handleSubmit } = useForm<SupplementForm>({
-    defaultValues: { nome: item.nome, unidade: item.unidade, observacoes: item.observacoes || '' },
+    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, observacoes: item.observacoes || '' },
   });
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
       <td className="px-4 py-2">
         <select {...register('unidade')} className={inputClass}>
-          <option value="kg">kg</option><option value="saco">saco</option><option value="litro">litro</option>
+          <option value="kg">KG</option>
+          <option value="saco">SACO</option>
         </select>
       </td>
-      <td className="px-4 py-2"><input {...register('observacoes')} className={inputClass} /></td>
+      <td className="px-4 py-2"><input type="number" step="0.1" min="0" {...register('peso', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 30" /></td>
+      <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 2.50" /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -811,7 +910,8 @@ function SuplementosTab() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg' } });
+  const [filterText, setFilterText] = useState('');
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0 } });
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -830,18 +930,40 @@ function SuplementosTab() {
     return () => { mounted = false; clearTimeout(tid); };
   }, [activeFarmId]);
 
+  const filteredItems = items.filter(s =>
+    !filterText || s.nome.toLowerCase().includes(filterText.toLowerCase())
+  );
+
   async function onAdd(data: SupplementForm) {
     if (!activeFarmId) return;
-    const { data: row, error } = await supabaseAdmin.from('supplement_types').insert({ ...data, farm_id: activeFarmId }).select().single();
+    const payload: Record<string, unknown> = {
+      nome: data.nome,
+      unidade: data.unidade,
+      observacoes: data.observacoes || null,
+      farm_id: activeFarmId,
+      // só inclui colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
+      ...(data.peso     > 0 && { peso:     data.peso }),
+      ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
+    };
+    const { data: row, error } = await supabaseAdmin.from('supplement_types').insert(payload).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
-    _suplementosCache = [..._suplementosCache, row]; setItems(_suplementosCache);
+    _suplementosCache = [..._suplementosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    setItems(_suplementosCache);
     toast.success('Suplemento adicionado!', { description: data.nome });
-    reset({ unidade: 'kg' }); setShowAddForm(false);
+    reset({ unidade: 'kg', peso: 0, valor_kg: 0 }); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: SupplementForm) {
-    const { error } = await supabaseAdmin.from('supplement_types').update(data).eq('id', id);
+    const payload: Record<string, unknown> = {
+      nome: data.nome,
+      unidade: data.unidade,
+      observacoes: data.observacoes || null,
+      ...(data.peso     > 0 && { peso:     data.peso }),
+      ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
+    };
+    const { error } = await supabaseAdmin.from('supplement_types').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    _suplementosCache = _suplementosCache.map(s => s.id === id ? { ...s, ...data } : s); setItems(_suplementosCache);
+    _suplementosCache = _suplementosCache.map(s => s.id === id ? { ...s, ...data } : s);
+    setItems(_suplementosCache);
     toast.success('Suplemento atualizado!'); setEditingId(null);
   }
   async function onDelete(id: string, nome: string) {
@@ -854,43 +976,99 @@ function SuplementosTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4"><AddBtn label="Novo Suplemento" onClick={() => setShowAddForm(v => !v)} /></div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Filtrar suplemento..."
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+          />
+        </div>
+        <AddBtn label="Novo Suplemento" onClick={() => setShowAddForm(v => !v)} />
+      </div>
       {showAddForm && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-4">Adicionar Suplemento</h2>
-          <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-3 gap-4">
-            <div><label className={labelClass}>Nome *</label>
-              <input placeholder="Ex: Mineral Adensado" {...register('nome', { required: true })} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} /></div>
-            <div><label className={labelClass}>Unidade</label>
+          <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Nome *</label>
+              <input placeholder="Ex.: Mineral Adensado" {...upperReg(register('nome', { required: true }))} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+            </div>
+            <div>
+              <label className={labelClass}>Unidade</label>
               <select {...register('unidade')} className={inputClass}>
-                <option value="kg">kg</option><option value="saco">saco</option><option value="litro">litro</option>
-              </select></div>
-            <div><label className={labelClass}>Observações</label>
-              <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} /></div>
-            <div className="col-span-3 flex gap-3">
+                <option value="kg">KG</option>
+                <option value="saco">SACO</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Peso por Unidade (kg)</label>
+              <input type="number" step="0.1" min="0" placeholder="Ex.: 30" {...register('peso', { valueAsNumber: true })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Valor / KG (R$)</label>
+              <input type="number" step="0.01" min="0" placeholder="Ex.: 2.50" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} />
+            </div>
+            <div className="col-span-2">
+              <label className={labelClass}>Observações</label>
+              <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
+            </div>
+            <div className="col-span-2 flex gap-3">
               <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"><Plus className="w-4 h-4" /> Adicionar</button>
-              <button type="button" onClick={() => { setShowAddForm(false); reset({ unidade: 'kg' }); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button type="button" onClick={() => { setShowAddForm(false); reset({ unidade: 'kg', peso: 0, valor_kg: 0 }); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
         </motion.div>
       )}
-      {loading ? <SkeletonTable rows={4} cols={4} /> : (
+      {loading ? <SkeletonTable rows={4} cols={6} /> : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {items.length === 0 ? (<div className="py-16 text-center"><Package className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">Nenhum suplemento cadastrado</p></div>) : (
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead><tr className="bg-gray-50 border-b border-gray-200">{['Nome', 'Unidade', 'Obs', 'Ações'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>))}</tr></thead>
-              <tbody className="divide-y divide-gray-100">{items.map(item => editingId === item.id ? (
-                <SupEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-              ) : (
-                <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.unidade}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
-                  <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
-                </motion.tr>
-              ))}</tbody>
-            </table></div>
+          {items.length === 0 ? (
+            <div className="py-16 text-center"><Package className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">Nenhum suplemento cadastrado</p></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Obs', 'Ações'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-sm text-gray-400">
+                        Nenhum suplemento encontrado para "{filterText}"
+                      </td>
+                    </tr>
+                  ) : filteredItems.map(item => editingId === item.id ? (
+                    <SupEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
+                  ) : (
+                    <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
+                      <td className="px-4 py-3 text-gray-600 uppercase">{item.unidade}</td>
+                      <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
+                      <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
+                      <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+                {filterText && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={6} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+                        {filteredItems.length} de {items.length} suplementos
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -905,12 +1083,24 @@ let _funcionariosCache: Employee[] = [];
 interface EmployeeForm { nome: string; funcao: string; contato: string; }
 
 function EmpEditRow({ item, onSave, onCancel }: { item: Employee; onSave: (d: EmployeeForm) => void; onCancel: () => void; }) {
-  const { register, handleSubmit } = useForm<EmployeeForm>({ defaultValues: { nome: item.nome, funcao: item.funcao || '', contato: item.contato || '' } });
+  const { register, handleSubmit, setValue } = useForm<EmployeeForm>({
+    defaultValues: { nome: item.nome, funcao: item.funcao || '', contato: item.contato || '' },
+  });
+  const contatoReg = register('contato');
+
+  function handleContatoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const formatted = formatPhone(e.target.value);
+    e.target.value = formatted;
+    setValue('contato', formatted, { shouldValidate: false });
+  }
+
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...register('nome', { required: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('funcao')} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('contato')} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
+      <td className="px-4 py-2"><input {...upperReg(register('funcao'))} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <input {...contatoReg} onChange={handleContatoChange} className={inputClass} placeholder="Ex.: (00) 00000-0000" />
+      </td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -922,7 +1112,15 @@ function FuncionariosTab() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EmployeeForm>();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<EmployeeForm>();
+
+  const contatoReg = register('contato');
+
+  function handleContatoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const formatted = formatPhone(e.target.value);
+    e.target.value = formatted;
+    setValue('contato', formatted, { shouldValidate: false });
+  }
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -931,8 +1129,13 @@ function FuncionariosTab() {
     const tid = setTimeout(() => { if (mounted) setLoading(false); }, 15_000);
     (async () => {
       try {
-        const { data } = await supabaseAdmin.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
-        if (mounted) { _funcionariosCache = data ?? []; setItems(_funcionariosCache); }
+        const { data, error } = await supabaseAdmin.from('employees').select('*').eq('farm_id', activeFarmId).order('nome');
+        if (!mounted) return;
+        if (error) {
+          toast.error('Tabela de funcionários não encontrada. Execute ajustes_v116b.sql no Supabase.');
+        } else {
+          _funcionariosCache = data ?? []; setItems(_funcionariosCache);
+        }
       } finally {
         clearTimeout(tid);
         if (mounted) setLoading(false);
@@ -942,15 +1145,25 @@ function FuncionariosTab() {
   }, [activeFarmId]);
 
   async function onAdd(data: EmployeeForm) {
-    if (!activeFarmId) return;
-    const { data: row, error } = await supabaseAdmin.from('employees').insert({ ...data, farm_id: activeFarmId }).select().single();
-    if (error) { toast.error('Erro ao adicionar.'); return; }
+    if (!activeFarmId) {
+      toast.error('Fazenda não selecionada.');
+      return;
+    }
+    const { data: row, error } = await supabaseAdmin
+      .from('employees')
+      .insert({ nome: data.nome, funcao: data.funcao || null, contato: data.contato || null, farm_id: activeFarmId })
+      .select()
+      .single();
+    if (error) {
+      toast.error('Erro ao adicionar funcionário. Verifique se a tabela employees existe.');
+      return;
+    }
     _funcionariosCache = [..._funcionariosCache, row]; setItems(_funcionariosCache);
     toast.success('Funcionário adicionado!', { description: data.nome });
     reset(); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: EmployeeForm) {
-    const { error } = await supabaseAdmin.from('employees').update(data).eq('id', id);
+    const { error } = await supabaseAdmin.from('employees').update({ nome: data.nome, funcao: data.funcao || null, contato: data.contato || null }).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
     _funcionariosCache = _funcionariosCache.map(e => e.id === id ? { ...e, ...data } : e); setItems(_funcionariosCache);
     toast.success('Funcionário atualizado!'); setEditingId(null);
@@ -971,12 +1184,27 @@ function FuncionariosTab() {
           className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-4">Adicionar Funcionário</h2>
           <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-3 gap-4">
-            <div><label className={labelClass}>Nome *</label>
-              <input placeholder="João Silva" {...register('nome', { required: true })} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} /></div>
-            <div><label className={labelClass}>Função</label><input placeholder="Veterinário" {...register('funcao')} className={inputClass} /></div>
-            <div><label className={labelClass}>Contato</label><input placeholder="(00) 00000-0000" {...register('contato')} className={inputClass} /></div>
+            <div>
+              <label className={labelClass}>Nome *</label>
+              <input placeholder="Ex.: João Silva" {...upperReg(register('nome', { required: true }))} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+            </div>
+            <div>
+              <label className={labelClass}>Função</label>
+              <input placeholder="Ex.: Veterinário" {...upperReg(register('funcao'))} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Contato</label>
+              <input
+                {...contatoReg}
+                onChange={handleContatoChange}
+                placeholder="Ex.: (00) 00000-0000"
+                className={inputClass}
+              />
+            </div>
             <div className="col-span-3 flex gap-3">
-              <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"><Plus className="w-4 h-4" /> Adicionar</button>
+              <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
+                <Plus className="w-4 h-4" /> Adicionar
+              </button>
               <button type="button" onClick={() => { setShowAddForm(false); reset(); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
@@ -984,7 +1212,9 @@ function FuncionariosTab() {
       )}
       {loading ? <SkeletonTable rows={4} cols={4} /> : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {items.length === 0 ? (<div className="py-16 text-center"><Users className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">Nenhum funcionário cadastrado</p></div>) : (
+          {items.length === 0 ? (
+            <div className="py-16 text-center"><Users className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">Nenhum funcionário cadastrado</p></div>
+          ) : (
             <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead><tr className="bg-gray-50 border-b border-gray-200">{['Nome', 'Função', 'Contato', 'Ações'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>))}</tr></thead>
               <tbody className="divide-y divide-gray-100">{items.map(item => editingId === item.id ? (

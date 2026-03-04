@@ -15,6 +15,8 @@ export interface Pasture {
   area?: number;
   observacoes?: string;
   retiro_id?: string;
+  forragem?: string;
+  qualidade_forragem?: string;
 }
 
 export type ClientInfo = Farm;
@@ -37,11 +39,13 @@ function toDataEntry(row: Record<string, unknown>): DataEntry {
 
 function toPasture(row: Record<string, unknown>): Pasture {
   return {
-    id:          row.id as string,
-    nome:        row.nome as string,
-    area:        (row.area as number) ?? undefined,
-    observacoes: (row.observacoes as string) ?? undefined,
-    retiro_id:   (row.retiro_id as string) ?? undefined,
+    id:                  row.id as string,
+    nome:                row.nome as string,
+    area:                (row.area as number) ?? undefined,
+    observacoes:         (row.observacoes as string) ?? undefined,
+    retiro_id:           (row.retiro_id as string) ?? undefined,
+    forragem:            (row.forragem as string) ?? undefined,
+    qualidade_forragem:  (row.qualidade_forragem as string) ?? undefined,
   };
 }
 
@@ -292,14 +296,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   /* ── Pastures ── */
   function addPasture(p: Omit<Pasture, 'id'>) {
     const tempId = `temp-${Date.now()}`;
-    setPastures(prev => [...prev, { ...p, id: tempId }]);
+    setPastures(prev => [...prev, { ...p, id: tempId }].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     supabaseAdmin.from('pastures').insert({
       farm_id: activeFarmId, nome: p.nome,
-      area: p.area ?? null, observacoes: p.observacoes ?? null,
+      area: (p.area != null && p.area > 0) ? p.area : null, observacoes: p.observacoes ?? null,
       retiro_id: p.retiro_id ?? null,
+      // só inclui as colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
+      ...(p.forragem           ? { forragem:           p.forragem }           : {}),
+      ...(p.qualidade_forragem ? { qualidade_forragem: p.qualidade_forragem } : {}),
     }).select().single().then(({ data, error }) => {
       if (data) setPastures(prev => prev.map(x => x.id === tempId ? toPasture(data) : x));
-      if (error) setPastures(prev => prev.filter(x => x.id !== tempId));
+      if (error) {
+        console.error('[addPasture] erro Supabase:', error.message);
+        setPastures(prev => prev.filter(x => x.id !== tempId));
+      }
     });
   }
 
@@ -311,10 +321,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   function updatePasture(id: string, patch: Partial<Pasture>) {
     setPastures(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
     supabaseAdmin.from('pastures').update({
-      ...(patch.nome        !== undefined && { nome:        patch.nome }),
-      ...(patch.area        !== undefined && { area:        patch.area ?? null }),
-      ...(patch.observacoes !== undefined && { observacoes: patch.observacoes ?? null }),
-      ...(patch.retiro_id   !== undefined && { retiro_id:   patch.retiro_id ?? null }),
+      ...(patch.nome               !== undefined && { nome:               patch.nome }),
+      ...(patch.area               !== undefined && { area:               patch.area ?? null }),
+      ...(patch.observacoes        !== undefined && { observacoes:        patch.observacoes ?? null }),
+      ...(patch.retiro_id          !== undefined && { retiro_id:          patch.retiro_id ?? null }),
+      // só inclui as colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
+      ...(patch.forragem           ? { forragem:           patch.forragem }           : {}),
+      ...(patch.qualidade_forragem ? { qualidade_forragem: patch.qualidade_forragem } : {}),
     }).eq('id', id);
   }
 
