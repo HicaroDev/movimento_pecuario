@@ -40,6 +40,7 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ### DashboardLayout / Sidebar
 - [ ] Logo em card branco `bg-white rounded-xl p-3`
+- [ ] Badge de versão `v1.15` ao lado do título — `bg-teal-50 text-teal-600 border border-teal-100 rounded-full text-[9px]`
 - [ ] Gradiente `#1a1f2e → #2d3548`
 - [ ] Nav ativo: `from-teal-500 to-teal-600` + `boxShadow rgba(26,96,64,0.4)`
 - [ ] Seletor de fazenda: **somente admin** (`{isAdmin && <AdminFarmSelector />}`)
@@ -67,6 +68,8 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 - [ ] Botão "Nova Fazenda": `bg-teal-600`
 - [ ] Botão "Cadastrar" no modal: `bg-teal-600`
 - [ ] Skeleton cards enquanto `loading`
+- [ ] Campo de busca abaixo do header — filtra por nome, responsável e endereço em tempo real
+- [ ] Estado vazio de "sem resultados" com ícone Search + botão "Limpar busca"
 
 ### Usuarios
 - [ ] Botão "Novo Usuário": `bg-teal-600` (**não indigo**)
@@ -74,6 +77,10 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 - [ ] Hover ícone editar: `hover:text-teal-600 hover:bg-teal-50` (**não indigo**)
 - [ ] Ícone equipe: `text-teal-500` (**não indigo**)
 - [ ] Skeleton tabela enquanto `loading`
+- [ ] **SEM avatar circular** — coluna Usuário mostra só nome + email em texto
+- [ ] Badge de perfil (Admin/Cliente): texto simples `text-xs font-medium text-gray-600`, **sem fundo colorido**
+- [ ] Chips de módulo: coloridos por tipo com ícone + borda suave (ver `MODULE_COLORS` em Usuarios.tsx)
+- [ ] Botões de ação: `opacity-60 group-hover:opacity-100` — ficam discretos, aparecem ao hover na linha
 
 ### Login
 - [ ] Botão "Entrar": `bg-teal-600 hover:bg-teal-700`

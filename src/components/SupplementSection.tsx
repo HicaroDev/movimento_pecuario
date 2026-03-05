@@ -88,10 +88,10 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                   className={`border-b border-gray-100 ${ri % 2 === 1 ? 'bg-gray-50/40' : ''}`}
                 >
                   <td className="py-2 pr-2 font-medium text-gray-800">{row.pasto}</td>
-                  <td className="py-2 text-right tabular-nums" style={{ color: '#3b82f6' }}>{fmtInt(row.quantidade)}</td>
+                  <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.quantidade)}</td>
                   <td className="py-2 pl-4 text-gray-400">{row.tipo}</td>
-                  <td className="py-2 text-right tabular-nums" style={{ color: '#3b82f6' }}>{fmtInt(row.periodo)}</td>
-                  <td className="py-2 text-right tabular-nums" style={{ color: '#3b82f6' }}>{fmtInt(row.sacos)}</td>
+                  <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.periodo)}</td>
+                  <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.sacos)}</td>
                   <td className="py-2 text-right text-gray-700 tabular-nums">{fmtInt(row.kg)}</td>
                   <td className="py-2 text-right font-bold text-gray-900 tabular-nums">{fmt(row.consumo)}</td>
                 </tr>

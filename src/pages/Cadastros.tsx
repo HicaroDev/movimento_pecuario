@@ -37,7 +37,7 @@ function formatPhone(raw: string): string {
 /* ── Local types ── */
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
-interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; observacoes?: string; }
+interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; consumo?: string; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
 
 const RACAS = ['NELORE', 'CRUZAMENTO INDUSTRIAL', 'COMPOSTO'] as const;
@@ -880,12 +880,24 @@ function AnimaisTab() {
 /* ═══════════════════════════════════════════════════════════════
    SuplementosTab
 ═══════════════════════════════════════════════════════════════ */
+const CONSUMO_OPTIONS = [
+  '20 A 30 GRAMAS/100 KG PV',
+  '35 A 45 GRAMAS/100 KG PV',
+  '50 A 100 GRAMAS/100 KG PV',
+  '100 A 120 GRAMAS/100 KG PV',
+  '200 A 300 GRAMAS/100 KG PV',
+  '300 A 500 GRAMAS/100 KG PV',
+  '400 A 700 GRAMAS/100 KG PV',
+  '1,0 A 1,50% PV',
+  '1,50 A 2,30% PV',
+] as const;
+
 let _suplementosCache: SupplementType[] = [];
-interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; observacoes: string; }
+interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; consumo: string; observacoes: string; }
 
 function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: (d: SupplementForm) => void; onCancel: () => void; }) {
   const { register, handleSubmit } = useForm<SupplementForm>({
-    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, observacoes: item.observacoes || '' },
+    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '' },
   });
   return (
     <tr className="bg-teal-50">
@@ -898,6 +910,12 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
       </td>
       <td className="px-4 py-2"><input type="number" step="0.1" min="0" {...register('peso', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 30" /></td>
       <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 2.50" /></td>
+      <td className="px-4 py-2">
+        <select {...register('consumo')} className={inputClass}>
+          <option value="">— Consumo —</option>
+          {CONSUMO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
@@ -911,7 +929,7 @@ function SuplementosTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0 } });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '' } });
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -944,13 +962,14 @@ function SuplementosTab() {
       // só inclui colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
       ...(data.peso     > 0 && { peso:     data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
+      ...(data.consumo        && { consumo: data.consumo }),
     };
     const { data: row, error } = await supabaseAdmin.from('supplement_types').insert(payload).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
     _suplementosCache = [..._suplementosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     setItems(_suplementosCache);
     toast.success('Suplemento adicionado!', { description: data.nome });
-    reset({ unidade: 'kg', peso: 0, valor_kg: 0 }); setShowAddForm(false);
+    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '' }); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: SupplementForm) {
     const payload: Record<string, unknown> = {
@@ -959,6 +978,7 @@ function SuplementosTab() {
       observacoes: data.observacoes || null,
       ...(data.peso     > 0 && { peso:     data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
+      consumo: data.consumo || null,
     };
     const { error } = await supabaseAdmin.from('supplement_types').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
@@ -1014,12 +1034,19 @@ function SuplementosTab() {
               <input type="number" step="0.01" min="0" placeholder="Ex.: 2.50" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} />
             </div>
             <div className="col-span-2">
+              <label className={labelClass}>Consumo Recomendado</label>
+              <select {...register('consumo')} className={inputClass}>
+                <option value="">— Selecione o consumo —</option>
+                {CONSUMO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
               <label className={labelClass}>Observações</label>
               <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
             </div>
             <div className="col-span-2 flex gap-3">
               <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"><Plus className="w-4 h-4" /> Adicionar</button>
-              <button type="button" onClick={() => { setShowAddForm(false); reset({ unidade: 'kg', peso: 0, valor_kg: 0 }); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button type="button" onClick={() => { setShowAddForm(false); reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '' }); }} className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
         </motion.div>
@@ -1033,7 +1060,7 @@ function SuplementosTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Obs', 'Ações'].map(h => (
+                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Obs', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -1041,7 +1068,7 @@ function SuplementosTab() {
                 <tbody className="divide-y divide-gray-100">
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-sm text-gray-400">
+                      <td colSpan={7} className="py-10 text-center text-sm text-gray-400">
                         Nenhum suplemento encontrado para "{filterText}"
                       </td>
                     </tr>
@@ -1053,6 +1080,7 @@ function SuplementosTab() {
                       <td className="px-4 py-3 text-gray-600 uppercase">{item.unidade}</td>
                       <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{item.consumo || '—'}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                       <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
                     </motion.tr>
@@ -1061,7 +1089,7 @@ function SuplementosTab() {
                 {filterText && (
                   <tfoot>
                     <tr>
-                      <td colSpan={6} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+                      <td colSpan={7} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
                         {filteredItems.length} de {items.length} suplementos
                       </td>
                     </tr>

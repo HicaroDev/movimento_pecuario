@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS public.supplement_types (
 -- Novas colunas adicionadas em março/2026
 ALTER TABLE public.supplement_types ADD COLUMN IF NOT EXISTS peso     numeric;
 ALTER TABLE public.supplement_types ADD COLUMN IF NOT EXISTS valor_kg numeric;
+ALTER TABLE public.supplement_types ADD COLUMN IF NOT EXISTS consumo  text;
 
 
 -- ── PASSO 3: Tabela employees ────────────────────────────────────

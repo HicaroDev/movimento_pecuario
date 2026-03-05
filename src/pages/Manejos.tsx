@@ -124,6 +124,18 @@ function LotesTab({
   const semPasto = ativosFiltrados.filter(a => !a.pasto_id);
   const pastosComLotes = pastures.filter(p => byPasto[p.id]?.length);
 
+  // ── Somatória global da fazenda ──
+  const globalStats = useMemo(() => {
+    const totalHA    = pastosComLotes.reduce((s, p) => s + (p.area ?? 0), 0);
+    const totalLotes = pastosComLotes.length;
+    const totalCab   = ativos.reduce((s, a) => s + a.quantidade, 0);
+    const pesoNum    = ativos.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+    const pesoDen    = ativos.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+    const pesoMedio  = pesoDen > 0 ? pesoNum / pesoDen : null;
+    return { totalHA, totalLotes, totalCab, pesoMedio };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastosComLotes, animals]);
+
   async function confirmarAlocacao() {
     if (!alocarAnimal || !pastoSel) return;
     setSaving(true);
@@ -145,7 +157,7 @@ function LotesTab({
       <tr className="hover:bg-gray-50 transition-colors">
         <td className="px-4 py-2.5 font-medium text-gray-900 text-sm">{a.nome}</td>
         <td className="px-4 py-2.5 text-xs text-gray-600">{a.categoria_id ? catMap[a.categoria_id] ?? '—' : '—'}</td>
-        <td className="px-4 py-2.5 text-sm font-semibold text-blue-600">{a.quantidade.toLocaleString('pt-BR')}</td>
+        <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
         <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
         <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
         <td className="px-4 py-2.5">
@@ -214,22 +226,60 @@ function LotesTab({
         )}
       </div>
 
+      {/* ── Header global da fazenda ── */}
+      <div className="rounded-xl border p-4 mb-6 flex flex-wrap gap-6"
+        style={{ background: 'linear-gradient(135deg,#1a6040,#0f4a30)', borderColor: '#1a6040' }}>
+        <div className="text-white">
+          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Área Total</p>
+          <p className="text-2xl font-bold">{globalStats.totalHA > 0 ? `${globalStats.totalHA.toLocaleString('pt-BR')} ha` : '—'}</p>
+        </div>
+        <div className="text-white">
+          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">N° Pastos</p>
+          <p className="text-2xl font-bold">{globalStats.totalLotes}</p>
+        </div>
+        <div className="text-white">
+          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Quantidade</p>
+          <p className="text-2xl font-bold">{globalStats.totalCab.toLocaleString('pt-BR')} cab.</p>
+        </div>
+        <div className="text-white">
+          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Peso Médio Ponderado</p>
+          <p className="text-2xl font-bold">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
+        </div>
+      </div>
+
       <div className="space-y-6">
-        {pastosComLotes.map(p => (
+        {pastosComLotes.map(p => {
+          const animaisPasto = byPasto[p.id];
+          const totalCabPasto = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
+          const pesoNum = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+          const pesoDen = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+          const pesoMedioPasto = pesoDen > 0 ? pesoNum / pesoDen : null;
+          return (
           <section key={p.id}>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <MapPin className="w-4 h-4 text-teal-600 flex-shrink-0" />
               <h3 className="font-semibold text-gray-800">{p.nome}</h3>
               {p.area && <span className="text-xs text-gray-400">· {p.area} ha</span>}
-              <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full ml-auto">
-                {byPasto[p.id].length} lote{byPasto[p.id].length !== 1 ? 's' : ''}
-              </span>
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                  {totalCabPasto.toLocaleString('pt-BR')} cab.
+                </span>
+                {pesoMedioPasto != null && (
+                  <span className="text-xs bg-teal-50 px-2 py-0.5 rounded-full font-semibold" style={{ color: '#1a6040' }}>
+                    {pesoMedioPasto.toFixed(0)} kg/cab
+                  </span>
+                )}
+                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
+                  {animaisPasto.length} lote{animaisPasto.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
             <TableWrap>
-              {byPasto[p.id].map(a => <AnimalRow key={a.id} a={a} />)}
+              {animaisPasto.map(a => <AnimalRow key={a.id} a={a} />)}
             </TableWrap>
           </section>
-        ))}
+          );
+        })}
 
         {semPasto.length > 0 && (
           <section>
@@ -588,7 +638,7 @@ function EvolucaoTab({
             <select value={loteDestId} onChange={e => setLoteDestId(e.target.value)} className={selectClass}>
               <option value="">Selecione o lote…</option>
               {ativos.filter(a => a.id !== excludeId).map(a => (
-                <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>
+                <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
               ))}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -713,7 +763,7 @@ function EvolucaoTab({
               <div className="relative">
                 <select value={parLoteMaeId} onChange={e => setParLoteMaeId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
@@ -759,10 +809,18 @@ function EvolucaoTab({
               <div className="relative">
                 <select value={bezLoteId} onChange={e => setBezLoteId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
+              {bezLoteId && (() => {
+                const loteSel = ativos.find(a => a.id === bezLoteId);
+                return loteSel?.bezerros_quantidade ? (
+                  <p className="text-xs mt-1 font-medium" style={{ color: '#1a6040' }}>
+                    Bezerros disponíveis: {loteSel.bezerros_quantidade} cab.
+                  </p>
+                ) : null;
+              })()}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -837,6 +895,7 @@ function AbateTab({
   const lote    = ativos.find(a => a.id === loteId);
   const qtdNum  = Number(qtd);
   const restam  = lote ? lote.quantidade - qtdNum : 0;
+  const catMap  = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
 
   const SAIDA_TIPOS: { id: TipoSaida; label: string; color: string }[] = [
     { id: 'abate',      label: 'Abate (abatedor)',  color: 'bg-red-600 hover:bg-red-700' },
@@ -941,7 +1000,7 @@ function AbateTab({
             <div className="relative">
               <select value={loteId} onChange={e => { setLoteId(e.target.value); setQtd(''); }} className={selectClass}>
                 <option value="">Selecione um lote…</option>
-                {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>)}
+                {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
@@ -1004,7 +1063,7 @@ function AbateTab({
                   <select value={desLoteDestId} onChange={e => setDesLoteDestId(e.target.value)} className={selectClass}>
                     <option value="">Selecione o lote…</option>
                     {ativos.filter(a => a.id !== loteId).map(a => (
-                      <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.</option>
+                      <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
