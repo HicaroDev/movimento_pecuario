@@ -897,7 +897,7 @@ function EvolucaoTab({
    TAB 4 — Abate
 ══════════════════════════════════════════════════════════════ */
 
-type TipoSaida = 'abate' | 'venda' | 'desagrupar';
+type TipoSaida = 'abate' | 'venda';
 
 function AbateTab({
   animals, categories, farmId, onReload,
@@ -914,12 +914,6 @@ function AbateTab({
   const [events, setEvents]       = useState<ManejoEvent[]>([]);
   const [loadingH, setLoadingH]   = useState(true);
 
-  /* Desagrupar destino */
-  const [desDestino,     setDesDestino]     = useState<DestinoTipo>('novo');
-  const [desLoteDestId,  setDesLoteDestId]  = useState('');
-  const [desNovoNome,    setDesNovoNome]    = useState('');
-  const [desNovoCatId,   setDesNovoCatId]   = useState('');
-
   const ativos  = animals.filter(a => a.status === 'ativo' || !a.status);
   const lote    = ativos.find(a => a.id === loteId);
   const qtdNum  = Number(qtd);
@@ -927,9 +921,8 @@ function AbateTab({
   const catMap  = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
 
   const SAIDA_TIPOS: { id: TipoSaida; label: string; color: string }[] = [
-    { id: 'abate',      label: 'Abate (abatedor)',  color: 'bg-red-600 hover:bg-red-700' },
-    { id: 'venda',      label: 'Venda direta',      color: 'bg-purple-600 hover:bg-purple-700' },
-    { id: 'desagrupar', label: 'Desagrupar bezerros', color: 'bg-cyan-600 hover:bg-cyan-700' },
+    { id: 'abate', label: 'Abate (abatedor)', color: 'bg-red-600 hover:bg-red-700' },
+    { id: 'venda', label: 'Venda direta',     color: 'bg-purple-600 hover:bg-purple-700' },
   ];
 
   const SAIDA_HISTORICO_TIPOS = ['abate', 'venda', 'desagrupamento'];
@@ -943,7 +936,6 @@ function AbateTab({
 
   function resetForm() {
     setLoteId(''); setQtd(''); setPeso(''); setDataSaida(new Date().toISOString().split('T')[0]); setObs('');
-    setDesDestino('novo'); setDesLoteDestId(''); setDesNovoNome(''); setDesNovoCatId('');
   }
 
   async function confirmarSaida() {
@@ -962,34 +954,6 @@ function AbateTab({
       setEvents(updated);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erro ao registrar saída.');
-    } finally { setSaving(false); }
-  }
-
-  async function confirmarDesagrupar() {
-    if (!lote) { toast.error('Selecione o lote de origem.'); return; }
-    if (!qtd || qtdNum <= 0) { toast.error('Informe a quantidade de bezerros.'); return; }
-    if (qtdNum > lote.quantidade) { toast.error(`Máximo ${lote.quantidade} cabeças.`); return; }
-    if (desDestino === 'existente' && !desLoteDestId) { toast.error('Selecione o lote de destino.'); return; }
-    if (desDestino === 'novo' && !desNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
-    setSaving(true);
-    try {
-      await manejoService.desagruparLote({
-        loteOrigem: lote, qtd: qtdNum,
-        pesoMedio: peso ? Number(peso) : undefined,
-        data: dataSaida,
-        destino: desDestino === 'existente'
-          ? { tipo: 'existente', loteId: desLoteDestId }
-          : { tipo: 'novo', nome: desNovoNome.trim(), categoriaId: desNovoCatId || undefined },
-        farmId,
-        loteDestinoNome: desDestino === 'existente' ? (ativos.find(a => a.id === desLoteDestId)?.nome ?? '') : undefined,
-      });
-      toast.success(`Desagrupamento de ${qtdNum} cab. registrado!`);
-      resetForm();
-      onReload();
-      const updated = await manejoService.listarHistorico(farmId, SAIDA_HISTORICO_TIPOS, 25);
-      setEvents(updated);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao desagrupar.');
     } finally { setSaving(false); }
   }
 
@@ -1018,9 +982,7 @@ function AbateTab({
           <div className="flex items-center gap-2">
             <Scissors className="w-4 h-4 text-gray-500" />
             <h3 className="font-semibold text-gray-900 text-sm">
-              {tipoSaida === 'abate' ? 'Abate (venda para abatedor)' :
-               tipoSaida === 'venda' ? 'Venda direta' :
-               'Desagrupar bezerros do lote'}
+              {tipoSaida === 'abate' ? 'Abate (venda para abatedor)' : 'Venda direta'}
             </h3>
           </div>
 
@@ -1037,14 +999,12 @@ function AbateTab({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>
-                {tipoSaida === 'desagrupar' ? 'Qtd. bezerros' : 'Cabeças'}
-              </label>
+              <label className={labelClass}>Cabeças</label>
               <input type="number" min="1" max={lote?.quantidade}
                 value={qtd} onChange={e => setQtd(e.target.value)}
                 placeholder={lote ? `Máx. ${lote.quantidade}` : '0'}
                 className={inputClass} disabled={!loteId} />
-              {lote && qtdNum > 0 && tipoSaida !== 'desagrupar' && (
+              {lote && qtdNum > 0 && (
                 <p className={`text-xs mt-1 font-medium ${restam <= 0 ? 'text-red-500' : 'text-gray-400'}`}>
                   {restam <= 0 ? '⚠ Lote será encerrado' : `Restam ${restam} cab.`}
                 </p>
@@ -1064,58 +1024,15 @@ function AbateTab({
               className={inputClass} disabled={!loteId} />
           </div>
 
-          {tipoSaida !== 'desagrupar' && (
-            <div>
-              <label className={labelClass}>Observação (opcional)</label>
-              <input type="text" value={obs} onChange={e => setObs(e.target.value)}
-                placeholder="Ex: Saída programada — março/26"
-                className={inputClass} disabled={!loteId} />
-            </div>
-          )}
-
-          {/* Destino para desagrupar */}
-          {tipoSaida === 'desagrupar' && (
-            <div className="space-y-3">
-              <label className={labelClass}>Destino dos bezerros</label>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-                <button type="button" onClick={() => setDesDestino('novo')}
-                  className={`flex-1 px-3 py-2 transition-colors ${desDestino === 'novo' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-                  Criar novo lote
-                </button>
-                <button type="button" onClick={() => setDesDestino('existente')}
-                  className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${desDestino === 'existente' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-                  Agregar em lote existente
-                </button>
-              </div>
-              {desDestino === 'existente' ? (
-                <div className="relative">
-                  <select value={desLoteDestId} onChange={e => setDesLoteDestId(e.target.value)} className={selectClass}>
-                    <option value="">Selecione o lote…</option>
-                    {ativos.filter(a => a.id !== loteId).map(a => (
-                      <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <input type="text" value={desNovoNome} onChange={e => setDesNovoNome(e.target.value)}
-                    placeholder="Nome do novo lote (ex: Bezerros Mar/26)"
-                    className={inputClass} />
-                  <div className="relative">
-                    <select value={desNovoCatId} onChange={e => setDesNovoCatId(e.target.value)} className={selectClass}>
-                      <option value="">Categoria (opcional)…</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <div>
+            <label className={labelClass}>Observação (opcional)</label>
+            <input type="text" value={obs} onChange={e => setObs(e.target.value)}
+              placeholder="Ex: Saída programada — março/26"
+              className={inputClass} disabled={!loteId} />
+          </div>
 
           <button
-            onClick={tipoSaida === 'desagrupar' ? confirmarDesagrupar : confirmarSaida}
+            onClick={confirmarSaida}
             disabled={saving || !loteId || !qtd || qtdNum <= 0}
             className={`flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${activeColor}`}>
             <Scissors className="w-4 h-4" />
