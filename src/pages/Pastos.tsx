@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Leaf, Plus, Trash2, Pencil, Save, X, ChevronDown, MapPin } from 'lucide-react';
+import { Leaf, Plus, Trash2, Pencil, Save, X, ChevronDown, MapPin, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -141,8 +141,73 @@ export function Pastos() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="max-w-5xl mx-auto">
 
+        {/* ── Print-only header ── */}
+        <div className="print-only mb-6 page-portrait">
+          {/* Brand bar */}
+          <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
+                Movimento Pecuário · Suplemento Control
+              </p>
+              <h1 className="text-white text-xl font-bold">Relatório de Pastos</h1>
+            </div>
+            <div className="text-right">
+              <p className="text-white text-xs opacity-70">Emitido em</p>
+              <p className="text-white text-sm font-semibold">
+                {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+
+          {/* Summary row */}
+          <div className="flex items-stretch gap-4 mb-5">
+            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Fazenda</p>
+              <p className="text-sm font-bold text-gray-800">{farmName}</p>
+            </div>
+            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total de Pastos</p>
+              <p className="text-sm font-bold text-gray-800">{pastures.length}</p>
+            </div>
+            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Área Total</p>
+              <p className="text-sm font-bold text-gray-800">
+                {pastures.reduce((s, p) => s + (p.area ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ha
+              </p>
+            </div>
+            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Com Observações</p>
+              <p className="text-sm font-bold text-gray-800">
+                {pastures.filter(p => p.observacoes).length} pasto{pastures.filter(p => p.observacoes).length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+
+          {/* Print table */}
+          <table className="pdf-table">
+            <thead>
+              <tr>
+                <th style={{ width: '3%' }}>#</th>
+                <th style={{ width: '35%' }}>Nome do Pasto</th>
+                <th style={{ width: '18%' }}>Área (ha)</th>
+                <th>Observações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pastures.map((p, i) => (
+                <tr key={p.id}>
+                  <td style={{ color: '#6b7280', textAlign: 'center' }}>{i + 1}</td>
+                  <td style={{ fontWeight: 600 }}>{p.nome}</td>
+                  <td>{p.area ? `${p.area.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ha` : '—'}</td>
+                  <td style={{ color: '#6b7280' }}>{p.observacoes || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between">
+        <div className="mb-8 flex items-start justify-between no-print">
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">Pastos</h1>
@@ -153,59 +218,73 @@ export function Pastos() {
               <span>{pastures.length} pasto{pastures.length !== 1 ? 's' : ''} cadastrado{pastures.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
-          <button
-            onClick={() => setShowAddForm(v => !v)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Pasto
-          </button>
+          <div className="flex items-center gap-3">
+            {pastures.length > 0 && (
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:border-teal-400 hover:text-teal-700 text-sm font-semibold transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                PDF
+              </button>
+            )}
+            <button
+              onClick={() => setShowAddForm(v => !v)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Pasto
+            </button>
+          </div>
         </div>
 
         {/* Admin farm selector */}
-        {isAdmin && <FarmSelector />}
+        {isAdmin && <div className="no-print"><FarmSelector /></div>}
 
         {/* Add form */}
         {showAddForm && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
-                <Plus className="w-4 h-4 text-white" />
+          <div className="no-print mb-6">
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl border border-teal-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+                  <Plus className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-base font-bold text-gray-900">Adicionar Pasto</h2>
               </div>
-              <h2 className="text-base font-bold text-gray-900">Adicionar Pasto</h2>
-            </div>
-            <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Nome do Pasto *</label>
-                <input placeholder="Ex: Lagoa Verde"
-                  {...register('nome', { required: true })}
-                  className={`${inputClass} ${errors.nome ? 'border-red-400 ring-2 ring-red-400' : ''}`} />
-              </div>
-              <div>
-                <label className={labelClass}>Área (ha)</label>
-                <input type="number" step="0.01" placeholder="10.5"
-                  {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Observações</label>
-                <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
-              </div>
-              <div className="col-span-3 flex gap-3">
-                <button type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
-                  <Plus className="w-4 h-4" /> Adicionar
-                </button>
-                <button type="button" onClick={() => { setShowAddForm(false); reset(); }}
-                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </motion.div>
+              <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className={labelClass}>Nome do Pasto *</label>
+                  <input placeholder="Ex: Lagoa Verde"
+                    {...register('nome', { required: true })}
+                    className={`${inputClass} ${errors.nome ? 'border-red-400 ring-2 ring-red-400' : ''}`} />
+                </div>
+                <div>
+                  <label className={labelClass}>Área (ha)</label>
+                  <input type="number" step="0.01" placeholder="10.5"
+                    {...register('area', { min: 0, valueAsNumber: true })} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Observações</label>
+                  <input placeholder="Info adicional" {...register('observacoes')} className={inputClass} />
+                </div>
+                <div className="col-span-3 flex gap-3">
+                  <button type="submit"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors">
+                    <Plus className="w-4 h-4" /> Adicionar
+                  </button>
+                  <button type="button" onClick={() => { setShowAddForm(false); reset(); }}
+                    className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
 
         {/* Table */}
+        <div className="no-print">
         {loading ? (
           <SkeletonTable rows={4} cols={4} />
         ) : (
@@ -269,18 +348,7 @@ export function Pastos() {
           )}
         </motion.div>
         )}
-
-        {/* Future: relatório de pasto placeholder */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-          className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-            <Leaf className="w-4 h-4 text-blue-500" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-blue-800">Relatório de Pastos</p>
-            <p className="text-xs text-blue-600">Em breve — análise detalhada por pasto com histórico de consumo.</p>
-          </div>
-        </motion.div>
+        </div>
 
       </motion.div>
     </div>

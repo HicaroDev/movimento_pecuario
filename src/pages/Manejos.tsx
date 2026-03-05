@@ -1248,11 +1248,54 @@ function HistoricoTab({ farmId, animals, pastures }: {
 
       {/* ── Print-only header ── */}
       <div className="print-only mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Histórico de Manejos</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Período: {fmtPrintDate(dataInicio)} a {fmtPrintDate(dataFim)}
-          {tiposSel.length > 0 && ` · ${tiposSel.map(t => TIPO_LABELS[t]).join(', ')}`}
-        </p>
+        {/* Brand bar */}
+        <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
+              Movimento Pecuário · Suplemento Control
+            </p>
+            <h1 className="text-white text-xl font-bold">Histórico de Manejos</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-white text-xs opacity-70">Emitido em</p>
+            <p className="text-white text-sm font-semibold">
+              {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
+
+        {/* Period + stats row */}
+        <div className="flex items-start gap-6 mb-5">
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Período</p>
+            <p className="text-sm font-bold text-gray-800">{fmtPrintDate(dataInicio)} — {fmtPrintDate(dataFim)}</p>
+          </div>
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total de Eventos</p>
+            <p className="text-sm font-bold text-gray-800">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</p>
+          </div>
+          {tiposSel.length > 0 && (
+            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Filtro de Tipo</p>
+              <p className="text-sm font-bold text-gray-800">{tiposSel.map(t => TIPO_LABELS[t]).join(', ')}</p>
+            </div>
+          )}
+          {/* Summary by type */}
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Por Tipo</p>
+            <div className="space-y-0.5">
+              {Object.keys(TIPO_LABELS)
+                .map(tipo => ({ tipo, count: filtered.filter(e => e.tipo === tipo).length }))
+                .filter(({ count }) => count > 0)
+                .map(({ tipo, count }) => (
+                  <div key={tipo} className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-gray-600">{TIPO_LABELS[tipo]}</span>
+                    <span className="text-[10px] font-bold text-gray-800">{count}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── Stats bar ── */}
@@ -1275,7 +1318,7 @@ function HistoricoTab({ farmId, animals, pastures }: {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm pdf-table">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap w-40">Data / Hora</th>
@@ -1284,17 +1327,33 @@ function HistoricoTab({ farmId, animals, pastures }: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map(e => (
-                  <tr key={e.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${TIPO_COLORS[e.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {TIPO_LABELS[e.tipo] ?? e.tipo}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-700 leading-relaxed">{e.descricao ?? '—'}</td>
-                  </tr>
-                ))}
+                {filtered.map(e => {
+                  const badgeClass: Record<string, string> = {
+                    alocacao: 'pdf-badge pdf-badge-blue',
+                    transferencia: 'pdf-badge pdf-badge-indigo',
+                    evolucao_categoria: 'pdf-badge pdf-badge-amber',
+                    paricao: 'pdf-badge pdf-badge-pink',
+                    manejo_bezerros: 'pdf-badge pdf-badge-orange',
+                    abate: 'pdf-badge pdf-badge-red',
+                    venda: 'pdf-badge pdf-badge-purple',
+                    desagrupamento: 'pdf-badge pdf-badge-gray',
+                    ajuste_quantidade: 'pdf-badge pdf-badge-gray',
+                  };
+                  return (
+                    <tr key={e.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full no-print ${TIPO_COLORS[e.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {TIPO_LABELS[e.tipo] ?? e.tipo}
+                        </span>
+                        <span className={`print-only ${badgeClass[e.tipo] ?? 'pdf-badge pdf-badge-gray'}`}>
+                          {TIPO_LABELS[e.tipo] ?? e.tipo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-700 leading-relaxed">{e.descricao ?? '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

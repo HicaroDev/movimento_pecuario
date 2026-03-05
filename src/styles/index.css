@@ -48,6 +48,8 @@
   html, body {
     background: white !important;
     color: black !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
   .no-print {
     display: none !important;
@@ -62,4 +64,76 @@
     size: landscape;
     margin: 12mm;
   }
+  @page portrait {
+    size: portrait;
+    margin: 14mm;
+  }
+  .page-portrait {
+    page: portrait;
+  }
+
+  /* PDF table styles */
+  .pdf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .pdf-table th {
+    background: #1a6040 !important;
+    color: #fff !important;
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .pdf-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 11px;
+    color: #111827;
+  }
+  .pdf-table tr:nth-child(even) td {
+    background: #f9fafb !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .pdf-table tr.sub-row td {
+    background: #fff7ed !important;
+    color: #c2410c;
+    font-style: italic;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* PDF brand bar */
+  .pdf-brand-bar {
+    background: #1a6040 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* PDF badge */
+  .pdf-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .pdf-badge-green  { background: #dcfce7 !important; color: #166534 !important; }
+  .pdf-badge-blue   { background: #dbeafe !important; color: #1e40af !important; }
+  .pdf-badge-amber  { background: #fef3c7 !important; color: #92400e !important; }
+  .pdf-badge-pink   { background: #fce7f3 !important; color: #9d174d !important; }
+  .pdf-badge-orange { background: #ffedd5 !important; color: #9a3412 !important; }
+  .pdf-badge-red    { background: #fee2e2 !important; color: #991b1b !important; }
+  .pdf-badge-purple { background: #ede9fe !important; color: #5b21b6 !important; }
+  .pdf-badge-indigo { background: #e0e7ff !important; color: #3730a3 !important; }
+  .pdf-badge-gray   { background: #f3f4f6 !important; color: #374151 !important; }
 }
