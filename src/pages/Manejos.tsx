@@ -740,7 +740,12 @@ function EvolucaoTab({
                       <input type="checkbox" checked={on} onChange={() => toggle(a.id)} className="sr-only" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900">{a.nome}</p>
-                        <p className="text-xs text-gray-500">{a.categoria_id ? catMap[a.categoria_id] : 'sem categoria'} · {a.quantidade} cab.</p>
+                        <p className="text-xs text-gray-500">
+                          {a.categoria_id ? catMap[a.categoria_id] : 'sem categoria'} · {a.quantidade} cab.
+                          {(a.bezerros_quantidade ?? 0) > 0 && (
+                            <span className="ml-1.5 text-orange-600 font-semibold">+ {a.bezerros_quantidade} bez.</span>
+                          )}
+                        </p>
                       </div>
                     </label>
                   );
