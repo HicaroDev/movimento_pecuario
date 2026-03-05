@@ -523,6 +523,7 @@ function EvolucaoTab({
   const [selected, setSelected]   = useState<Set<string>>(new Set());
   const [novaCatId, setNovaCatId] = useState('');
   const [catPeso, setCatPeso]     = useState('');
+  const [catBezPeso, setCatBezPeso] = useState('');
   const [catData, setCatData]     = useState(() => new Date().toISOString().split('T')[0]);
 
   /* ── Parição ── */
@@ -568,6 +569,7 @@ function EvolucaoTab({
   }
   const selectedAnimals = ativos.filter(a => selected.has(a.id));
   const totalCab = selectedAnimals.reduce((s, a) => s + a.quantidade, 0);
+  const selectedHasBez = selectedAnimals.some(a => (a.bezerros_quantidade ?? 0) > 0);
 
   /* ── Confirmar: Categoria ── */
   async function confirmarCategoria() {
@@ -576,9 +578,13 @@ function EvolucaoTab({
     const catOrigemNomes = [...new Set(selectedAnimals.map(a => a.categoria_id ? (catMap[a.categoria_id] ?? 'sem categoria') : 'sem categoria'))].join(', ');
     setSaving(true);
     try {
-      await manejoService.evoluirCategorias(selectedAnimals, novaCatId, catOrigemNomes, catMap[novaCatId] ?? novaCatId, catPeso ? Number(catPeso) : undefined, catData);
+      await manejoService.evoluirCategorias(
+        selectedAnimals, novaCatId, catOrigemNomes, catMap[novaCatId] ?? novaCatId,
+        catPeso ? Number(catPeso) : undefined, catData,
+        catBezPeso ? Number(catBezPeso) : undefined,
+      );
       toast.success(`${selected.size} lote(s) evoluído(s) para ${catMap[novaCatId]}!`);
-      setSelected(new Set()); setNovaCatId(''); setCatPeso(''); setCatData(new Date().toISOString().split('T')[0]);
+      setSelected(new Set()); setNovaCatId(''); setCatPeso(''); setCatBezPeso(''); setCatData(new Date().toISOString().split('T')[0]);
       onReload(); await reloadHistorico();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setSaving(false); }
@@ -764,9 +770,26 @@ function EvolucaoTab({
                 </div>
               </div>
               <div>
-                <label className={labelClass}>Novo peso médio (opcional)</label>
+                <label className={labelClass}>Novo peso médio — Animal (opcional)</label>
                 <input type="number" min="0" step="0.1" value={catPeso} onChange={e => setCatPeso(e.target.value)} placeholder="Ex: 220 kg" className={inputClass} />
               </div>
+              {selectedHasBez && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-orange-700 flex items-center gap-1.5">
+                    <span>🐄</span> Bezerros detectados nos lotes selecionados
+                  </p>
+                  <div>
+                    <label className={labelClass}>Novo peso médio — Bezerros (opcional)</label>
+                    <input
+                      type="number" min="0" step="0.1"
+                      value={catBezPeso}
+                      onChange={e => setCatBezPeso(e.target.value)}
+                      placeholder="Ex: 120 kg"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className={labelClass}>Data da evolução</label>
                 <input type="date" value={catData} onChange={e => setCatData(e.target.value)} className={inputClass} />

@@ -177,6 +177,7 @@ export const manejoService = {
     categoriaDestinoNome: string,
     pesoMedio?: number,
     data?: string,
+    bezPesoMedio?: number,
   ): Promise<void> {
     const ids = animals.map(a => a.id);
     const patch: Record<string, unknown> = { categoria_id: novaCategoriaId };
@@ -186,6 +187,14 @@ export const manejoService = {
       .from('animals')
       .update(patch)
       .in('id', ids);
+
+    // Atualiza peso dos bezerros apenas nos lotes que têm bezerros
+    if (bezPesoMedio) {
+      const idsComBez = animals.filter(a => (a.bezerros_quantidade ?? 0) > 0).map(a => a.id);
+      if (idsComBez.length > 0) {
+        await supabaseAdmin.from('animals').update({ bezerros_peso_medio: bezPesoMedio }).in('id', idsComBez);
+      }
+    }
     if (error) throw new Error(error.message);
 
     const totalCab   = animals.reduce((s, a) => s + a.quantidade, 0);
