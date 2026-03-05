@@ -253,10 +253,20 @@ function LotesTab({
             <p className="text-sm font-bold text-gray-800">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
           </div>
           {globalStats.totalBez > 0 && (
-            <div className="flex-1 border border-orange-200 rounded-lg px-4 py-3" style={{ background: '#fff7ed' }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#c2410c' }}>Bezerros</p>
-              <p className="text-sm font-bold" style={{ color: '#c2410c' }}>{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
-            </div>
+            <>
+              <div className="flex-1 border border-orange-200 rounded-lg px-4 py-3" style={{ background: '#fff7ed' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#c2410c' }}>Bezerros</p>
+                <p className="text-sm font-bold" style={{ color: '#c2410c' }}>{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
+                {globalStats.bezPesoMedio != null && (
+                  <p className="text-[10px] mt-0.5" style={{ color: '#c2410c' }}>{globalStats.bezPesoMedio.toFixed(0)} kg pond.</p>
+                )}
+              </div>
+              <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total Geral</p>
+                <p className="text-sm font-bold text-gray-900">{(globalStats.totalCab + globalStats.totalBez).toLocaleString('pt-BR')} cab.</p>
+                <p className="text-[10px] text-gray-400">gado + bezerros</p>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -294,42 +304,67 @@ function LotesTab({
       </div>
 
       {/* ── Header global da fazenda ── */}
-      <div className="rounded-xl border p-4 mb-6 flex flex-wrap gap-6"
-        style={{ background: 'linear-gradient(135deg,#1a6040,#0f4a30)', borderColor: '#1a6040' }}>
-        <div className="text-white">
-          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Área Total</p>
-          <p className="text-2xl font-bold">{globalStats.totalHA > 0 ? `${globalStats.totalHA.toLocaleString('pt-BR')} ha` : '—'}</p>
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 mb-6 flex flex-wrap gap-x-6 gap-y-2 items-center">
+        {/* Área + Pastos */}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Área Total</p>
+          <p className="text-base font-bold text-gray-800">{globalStats.totalHA > 0 ? `${globalStats.totalHA.toLocaleString('pt-BR')} ha` : '—'}</p>
         </div>
-        <div className="text-white">
-          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">N° Pastos</p>
-          <p className="text-2xl font-bold">{globalStats.totalLotes}</p>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">N° Pastos</p>
+          <p className="text-base font-bold text-gray-800">{globalStats.totalLotes}</p>
         </div>
-        <div className="text-white">
-          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Quantidade</p>
-          <p className="text-2xl font-bold">{globalStats.totalCab.toLocaleString('pt-BR')} cab.</p>
+
+        <div className="w-px h-8 bg-gray-200 self-center" />
+
+        {/* Gado */}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Cabeças</p>
+          <p className="text-base font-bold" style={{ color: '#1a6040' }}>{globalStats.totalCab.toLocaleString('pt-BR')} cab.</p>
         </div>
-        <div className="text-white">
-          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Peso Médio Ponderado</p>
-          <p className="text-2xl font-bold">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Peso Médio Pond.</p>
+          <p className="text-base font-bold text-gray-800">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
         </div>
+
         {globalStats.totalBez > 0 && (
-          <div className="text-white border-l border-white/20 pl-6">
-            <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Bezerros</p>
-            <p className="text-2xl font-bold">{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
-            {globalStats.bezPesoMedio != null && (
-              <p className="text-xs opacity-70 mt-0.5">{globalStats.bezPesoMedio.toFixed(0)} kg/cab</p>
-            )}
-          </div>
+          <>
+            <div className="w-px h-8 bg-orange-200 self-center" />
+            {/* Bezerros */}
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Bezerros</p>
+              <p className="text-base font-bold text-orange-600">{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Peso Médio Pond. Bez.</p>
+              <p className="text-base font-bold text-orange-600">{globalStats.bezPesoMedio != null ? `${globalStats.bezPesoMedio.toFixed(0)} kg` : '—'}</p>
+            </div>
+
+            <div className="w-px h-8 bg-gray-200 self-center" />
+
+            {/* Total geral */}
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Total Geral</p>
+              <p className="text-base font-bold text-gray-900">
+                {(globalStats.totalCab + globalStats.totalBez).toLocaleString('pt-BR')} cab.
+              </p>
+              <p className="text-[10px] text-gray-400">gado + bezerros</p>
+            </div>
+          </>
         )}
       </div>
 
       <div className="space-y-6">
         {pastosComLotes.map(p => {
           const animaisPasto = byPasto[p.id];
-          const totalCabPasto = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
-          const pesoNum = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
-          const pesoDen = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+          const totalCabPasto  = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
+          const pesoNum        = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+          const pesoDen        = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
           const pesoMedioPasto = pesoDen > 0 ? pesoNum / pesoDen : null;
+          const bezPasto       = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+          const bezPesoNum     = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+          const bezPesoDen     = animaisPasto.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+          const bezPesoMedioPasto = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
           return (
           <section key={p.id}>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -344,6 +379,18 @@ function LotesTab({
                   <span className="text-xs bg-teal-50 px-2 py-0.5 rounded-full font-semibold" style={{ color: '#1a6040' }}>
                     {pesoMedioPasto.toFixed(0)} kg/cab
                   </span>
+                )}
+                {bezPasto > 0 && (
+                  <>
+                    <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-semibold">
+                      {bezPasto.toLocaleString('pt-BR')} bez.
+                    </span>
+                    {bezPesoMedioPasto != null && (
+                      <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">
+                        {bezPesoMedioPasto.toFixed(0)} kg/bez
+                      </span>
+                    )}
+                  </>
                 )}
                 <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
                   {animaisPasto.length} lote{animaisPasto.length !== 1 ? 's' : ''}
