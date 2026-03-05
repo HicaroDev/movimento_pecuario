@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -81,6 +81,7 @@ export function DashboardLayout() {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
+  const [showEmDev, setShowEmDev] = useState(false);
 
   const visibleNavItems = navItems.filter(item => hasModule(item.module));
 
@@ -195,7 +196,64 @@ export function DashboardLayout() {
               </motion.div>
             );
           })}
+
+          {/* ── Livro Caixa — em breve ── */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 }}
+          >
+            <div
+              className="mt-3 pt-3"
+              style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
+            >
+              <button
+                onClick={() => setShowEmDev(true)}
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
+                style={{ color: '#6b7280' }}
+              >
+                <BookOpen className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-medium">Livro Caixa</span>
+                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
+                  EM BREVE
+                </span>
+              </button>
+            </div>
+          </motion.div>
         </nav>
+
+        {/* Modal em desenvolvimento */}
+        {showEmDev && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowEmDev(false)}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 p-8 text-center"
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'rgba(26,96,64,0.08)' }}>
+                <Construction className="w-7 h-7" style={{ color: '#1a6040' }} />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Em Desenvolvimento</h2>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                O módulo <strong>Livro Caixa</strong> está sendo desenvolvido e estará disponível em breve.
+              </p>
+              <button
+                onClick={() => setShowEmDev(false)}
+                className="mt-6 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+                style={{ background: '#1a6040' }}
+              >
+                Entendido
+              </button>
+            </motion.div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 space-y-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
