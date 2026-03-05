@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
 import { Leaf, Plus, Trash2, Pencil, Save, X, ChevronDown, MapPin, FileText } from 'lucide-react';
@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { farmService } from '../services/farmService';
+import { manejoService } from '../services/manejoService';
+import type { Animal, AnimalCategory } from '../services/manejoService';
 import { SkeletonTable } from '../components/Skeleton';
 import type { Pasture } from '../context/DataContext';
 
@@ -94,6 +96,154 @@ function PastureEditRow({ pasture, onSave, onCancel }: {
   );
 }
 
+/* ─────────────── Ocupação dos Pastos (componente vivo) ─────────────── */
+
+function OcupacaoPastos({ pastures, animals, categories, loading }: {
+  pastures: Pasture[];
+  animals: Animal[];
+  categories: AnimalCategory[];
+  loading: boolean;
+}) {
+  const catMap = useMemo(
+    () => Object.fromEntries(categories.map(c => [c.id, c.nome])),
+    [categories]
+  );
+
+  const ativos = useMemo(
+    () => animals.filter(a => a.status === 'ativo' || !a.status),
+    [animals]
+  );
+
+  const porPasto = useMemo(() =>
+    pastures.map(p => ({
+      pasto: p,
+      lotes: ativos.filter(a => a.pasto_id === p.id),
+    })).sort((a, b) => b.lotes.length - a.lotes.length),
+  [pastures, ativos]);
+
+  const pastosOcupados = porPasto.filter(x => x.lotes.length > 0).length;
+  const totalCab = ativos.reduce((s, a) => s + a.quantidade, 0);
+  const totalBez = ativos.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+  const areaTotal = pastures.reduce((s, p) => s + (p.area ?? 0), 0);
+
+  if (loading) return <div className="mt-6"><SkeletonTable rows={4} cols={5} /></div>;
+  if (pastures.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      {/* Cabeçalho da seção */}
+      <div className="mb-4">
+        <h2 className="text-base font-bold text-gray-900">Ocupação dos Pastos</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Lotes ativos alocados por pasto</p>
+      </div>
+
+      {/* Cards de resumo */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {[
+          { label: 'Pastos Ocupados', value: `${pastosOcupados} / ${pastures.length}`, color: '#1a6040' },
+          { label: 'Área Total',      value: `${areaTotal.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ha`, color: '#1a6040' },
+          { label: 'Total Cabeças',   value: totalCab.toLocaleString('pt-BR'), color: '#1a6040' },
+          { label: 'Total Bezerros',  value: totalBez > 0 ? totalBez.toLocaleString('pt-BR') : '—', color: '#c2410c' },
+        ].map(s => (
+          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{s.label}</p>
+            <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Por pasto */}
+      <div className="space-y-3">
+        {porPasto.map(({ pasto, lotes }) => {
+          const totalPasto = lotes.reduce((s, a) => s + a.quantidade, 0);
+          const bezPasto   = lotes.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+          return (
+            <div key={pasto.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              {/* Cabeçalho do pasto */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100"
+                style={{ background: 'rgba(26,96,64,0.04)' }}>
+                <div className="flex items-center gap-2">
+                  <Leaf className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                  <span className="font-semibold text-sm text-gray-900">{pasto.nome}</span>
+                  {pasto.area && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
+                      {pasto.area} ha
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {bezPasto > 0 && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100">
+                      {bezPasto.toLocaleString('pt-BR')} bez.
+                    </span>
+                  )}
+                  {lotes.length === 0 ? (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">
+                      Vago
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
+                      {totalPasto.toLocaleString('pt-BR')} cab.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Lotes */}
+              {lotes.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Lote</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Categoria</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Qtd</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Peso Médio</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Bezerros</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lotes.map((a, i) => (
+                        <tr key={a.id}
+                          style={{ borderBottom: i < lotes.length - 1 ? '1px solid #f9fafb' : 'none' }}>
+                          <td className="px-4 py-2.5 text-xs font-medium text-gray-900">{a.nome}</td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {a.categoria_id && catMap[a.categoria_id] ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold border border-amber-100">
+                                {catMap[a.categoria_id]}
+                              </span>
+                            ) : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right font-semibold" style={{ color: '#1a6040' }}>
+                            {a.quantidade.toLocaleString('pt-BR')}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right text-gray-500">
+                            {a.peso_medio ? `${a.peso_medio} kg` : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right">
+                            {(a.bezerros_quantidade ?? 0) > 0 ? (
+                              <span className="text-orange-600 font-medium">
+                                {a.bezerros_quantidade!.toLocaleString('pt-BR')} cab.
+                                {a.bezerros_peso_medio ? ` · ${a.bezerros_peso_medio} kg` : ''}
+                              </span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="px-4 py-3 text-xs text-gray-400 italic">Nenhum lote alocado neste pasto.</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Main Pastos page ─────────────── */
 
 export function Pastos() {
@@ -102,6 +252,9 @@ export function Pastos() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [farmName, setFarmName] = useState<string>(user?.name || '—');
+  const [animals, setAnimals] = useState<Animal[]>([]);
+  const [categories, setCategories] = useState<AnimalCategory[]>([]);
+  const [loadingAnimals, setLoadingAnimals] = useState(false);
 
   const {
     register,
@@ -116,6 +269,19 @@ export function Pastos() {
     if (!id) return;
     farmService.findById(id).then(f => setFarmName(f?.nomeFazenda || user?.name || '—'));
   }, [activeFarmId, isAdmin, user?.id, user?.name]);
+
+  // Load animals + categories for occupancy report
+  useEffect(() => {
+    if (!activeFarmId) return;
+    setLoadingAnimals(true);
+    Promise.all([
+      manejoService.listarAnimais(activeFarmId),
+      manejoService.listarCategorias(activeFarmId),
+    ]).then(([a, c]) => {
+      setAnimals(a);
+      setCategories(c);
+    }).catch(() => {}).finally(() => setLoadingAnimals(false));
+  }, [activeFarmId]);
 
   function onAdd(data: PastureForm) {
     addPasture(data);
@@ -142,68 +308,21 @@ export function Pastos() {
         className="max-w-5xl mx-auto">
 
         {/* ── Print-only header ── */}
-        <div className="print-only mb-6 page-portrait">
-          {/* Brand bar */}
+        <div className="print-only mb-6">
           <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
             <div>
               <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
                 Movimento Pecuário · Suplemento Control
               </p>
-              <h1 className="text-white text-xl font-bold">Relatório de Pastos</h1>
+              <h1 className="text-white text-xl font-bold">Relatório de Ocupação dos Pastos</h1>
             </div>
             <div className="text-right">
-              <p className="text-white text-xs opacity-70">Emitido em</p>
+              <p className="text-white text-xs opacity-70">{farmName} · Emitido em</p>
               <p className="text-white text-sm font-semibold">
                 {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
               </p>
             </div>
           </div>
-
-          {/* Summary row */}
-          <div className="flex items-stretch gap-4 mb-5">
-            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Fazenda</p>
-              <p className="text-sm font-bold text-gray-800">{farmName}</p>
-            </div>
-            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total de Pastos</p>
-              <p className="text-sm font-bold text-gray-800">{pastures.length}</p>
-            </div>
-            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Área Total</p>
-              <p className="text-sm font-bold text-gray-800">
-                {pastures.reduce((s, p) => s + (p.area ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ha
-              </p>
-            </div>
-            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Com Observações</p>
-              <p className="text-sm font-bold text-gray-800">
-                {pastures.filter(p => p.observacoes).length} pasto{pastures.filter(p => p.observacoes).length !== 1 ? 's' : ''}
-              </p>
-            </div>
-          </div>
-
-          {/* Print table */}
-          <table className="pdf-table">
-            <thead>
-              <tr>
-                <th style={{ width: '3%' }}>#</th>
-                <th style={{ width: '35%' }}>Nome do Pasto</th>
-                <th style={{ width: '18%' }}>Área (ha)</th>
-                <th>Observações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pastures.map((p, i) => (
-                <tr key={p.id}>
-                  <td style={{ color: '#6b7280', textAlign: 'center' }}>{i + 1}</td>
-                  <td style={{ fontWeight: 600 }}>{p.nome}</td>
-                  <td>{p.area ? `${p.area.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ha` : '—'}</td>
-                  <td style={{ color: '#6b7280' }}>{p.observacoes || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
 
         {/* Header */}
@@ -219,15 +338,13 @@ export function Pastos() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {pastures.length > 0 && (
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:border-teal-400 hover:text-teal-700 text-sm font-semibold transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                PDF
-              </button>
-            )}
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:border-teal-400 hover:text-teal-700 text-sm font-semibold transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Exportar PDF
+            </button>
             <button
               onClick={() => setShowAddForm(v => !v)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm"
@@ -349,6 +466,14 @@ export function Pastos() {
         </motion.div>
         )}
         </div>
+
+        {/* Relatório de Ocupação — sempre visível em tela e no PDF */}
+        <OcupacaoPastos
+          pastures={pastures}
+          animals={animals}
+          categories={categories}
+          loading={loadingAnimals}
+        />
 
       </motion.div>
     </div>

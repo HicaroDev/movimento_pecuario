@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { manejoService, type Animal, type AnimalCategory, type ManejoEvent } from '../services/manejoService';
+import { farmService } from '../services/farmService';
 import type { Pasture } from '../context/DataContext';
 import { SkeletonTable } from '../components/Skeleton';
 
@@ -1084,8 +1085,8 @@ function AbateTab({
    TAB 5 — Histórico Completo
 ══════════════════════════════════════════════════════════════ */
 
-function HistoricoTab({ farmId, animals, pastures }: {
-  farmId: string; animals: Animal[]; pastures: Pasture[];
+function HistoricoTab({ farmId, animals, pastures, farmName }: {
+  farmId: string; animals: Animal[]; pastures: Pasture[]; farmName: string;
 }) {
   const today      = new Date().toISOString().split('T')[0];
   const fom        = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -1252,7 +1253,7 @@ function HistoricoTab({ farmId, animals, pastures }: {
         <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
           <div>
             <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
-              Movimento Pecuário · Suplemento Control
+              Movimento Pecuário · Suplemento Control{farmName ? ` · ${farmName}` : ''}
             </p>
             <h1 className="text-white text-xl font-bold">Histórico de Manejos</h1>
           </div>
@@ -1382,6 +1383,12 @@ export function Manejos() {
   const [categories, setCategories] = useState<AnimalCategory[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [farmName, setFarmName]   = useState('');
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    farmService.findById(activeFarmId).then(f => setFarmName(f?.nomeFazenda || ''));
+  }, [activeFarmId]);
 
   useEffect(() => {
     if (!activeFarmId) { setLoading(false); return; }
@@ -1407,7 +1414,7 @@ export function Manejos() {
         className="max-w-6xl mx-auto">
 
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
+        <div className="mb-6 flex items-start justify-between no-print">
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
             <h1 className="text-3xl font-bold text-gray-900">Manejos</h1>
@@ -1424,7 +1431,7 @@ export function Manejos() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-xl p-1 w-fit shadow-sm">
+        <div className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-xl p-1 w-fit shadow-sm no-print">
           {TABS.map(t => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -1471,7 +1478,7 @@ export function Manejos() {
                 <AbateTab animals={animals} categories={categories} farmId={activeFarmId} onReload={reload} />
               )}
               {tab === 'historico' && (
-                <HistoricoTab farmId={activeFarmId} animals={animals} pastures={pastures} />
+                <HistoricoTab farmId={activeFarmId} animals={animals} pastures={pastures} farmName={farmName} />
               )}
             </motion.div>
           </AnimatePresence>

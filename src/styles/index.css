@@ -50,6 +50,22 @@
     color: black !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  /* Remove scrollbar — fix principal do PDF */
+  main, .overflow-auto, .overflow-y-auto, .overflow-x-auto {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  /* Fundo branco — sobrescreve inline style do layout */
+  main {
+    background: white !important;
+    isolation: auto !important;
+  }
+  /* Fundo cinza das páginas → branco */
+  .bg-gray-50, .bg-gray-100 {
+    background-color: white !important;
   }
   .no-print {
     display: none !important;
@@ -77,6 +93,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 11px;
+    table-layout: fixed;
   }
   .pdf-table th {
     background: #1a6040 !important;
@@ -95,6 +112,9 @@
     border-bottom: 1px solid #e5e7eb;
     font-size: 11px;
     color: #111827;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
   }
   .pdf-table tr:nth-child(even) td {
     background: #f9fafb !important;
