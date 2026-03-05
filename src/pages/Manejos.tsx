@@ -27,7 +27,7 @@ const TIPO_LABELS: Record<string, string> = {
   transferencia:      'Transferência',
   evolucao_categoria: 'Evolução',
   paricao:            'Parição',
-  manejo_bezerros:    'Bezerros',
+  manejo_bezerros:    'Desmama',
   abate:              'Abate',
   venda:              'Venda',
   desagrupamento:     'Desagrupamento',
@@ -555,7 +555,7 @@ function EvolucaoTab({
         farmId,
         loteDestinoNome: bezDestino === 'existente' ? (ativos.find(a => a.id === bezLoteDestId)?.nome ?? '') : undefined,
       });
-      toast.success(`Bezerros registrados: ${bezQtd} cab.!`);
+      toast.success(`Desmama registrada: ${bezQtd} cab.!`);
       setBezLoteId(''); setBezQtd(''); setBezPeso(''); setBezLoteDestId(''); setBezNovoNome(''); setBezNovoCatId(''); setBezDestino('novo');
       onReload(); await reloadHistorico();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
@@ -614,7 +614,7 @@ function EvolucaoTab({
   const SUB_OPS = [
     { id: 'categoria' as SubOp, label: 'Categoria',  icon: TrendingUp },
     { id: 'paricao'   as SubOp, label: 'Parição',    icon: Baby },
-    { id: 'bezerros'  as SubOp, label: 'Bezerros',   icon: Milk },
+    { id: 'bezerros'  as SubOp, label: 'Desmama',    icon: Milk },
   ];
 
   return (
@@ -752,7 +752,7 @@ function EvolucaoTab({
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
               <Milk className="w-4 h-4 text-orange-500" />
-              <h3 className="font-semibold text-gray-900">Manejar bezerros</h3>
+              <h3 className="font-semibold text-gray-900">Desmama</h3>
             </div>
             <div>
               <label className={labelClass}>Lote de origem</label>
@@ -788,7 +788,7 @@ function EvolucaoTab({
             <button onClick={confirmarBezerros} disabled={saving || !bezLoteId || !bezQtd}
               className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               <Milk className="w-4 h-4" />
-              {saving ? 'Registrando...' : 'Confirmar Manejo de Bezerros'}
+              {saving ? 'Registrando...' : 'Confirmar Desmama'}
             </button>
           </div>
         )}
