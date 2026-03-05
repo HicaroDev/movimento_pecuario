@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -197,16 +197,24 @@ export function DashboardLayout() {
             );
           })}
 
-          {/* ── Livro Caixa — em breve ── */}
+          {/* ── Módulos em breve ── */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 }}
           >
-            <div
-              className="mt-3 pt-3"
-              style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
-            >
+            <div className="mt-3 pt-3 space-y-1" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              <button
+                onClick={() => setShowEmDev(true)}
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
+                style={{ color: '#6b7280' }}
+              >
+                <Leaf className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-medium">Formulário Pasto</span>
+                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
+                  EM BREVE
+                </span>
+              </button>
               <button
                 onClick={() => setShowEmDev(true)}
                 className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
