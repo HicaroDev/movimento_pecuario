@@ -78,10 +78,10 @@ function HistoricoTable({ events, loading }: { events: ManejoEvent[]; loading: b
 ══════════════════════════════════════════════════════════════ */
 
 function LotesTab({
-  animals, pastures, categories, onReload,
+  animals, pastures, categories, onReload, farmName,
 }: {
   animals: Animal[]; pastures: Pasture[]; categories: AnimalCategory[];
-  onReload: () => void;
+  onReload: () => void; farmName: string;
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
@@ -166,7 +166,7 @@ function LotesTab({
           <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
           <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
-          <td className="px-4 py-2.5">
+          <td className="px-4 py-2.5 no-print">
             <button
               onClick={() => { setAlocarAnimal(a); setPastoSel(a.pasto_id ?? ''); }}
               className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
@@ -181,7 +181,8 @@ function LotesTab({
             <td className="px-4 py-1.5 text-xs text-orange-600">—</td>
             <td className="px-4 py-1.5 text-xs font-semibold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')}</td>
             <td className="px-4 py-1.5 text-xs text-orange-600">{a.bezerros_peso_medio ? `${a.bezerros_peso_medio} kg` : '—'}</td>
-            <td colSpan={2} />
+            <td />
+            <td className="no-print" />
           </tr>
         )}
       </>
@@ -195,8 +196,8 @@ function LotesTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', 'Sexo', ''].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', 'Sexo', ''].map((h, i) => (
+                  <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider${i === 5 ? ' no-print' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -217,8 +218,51 @@ function LotesTab({
 
   return (
     <>
-      {/* Toolbar: search + Histórico */}
-      <div className="flex items-center gap-3 mb-5">
+      {/* ── Print-only header ── */}
+      <div className="print-only mb-6">
+        <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
+              Movimento Pecuário · Suplemento Control{farmName ? ` · ${farmName}` : ''}
+            </p>
+            <h1 className="text-white text-xl font-bold">Situação dos Pastos</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-white text-xs opacity-70">Emitido em</p>
+            <p className="text-white text-sm font-semibold">
+              {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
+        {/* Stats resumo */}
+        <div className="flex items-stretch gap-4 mb-5">
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Área Total</p>
+            <p className="text-sm font-bold text-gray-800">{globalStats.totalHA > 0 ? `${globalStats.totalHA.toLocaleString('pt-BR')} ha` : '—'}</p>
+          </div>
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">N° Pastos</p>
+            <p className="text-sm font-bold text-gray-800">{globalStats.totalLotes}</p>
+          </div>
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total Cabeças</p>
+            <p className="text-sm font-bold text-gray-800">{globalStats.totalCab.toLocaleString('pt-BR')} cab.</p>
+          </div>
+          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Peso Médio Pond.</p>
+            <p className="text-sm font-bold text-gray-800">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
+          </div>
+          {globalStats.totalBez > 0 && (
+            <div className="flex-1 border border-orange-200 rounded-lg px-4 py-3" style={{ background: '#fff7ed' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#c2410c' }}>Bezerros</p>
+              <p className="text-sm font-bold" style={{ color: '#c2410c' }}>{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Toolbar: search + PDF */}
+      <div className="flex items-center gap-3 mb-5 no-print">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <input
@@ -240,6 +284,13 @@ function LotesTab({
             {ativosFiltrados.length} lote{ativosFiltrados.length !== 1 ? 's' : ''}
           </span>
         )}
+        <button
+          onClick={() => window.print()}
+          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:border-teal-400 hover:text-teal-600 transition-colors font-medium flex-shrink-0"
+        >
+          <FileText className="w-4 h-4" />
+          Exportar PDF
+        </button>
       </div>
 
       {/* ── Header global da fazenda ── */}
@@ -1464,7 +1515,7 @@ export function Manejos() {
               exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {tab === 'lotes' && (
                 <LotesTab animals={animals} pastures={pastures} categories={categories}
-                  onReload={reload} />
+                  onReload={reload} farmName={farmName} />
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
