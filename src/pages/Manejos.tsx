@@ -126,13 +126,17 @@ function LotesTab({
 
   // ── Somatória global da fazenda ──
   const globalStats = useMemo(() => {
-    const totalHA    = pastosComLotes.reduce((s, p) => s + (p.area ?? 0), 0);
-    const totalLotes = pastosComLotes.length;
-    const totalCab   = ativos.reduce((s, a) => s + a.quantidade, 0);
-    const pesoNum    = ativos.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
-    const pesoDen    = ativos.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
-    const pesoMedio  = pesoDen > 0 ? pesoNum / pesoDen : null;
-    return { totalHA, totalLotes, totalCab, pesoMedio };
+    const totalHA      = pastosComLotes.reduce((s, p) => s + (p.area ?? 0), 0);
+    const totalLotes   = pastosComLotes.length;
+    const totalCab     = ativos.reduce((s, a) => s + a.quantidade, 0);
+    const pesoNum      = ativos.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+    const pesoDen      = ativos.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+    const pesoMedio    = pesoDen > 0 ? pesoNum / pesoDen : null;
+    const totalBez     = ativos.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+    const bezPesoNum   = ativos.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+    const bezPesoDen   = ativos.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+    const bezPesoMedio = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
+    return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pastosComLotes, animals]);
 
@@ -154,21 +158,32 @@ function LotesTab({
 
   function AnimalRow({ a }: { a: Animal }) {
     return (
-      <tr className="hover:bg-gray-50 transition-colors">
-        <td className="px-4 py-2.5 font-medium text-gray-900 text-sm">{a.nome}</td>
-        <td className="px-4 py-2.5 text-xs text-gray-600">{a.categoria_id ? catMap[a.categoria_id] ?? '—' : '—'}</td>
-        <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
-        <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
-        <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
-        <td className="px-4 py-2.5">
-          <button
-            onClick={() => { setAlocarAnimal(a); setPastoSel(a.pasto_id ?? ''); }}
-            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
-          >
-            {a.pasto_id ? 'Mover' : 'Alocar'}
-          </button>
-        </td>
-      </tr>
+      <>
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-2.5 font-medium text-gray-900 text-sm">{a.nome}</td>
+          <td className="px-4 py-2.5 text-xs text-gray-600">{a.categoria_id ? catMap[a.categoria_id] ?? '—' : '—'}</td>
+          <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
+          <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
+          <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
+          <td className="px-4 py-2.5">
+            <button
+              onClick={() => { setAlocarAnimal(a); setPastoSel(a.pasto_id ?? ''); }}
+              className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+            >
+              {a.pasto_id ? 'Mover' : 'Alocar'}
+            </button>
+          </td>
+        </tr>
+        {(a.bezerros_quantidade ?? 0) > 0 && (
+          <tr className="bg-orange-50/60">
+            <td className="pl-8 pr-4 py-1.5 text-xs text-orange-700 italic">↳ Bezerros</td>
+            <td className="px-4 py-1.5 text-xs text-orange-600">—</td>
+            <td className="px-4 py-1.5 text-xs font-semibold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')}</td>
+            <td className="px-4 py-1.5 text-xs text-orange-600">{a.bezerros_peso_medio ? `${a.bezerros_peso_medio} kg` : '—'}</td>
+            <td colSpan={2} />
+          </tr>
+        )}
+      </>
     );
   }
 
@@ -245,6 +260,15 @@ function LotesTab({
           <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Peso Médio Ponderado</p>
           <p className="text-2xl font-bold">{globalStats.pesoMedio != null ? `${globalStats.pesoMedio.toFixed(0)} kg` : '—'}</p>
         </div>
+        {globalStats.totalBez > 0 && (
+          <div className="text-white border-l border-white/20 pl-6">
+            <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70">Bezerros</p>
+            <p className="text-2xl font-bold">{globalStats.totalBez.toLocaleString('pt-BR')} cab.</p>
+            {globalStats.bezPesoMedio != null && (
+              <p className="text-xs opacity-70 mt-0.5">{globalStats.bezPesoMedio.toFixed(0)} kg/cab</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-6">

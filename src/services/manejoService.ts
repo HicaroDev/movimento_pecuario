@@ -11,6 +11,8 @@ export interface Animal {
   categoria_id?: string;
   peso_medio?: number;
   sexo?: string;
+  bezerros_quantidade?: number;
+  bezerros_peso_medio?: number;
   observacoes?: string;
   pasto_id?: string;
   status: 'ativo' | 'abatido' | 'vendido';
@@ -46,9 +48,11 @@ function toAnimal(row: Record<string, unknown>): Animal {
     quantidade:   (row.quantidade as number) ?? 0,
     raca:         (row.raca as string) ?? undefined,
     categoria_id: (row.categoria_id as string) ?? undefined,
-    peso_medio:   (row.peso_medio as number) ?? undefined,
-    sexo:         (row.sexo as string) ?? undefined,
-    observacoes:  (row.observacoes as string) ?? undefined,
+    peso_medio:          (row.peso_medio as number) ?? undefined,
+    sexo:                (row.sexo as string) ?? undefined,
+    bezerros_quantidade: (row.bezerros_quantidade as number) ?? undefined,
+    bezerros_peso_medio: (row.bezerros_peso_medio as number) ?? undefined,
+    observacoes:         (row.observacoes as string) ?? undefined,
     pasto_id:     (row.pasto_id as string) ?? undefined,
     status:       ((row.status as string) ?? 'ativo') as Animal['status'],
     created_at:   (row.created_at as string) ?? undefined,
