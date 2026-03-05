@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-03-01
+> Última atualização: 2026-03-04
 
 ## Legenda
 - [ ] Pendente
@@ -106,6 +106,43 @@
 - [ ] **T-240** GitHub Actions: build Docker no CI e push para ghcr.io → EasyPanel só puxa imagem pronta (~20s deploy)
 - [ ] **T-241** Alternativa Nixpacks: remover Dockerfile e usar Nixpacks nativo do EasyPanel (~1-2 min deploy)
 
+### 2F — Módulo Manejos (CONCLUÍDO ✅)
+- [x] **T-250** `src/pages/Manejos.tsx` — estrutura base + 5 tabs
+- [x] **T-251** `src/services/manejoService.ts` — CRUD animals, categorias, historico
+- [x] **T-252** `supabase/ajustes_v116b.sql` — tabelas: animals, supplement_types, employees, manejo_historico + RLS
+- [x] **T-253** Tab "Lotes por Pasto" — listagem de animais agrupados por pasto
+- [x] **T-254** Tab "Transferir" — mover animal entre pastos com registro no histórico
+- [x] **T-255** Tab "Evolução" — subtabs: Categoria, Parição, Desmama
+- [x] **T-256** Tab "Saída" — abate ou venda com quantidade parcial/total + encerrar lote
+- [x] **T-257** Tab "Histórico" — tabela filtrada por período, tipo e pasto
+- [x] **T-258** Alocação de animais a pastos (modal inline em LotesTab)
+- [x] **T-259** Rota `/manejos` + módulo `manejos` no sistema de auth
+
+### 2G — AJUSTES MP_04 MAR + PDF Profissional (CONCLUÍDO ✅)
+- [x] **T-260** Reordenar sidebar: Manejo → Lançamento → Relatórios → Cadastros → Usuários → Fazenda
+- [x] **T-261** LotesTab: header global da fazenda (HA total, N° pastos, Cab total, Peso Médio Pond.)
+- [x] **T-262** LotesTab: somatória por pasto (total cab + peso médio ponderado por pasto)
+- [x] **T-263** LotesTab: sub-row laranja de bezerros (bezerros_quantidade + bezerros_peso_medio)
+- [x] **T-264** LotesTab: bezerros no header global (total bezerros + peso médio ponderado)
+- [x] **T-265** Selects de lote (Parição, Desmama, Saída): exibir categoria junto com nome e quantidade
+- [x] **T-266** Desmama: mostrar "Bezerros disponíveis: X cab." ao selecionar lote origem
+- [x] **T-267** EvolucaoTab: "+ X bez." em laranja na lista de checkboxes dos lotes
+- [x] **T-268** EvolucaoTab > Categoria: campo "Novo peso médio — Bezerros" quando lote selecionado tem bezerros
+- [x] **T-269** `manejoService.evoluirCategorias()`: atualizar bezerros_peso_medio nos animais com bezerros
+- [x] **T-270** Remover opção "Desagrupar bezerros" da tab Saída
+- [x] **T-271** Cadastros > Suplementos: coluna CONSUMO com 9 opções (range de g/100kg PV a % PV)
+- [x] **T-272** SQL: `ALTER TABLE supplement_types ADD COLUMN consumo text` (em ajustes_v116b.sql)
+- [x] **T-273** SupplementSection: trocar azul `#3b82f6` por verde `#1a6040` nas colunas de números
+- [x] **T-274** Sidebar: "Formulário Pasto" e "Livro Caixa" como itens dimmed com badge "EM BREVE"
+- [x] **T-275** Sidebar: modal "Em Desenvolvimento" ao clicar nos módulos em breve
+- [x] **T-276** PDF Histórico de Manejos: brand bar verde, cards de período/total/resumo por tipo, badges coloridos (landscape)
+- [x] **T-277** PDF Pastos: botão PDF no header, layout portrait, brand bar, sumário de área total, tabela numerada
+- [x] **T-278** index.css: `print-color-adjust`, classes `.pdf-brand-bar`, `.pdf-table`, `.pdf-badge-*`
+
+### 2H — Entregas Finais (PENDENTE)
+- [ ] **T-280** Lançamento (Formulário): melhorias visuais + UX para entrega final
+- [ ] **T-281** Relatório / Dashboard corporativo: redesign visual completo
+
 ---
 
 ## FASE 3 — Escala SaaS (FUTURO ⬜)
@@ -126,9 +163,12 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1.5 — Auth + Multi-tenant | 16 | 16 | ✅ Concluída |
 | 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
-| 2 — Melhorias Avançadas | 19 | 17 | 🔄 89% |
+| 2A–E — Melhorias Avançadas | 19 | 17 | 🔄 89% |
+| 2F — Módulo Manejos | 10 | 10 | ✅ Concluída |
+| 2G — Ajustes MP_04 MAR + PDF | 19 | 19 | ✅ Concluída |
+| 2H — Entregas Finais | 2 | 0 | 🔄 Pendente |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **88** | **85** | **97%** |
+| **TOTAL** | **118** | **109** | **92%** |
 
 ---
 
@@ -140,7 +180,22 @@ npm run dev
 # Abrir: http://localhost:5173
 ```
 
-## Para Aplicar Migration das Tabelas do Cadastros
+## Para Aplicar Migration Completa (v116b)
 
-Execute `supabase/migration_cadastros.sql` no SQL Editor do Supabase:
+Execute `supabase/ajustes_v116b.sql` no SQL Editor do Supabase:
 `https://saas-supabase.bj3amt.easypanel.host`
+
+Inclui: tabelas `animals`, `supplement_types` (+ coluna `consumo`), `employees`, `manejo_historico` + todas as RLS policies.
+
+## Commits Recentes
+
+| Hash | Descrição |
+|------|-----------|
+| `b0b5920` | feat: PDF profissional Histórico de Manejos e Pastos |
+| `8f3a842` | feat: Formulário Pasto no sidebar como módulo em breve |
+| `091c910` | feat: Livro Caixa no sidebar como módulo em breve |
+| `efcc5c8` | feat: evoluir peso dos bezerros junto com categoria do lote |
+| `4adb684` | feat: remover opção Desagrupar bezerros de Saída |
+| `7070d05` | feat: mostrar bezerros na lista de seleção de lotes |
+| `a06b8ec` | feat: bezerros visíveis em Lotes por Pasto e header global |
+| `41227d2` | feat: ajustes AJUSTES MP_04 MAR — UX e cadastros |
