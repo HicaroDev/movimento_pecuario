@@ -98,6 +98,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [pastures,     setPastures]     = useState<Pasture[]>([]);
   const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
   const [refreshTick,  setRefreshTick]  = useState(0);
+  const pendingDeletesRef = useRef<Set<string>>(new Set());
 
   /* Determina a fazenda ativa ao logar */
   useEffect(() => {
@@ -219,7 +220,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]).then(([entriesRes, pasturesRes, farm]) => {
       if (cancelled) return;
       if (!entriesRes.error) setEntries((entriesRes.data ?? []).map(toDataEntry));
-      if (!pasturesRes.error) setPastures((pasturesRes.data ?? []).map(toPasture));
+      if (!pasturesRes.error) setPastures(
+        (pasturesRes.data ?? []).map(toPasture).filter(p => !pendingDeletesRef.current.has(p.id))
+      );
       if (farm) setClientInfo(farm);
       setLoading(false);
     }).catch(() => {
@@ -314,9 +317,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   async function deletePasture(id: string) {
-    const { error } = await supabaseAdmin.from('pastures').delete().eq('id', id);
-    if (error) throw error;
-    setPastures(prev => prev.filter(p => p.id !== id));
+    pendingDeletesRef.current.add(id);
+    try {
+      const { error } = await supabaseAdmin.from('pastures').delete().eq('id', id);
+      if (error) throw error;
+      setPastures(prev => prev.filter(p => p.id !== id));
+    } finally {
+      pendingDeletesRef.current.delete(id);
+    }
   }
 
   function updatePasture(id: string, patch: Partial<Pasture>) {
