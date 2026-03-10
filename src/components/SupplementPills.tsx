@@ -29,17 +29,22 @@ function abbreviate(nome: string): string {
   return map[nome] ?? nome.split(' ').slice(0, 2).join(' ');
 }
 
+// Cores fixas para o pódio (1º, 2º, 3º lugar por consumo médio)
+const TOP3_COLORS = ['#1a6040', '#4ade80', '#2d8a60'] as const;
+// 1 = verde escuro (brand), 2 = verde claro, 3 = verde médio
+
 export function SupplementPills({ activeTypes, groups }: SupplementPillsProps) {
   if (activeTypes.length === 0) return null;
 
   const avgs    = activeTypes.map(t => averageConsumo(groups[t] ?? []));
   const maxAvg  = Math.max(...avgs, 0.001);
 
-  // Top 3 by avg consumption
+  // Top 3 by avg consumption — ordered by rank (0 = highest)
   const ranked = [...activeTypes]
     .map((t, i) => ({ tipo: t, avg: avgs[i] }))
     .sort((a, b) => b.avg - a.avg);
-  const top3 = new Set(ranked.slice(0, 3).map(r => r.tipo));
+  const top3Map = new Map(ranked.slice(0, 3).map((r, rank) => [r.tipo, rank]));
+  const top3 = new Set(top3Map.keys());
 
   const MIN_H = 48;
   const MAX_H = 110;
@@ -55,11 +60,14 @@ export function SupplementPills({ activeTypes, groups }: SupplementPillsProps) {
 
       <div className="flex items-end justify-center gap-4 flex-wrap">
         {activeTypes.map((tipo, i) => {
-          const avg    = avgs[i];
-          const color  = getSupplementColor(tipo, i);
-          const isTop  = top3.has(tipo);
-          const height = MIN_H + Math.round((avg / maxAvg) * (MAX_H - MIN_H));
-          const label  = abbreviate(tipo);
+          const avg       = avgs[i];
+          const fallback  = getSupplementColor(tipo, i);
+          const rank      = top3Map.get(tipo); // 0 | 1 | 2 | undefined
+          const isTop     = top3.has(tipo);
+          const solidColor = rank !== undefined ? TOP3_COLORS[rank] : fallback;
+          const stripeColor = fallback;
+          const height    = MIN_H + Math.round((avg / maxAvg) * (MAX_H - MIN_H));
+          const label     = abbreviate(tipo);
 
           return (
             <div
@@ -67,14 +75,12 @@ export function SupplementPills({ activeTypes, groups }: SupplementPillsProps) {
               className="flex flex-col items-center gap-2 group cursor-default"
               title={`${tipo} — ${fmt(avg)} kg/cab dia`}
             >
-              {/* Value badge (visible on hover or always for top3) */}
+              {/* Value badge */}
               <span
                 className={`text-[11px] font-bold tabular-nums transition-opacity duration-150 ${
-                  isTop
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
+                  isTop ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                 }`}
-                style={{ color }}
+                style={{ color: solidColor }}
               >
                 {fmt(avg)}
               </span>
@@ -86,16 +92,16 @@ export function SupplementPills({ activeTypes, groups }: SupplementPillsProps) {
                   height,
                   borderRadius: 9999,
                   background: isTop
-                    ? color
+                    ? solidColor
                     : `repeating-linear-gradient(
                         45deg,
-                        ${color}44 0px,
-                        ${color}44 4px,
-                        ${color}18 4px,
-                        ${color}18 10px
+                        ${stripeColor}44 0px,
+                        ${stripeColor}44 4px,
+                        ${stripeColor}18 4px,
+                        ${stripeColor}18 10px
                       )`,
-                  border: `2px solid ${color}`,
-                  boxShadow: isTop ? `0 4px 14px ${color}55` : 'none',
+                  border: `2px solid ${isTop ? solidColor : stripeColor}`,
+                  boxShadow: isTop ? `0 4px 14px ${solidColor}55` : 'none',
                   transition: 'all 0.2s ease',
                 }}
                 className="group-hover:scale-105"
