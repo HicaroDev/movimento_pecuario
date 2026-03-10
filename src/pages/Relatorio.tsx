@@ -6,10 +6,10 @@ import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { StatsOverview } from '../components/StatsOverview';
-import { MetricCard } from '../components/MetricCard';
 import { SummaryChart } from '../components/SummaryChart';
 import { SupplementSection } from '../components/SupplementSection';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
+import { SupplementPills } from '../components/SupplementPills';
 import { groupByType, averageConsumo, sumQuantidade, sortedTypes, fmt } from '../lib/utils';
 import { getSupplementColor } from '../lib/data';
 
@@ -89,9 +89,6 @@ export function Relatorio() {
 
   /* ── Ordered supplement types (only those with data) ── */
   const activeTypes = useMemo(() => sortedTypes(groups), [groups]);
-
-  /* ── Top-3 MetricCards (first 3 supplements with data) ── */
-  const metricTypes = activeTypes.slice(0, 3);
 
   /* ── Summary chart data (only supplements with data) ── */
   const summaryData = useMemo(() => activeTypes.map((name, i) => ({
@@ -288,31 +285,13 @@ export function Relatorio() {
           />
         )}
 
-        {/* ── 3 metric cards (top 3 supplements with data) ── */}
+        {/* ── Supplement pills (all active types, top 3 highlighted) ── */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : metricTypes.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {metricTypes.map((tipo, i) => {
-              const typeEntries = groups[tipo] ?? [];
-              const avg = averageConsumo(typeEntries);
-              const color = getSupplementColor(tipo, i);
-              const icons = ['energy', 'mineral', 'feed'] as const;
-              return (
-                <MetricCard
-                  key={tipo}
-                  icon={icons[i % icons.length]}
-                  title={tipo}
-                  value={fmt(avg)}
-                  subtitle={`${typeEntries.length} pasto${typeEntries.length !== 1 ? 's' : ''}`}
-                  color={color}
-                  trend={undefined}
-                />
-              );
-            })}
-          </div>
+        ) : (
+          <SupplementPills activeTypes={activeTypes} groups={groups} />
         )}
 
         {/* ── Summary chart ── */}
