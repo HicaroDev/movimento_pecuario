@@ -296,10 +296,14 @@ export function Pastos() {
     setEditingId(null);
   }
 
-  function onDelete(p: Pasture) {
+  async function onDelete(p: Pasture) {
     if (!window.confirm(`Remover o pasto "${p.nome}"?`)) return;
-    deletePasture(p.id);
-    toast.success('Pasto removido.', { description: p.nome });
+    try {
+      await deletePasture(p.id);
+      toast.success('Pasto removido.', { description: p.nome });
+    } catch {
+      toast.error('Não foi possível excluir. Este pasto possui lançamentos ou animais vinculados.');
+    }
   }
 
   return (

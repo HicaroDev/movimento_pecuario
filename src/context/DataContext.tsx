@@ -64,7 +64,7 @@ interface DataContextType {
   updateClientInfo: (info: ClientInfo) => void;
   pastures: Pasture[];
   addPasture: (pasture: Omit<Pasture, 'id'>) => void;
-  deletePasture: (id: string) => void;
+  deletePasture: (id: string) => Promise<void>;
   updatePasture: (id: string, data: Partial<Pasture>) => void;
 }
 
@@ -83,7 +83,7 @@ const fallbackContext: DataContextType = {
   updateClientInfo: () => {},
   pastures: [],
   addPasture: () => {},
-  deletePasture: () => {},
+  deletePasture: async () => {},
   updatePasture: () => {},
 };
 
@@ -313,9 +313,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  function deletePasture(id: string) {
+  async function deletePasture(id: string) {
+    const { error } = await supabaseAdmin.from('pastures').delete().eq('id', id);
+    if (error) throw error;
     setPastures(prev => prev.filter(p => p.id !== id));
-    supabaseAdmin.from('pastures').delete().eq('id', id);
   }
 
   function updatePasture(id: string, patch: Partial<Pasture>) {

@@ -1,6 +1,54 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { Farm } from '../types/farm';
 
+/* ── Dados padrão — carregados ao criar cada fazenda nova ── */
+
+const DEFAULT_FORRAGENS = [
+  'Andropogon', 'Anoni', 'Australiano', 'Azeven',
+  'B Brizantha', 'B. Decumbens', 'B. Dictioneura', 'B. Humidicola (Quicuia)',
+  'B. MG-5', 'B. Paiaguas', 'B. Piatã', 'B. Ruzizienses',
+  'BRS Planaltina', 'BRS Sarabndi', 'Dunamis', 'Jaragua',
+  'Mavuno', 'Navalhão', 'P. Massai', 'P. Miyagi',
+  'P. Mombaça', 'P. Quenia', 'P. Tamani', 'P. Zuri',
+  'Tangola', 'Tifiton', 'Tiriricão',
+];
+
+const DEFAULT_CATEGORIAS = [
+  'Bezerra Fêmea Desmama', 'Bezerras fêmea mamando', 'Bezerro Macho Desmama',
+  'Bezerros Aleitamento Creep Feeding', 'Bezerros macho mamando',
+  'Boi Gordo', 'Boi Magro',
+  'Femeas até 12 meses', 'Femeas até 13 a 24 meses (Fundo para Abate)',
+  'Garrotes',
+  'Macho > 24 meses (Abate final Fevereiro)', 'Macho > 24 meses (Abate final Maio)',
+  'Macho até 12 meses', 'Novilha Inseminada > 24 meses',
+  'Novilhas Precoce Chance', 'Novilhas Precoce Prenha',
+  'Primipara Parida', 'Touros',
+  'Vaca Descarte', 'Vaca descarte',
+  'Vacas Adultas e Primiparas', 'Vacas Prenhas Paridas', 'Vacas Prenhas Solteiras',
+];
+
+const DEFAULT_SUPLEMENTOS = [
+  'Energetico 0,3%', 'Energetico 0,5%',
+  'Mineral Adensado Aguas', 'Mineral Adensado Seca', 'Mineral Adensado Transicao',
+  'Proteico 0,1% Aguas', 'Proteico 0,1% Seca', 'Proteico 0,1% Transicao', 'Proteico 0,2%',
+  'Racao Creep', 'Ração Engorda TIP', 'Sal Mieneral Reprodução',
+  'Sal Mineral Águas', 'Sal Mineral Águas Aditivado', 'Sal Mineral com Ureia',
+];
+
+async function seedFarmDefaults(farmId: string): Promise<void> {
+  await Promise.all([
+    supabaseAdmin.from('forage_types').insert(
+      DEFAULT_FORRAGENS.map(nome => ({ farm_id: farmId, nome }))
+    ),
+    supabaseAdmin.from('animal_categories').insert(
+      DEFAULT_CATEGORIAS.map(nome => ({ farm_id: farmId, nome }))
+    ),
+    supabaseAdmin.from('supplement_types').insert(
+      DEFAULT_SUPLEMENTOS.map(nome => ({ farm_id: farmId, nome, unidade: 'kg' }))
+    ),
+  ]);
+}
+
 let farmsCache: Farm[] | null = null;
 let farmsCacheAt = 0;
 const CACHE_TTL = 60_000;
@@ -99,7 +147,12 @@ export const farmService = {
       .from('farms').insert({ nome_fazenda: d.nomeFazenda, ...toRow(d) })
       .select().single();
     if (error) throw new Error(error.message);
-    return toFarm(data);
+    const farm = toFarm(data);
+    // Seed automático — não bloqueia nem falha o create se der erro no seed
+    seedFarmDefaults(farm.id).catch(err =>
+      console.warn('[farmService] seed defaults failed:', err)
+    );
+    return farm;
   },
 
   async update(id: string, d: Partial<Farm>): Promise<Farm> {

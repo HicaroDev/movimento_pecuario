@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
-import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag, Search, ChevronDown } from 'lucide-react';
+import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Tag, Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabaseAdmin } from '../lib/supabase';
 import { useData } from '../context/DataContext';
@@ -43,11 +43,20 @@ interface Employee        { id: string; farm_id: string; nome: string; funcao?: 
 const RACAS = ['NELORE', 'CRUZAMENTO INDUSTRIAL', 'COMPOSTO'] as const;
 const QUALIDADES_FORRAGEM = ['REGULAR', 'BOA', 'ÓTIMA'] as const;
 
+const FORRAGENS = [
+  'Andropogon', 'Anoni', 'Australiano', 'Azeven',
+  'B Brizantha', 'B. Decumbens', 'B. Dictioneura', 'B. Humidicola (Quicuia)',
+  'B. MG-5', 'B. Paiaguas', 'B. Piatã', 'B. Ruzizienses',
+  'BRS Planaltina', 'BRS Sarabndi', 'Dunamis', 'Jaragua',
+  'Mavuno', 'Navalhão', 'P. Massai', 'P. Miyagi',
+  'P. Mombaça', 'P. Quenia', 'P. Tamani', 'P. Zuri',
+  'Tangola', 'Tifiton', 'Tiriricão',
+] as const;
+
 /* ── Tab definition ── */
 const TABS = [
   { key: 'pastos',       label: 'Pastos',       icon: Leaf    },
   { key: 'animais',      label: 'Animais',      icon: Beef    },
-  { key: 'forragens',    label: 'Forragens',    icon: Sprout  },
   { key: 'suplementos',  label: 'Suplementos',  icon: Package },
   { key: 'funcionarios', label: 'Funcionários', icon: Users   },
 ] as const;
@@ -95,15 +104,25 @@ function SaveCancelBtns({ onSave, onCancel }: { onSave: () => void; onCancel: ()
 interface SimpleItem { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface SimpleForm { nome: string; observacoes: string; }
 
-function SimpleEditRow({ item, onSave, onCancel }: {
+function SimpleEditRow({ item, onSave, onCancel, predefinedOptions }: {
   item: SimpleItem; onSave: (d: SimpleForm) => void; onCancel: () => void;
+  predefinedOptions?: readonly string[];
 }) {
   const { register, handleSubmit } = useForm<SimpleForm>({
     defaultValues: { nome: item.nome, observacoes: item.observacoes || '' },
   });
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        {predefinedOptions ? (
+          <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer`}>
+            <option value="">— Selecione —</option>
+            {predefinedOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        ) : (
+          <input {...upperReg(register('nome', { required: true }))} className={inputClass} />
+        )}
+      </td>
       <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
@@ -111,12 +130,13 @@ function SimpleEditRow({ item, onSave, onCancel }: {
 }
 
 function SimpleTab({
-  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems,
+  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems, predefinedOptions,
 }: {
   table: string; label: string; icon: React.ElementType;
   emptyText: string; newLabel: string;
   onDataChange?: (items: SimpleItem[]) => void;
   initialItems?: SimpleItem[];
+  predefinedOptions?: readonly string[];
 }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<SimpleItem[]>(initialItems ?? []);
@@ -186,8 +206,15 @@ function SimpleTab({
           <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Nome *</label>
-              <input placeholder={`Ex.: ${label}`} {...upperReg(register('nome', { required: true }))}
-                className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+              {predefinedOptions ? (
+                <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer ${errors.nome ? 'border-red-400' : ''}`}>
+                  <option value="">— Selecione —</option>
+                  {predefinedOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input placeholder={`Ex.: ${label}`} {...upperReg(register('nome', { required: true }))}
+                  className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+              )}
             </div>
             <div>
               <label className={labelClass}>Observações</label>
@@ -227,7 +254,8 @@ function SimpleTab({
                   {items.map(item =>
                     editingId === item.id ? (
                       <SimpleEditRow key={item.id} item={item}
-                        onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
+                        onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)}
+                        predefinedOptions={predefinedOptions} />
                     ) : (
                       <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                         className="hover:bg-gray-50 transition-colors">
@@ -256,10 +284,9 @@ function SimpleTab({
 ═══════════════════════════════════════════════════════════════ */
 interface PastureForm { nome: string; area: number; retiro_id: string; forragem: string; qualidade_forragem: string; observacoes: string; }
 
-function PastureEditRow({ pasture, retiros, forages, onSave, onCancel }: {
+function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
   pasture: { id: string; nome: string; area?: number; retiro_id?: string; forragem?: string; qualidade_forragem?: string; observacoes?: string };
   retiros: SimpleItem[];
-  forages: SimpleItem[];
   onSave: (data: PastureForm) => void; onCancel: () => void;
 }) {
   const { register, handleSubmit } = useForm<PastureForm>({
@@ -285,7 +312,7 @@ function PastureEditRow({ pasture, retiros, forages, onSave, onCancel }: {
       <td className="px-4 py-2">
         <select {...register('forragem')} className={inputClass}>
           <option value="">— Selecione —</option>
-          {forages.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+          {FORRAGENS.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
       </td>
       <td className="px-4 py-2">
@@ -303,7 +330,6 @@ function PastureEditRow({ pasture, retiros, forages, onSave, onCancel }: {
 function PastosTab() {
   const { pastures, addPasture, deletePasture, updatePasture, loading } = useData();
   const [retiros, setRetiros] = useState<SimpleItem[]>([]);
-  const [forages, setForages] = useState<SimpleItem[]>([]);
   const [showRetiros, setShowRetiros] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -316,13 +342,9 @@ function PastosTab() {
     if (!activeFarmId) return;
     let mounted = true;
     (async () => {
-      const [retRes, forRes] = await Promise.all([
-        supabaseAdmin.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome'),
-        supabaseAdmin.from('forage_types').select('*').eq('farm_id', activeFarmId).order('nome'),
-      ]);
+      const retRes = await supabaseAdmin.from('retiros').select('*').eq('farm_id', activeFarmId).order('nome');
       if (mounted) {
         setRetiros(retRes.data ?? []);
-        setForages(forRes.data ?? []);
       }
     })();
     return () => { mounted = false; };
@@ -359,9 +381,14 @@ function PastosTab() {
     });
     toast.success('Pasto atualizado!'); setEditingId(null);
   }
-  function onDelete(p: { id: string; nome: string }) {
+  async function onDelete(p: { id: string; nome: string }) {
     if (!window.confirm(`Remover o pasto "${p.nome}"?`)) return;
-    deletePasture(p.id); toast.success('Pasto removido.');
+    try {
+      await deletePasture(p.id);
+      toast.success('Pasto removido.');
+    } catch {
+      toast.error('Não foi possível excluir. Este pasto possui lançamentos ou animais vinculados.');
+    }
   }
 
   return (
@@ -450,7 +477,7 @@ function PastosTab() {
                 <label className={labelClass}>Forragem</label>
                 <select {...register('forragem')} className={`${inputClass} cursor-pointer`}>
                   <option value="">— Selecione —</option>
-                  {forages.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+                  {FORRAGENS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
               <div>
@@ -502,7 +529,7 @@ function PastosTab() {
                       </tr>
                     ) : filteredPastures.map(p =>
                       editingId === p.id ? (
-                        <PastureEditRow key={p.id} pasture={p} retiros={retiros} forages={forages}
+                        <PastureEditRow key={p.id} pasture={p} retiros={retiros}
                           onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
                       ) : (
                         <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
@@ -729,6 +756,7 @@ function AnimaisTab() {
               newLabel="Nova Categoria"
               initialItems={categories}
               onDataChange={(list) => { _acatCache = list as AnimalCategory[]; setCategories(_acatCache); }}
+              predefinedOptions={CATEGORIAS_ANIMAIS}
             />
           </div>
         )}
@@ -880,6 +908,49 @@ function AnimaisTab() {
 /* ═══════════════════════════════════════════════════════════════
    SuplementosTab
 ═══════════════════════════════════════════════════════════════ */
+const SUPLEMENTOS_NOMES = [
+  'Energetico 0,3%',
+  'Energetico 0,5%',
+  'Mineral Adensado Aguas',
+  'Mineral Adensado Seca',
+  'Mineral Adensado Transicao',
+  'Proteico 0,1% Aguas',
+  'Proteico 0,1% Seca',
+  'Proteico 0,1% Transicao',
+  'Proteico 0,2%',
+  'Racao Creep',
+  'Ração Engorda TIP',
+  'Sal Mineral Reprodução',
+  'Sal Mineral Águas',
+  'Sal Mineral Águas Aditivado',
+  'Sal Mineral com Ureia',
+] as const;
+
+const CATEGORIAS_ANIMAIS = [
+  'Bezerra Fêmea Desmama',
+  'Bezerras fêmea mamando',
+  'Bezerro Macho Desmama',
+  'Bezerros Aleitamento Creep Feeding',
+  'Bezerros macho mamando',
+  'Boi Gordo',
+  'Boi Magro',
+  'Femeas até 12 meses',
+  'Femeas até 13 a 24 meses (Fundo para Abate)',
+  'Garrotes',
+  'Macho > 24 meses (Abate final Fevereiro)',
+  'Macho > 24 meses (Abate final Maio)',
+  'Macho até 12 meses',
+  'Novilha Inseminada > 24 meses',
+  'Novilhas Precoce Chance',
+  'Novilhas Precoce Prenha',
+  'Primipara Parida',
+  'Touros',
+  'Vaca Descarte',
+  'Vacas Adultas e Primiparas',
+  'Vacas Prenhas Paridas',
+  'Vacas Prenhas Solteiras',
+] as const;
+
 const CONSUMO_OPTIONS = [
   '20 A 30 GRAMAS/100 KG PV',
   '35 A 45 GRAMAS/100 KG PV',
@@ -901,7 +972,12 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
   });
   return (
     <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <select {...register('nome', { required: true })} className={inputClass}>
+          <option value="">— Selecione —</option>
+          {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2">
         <select {...register('unidade')} className={inputClass}>
           <option value="kg">KG</option>
@@ -1016,7 +1092,10 @@ function SuplementosTab() {
           <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Nome *</label>
-              <input placeholder="Ex.: Mineral Adensado" {...upperReg(register('nome', { required: true }))} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+              <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer ${errors.nome ? 'border-red-400' : ''}`}>
+                <option value="">— Selecione —</option>
+                {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Unidade</label>
@@ -1305,8 +1384,7 @@ export function Cadastros() {
         {/* Tab content */}
         {activeTab === 'pastos'       && <PastosTab />}
         {activeTab === 'animais'      && <AnimaisTab />}
-        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" />}
-        {activeTab === 'suplementos'  && <SuplementosTab />}
+{activeTab === 'suplementos'  && <SuplementosTab />}
         {activeTab === 'funcionarios' && <FuncionariosTab />}
 
       </motion.div>
