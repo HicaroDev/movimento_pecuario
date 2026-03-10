@@ -1,59 +1,115 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import type { DataEntry } from '../lib/data';
 import { supplementOrder } from '../lib/data';
-import { fmt, fmtInt } from '../lib/utils';
+import { supabaseAdmin } from '../lib/supabase';
+import { manejoService, type Animal } from '../services/manejoService';
+import { fmtInt } from '../lib/utils';
 import { ImportExcelModal } from '../components/ImportExcelModal';
+
+interface SupplementType {
+  id: string;
+  nome: string;
+  unidade: string;
+  peso?: number;
+}
 
 interface FormFields {
   pasto: string;
-  quantidade: number;
+  data: string;
   tipo: string;
-  periodo: number;
+  quantidade: number;
   sacos: number;
 }
 
 const inputClass =
   'w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
+const today = new Date().toISOString().split('T')[0];
 
 export function Formulario() {
-  const { entries, addEntry, removeEntry, clearAll, loadSample, pastures, loading } = useData();
+  const { entries, addEntry, removeEntry, clearAll, loadSample, pastures, loading, activeFarmId } = useData();
+  const { user } = useAuth();
   const [showImport, setShowImport] = useState(false);
+  const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
+  const [animals, setAnimals] = useState<Animal[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormFields>({
-    defaultValues: { periodo: 30 },
+  const farmId = activeFarmId || user?.farmId || '';
+
+  /* Load supplement_types and animals when farmId changes */
+  useEffect(() => {
+    if (!farmId) return;
+    setLoadingData(true);
+    Promise.all([
+      supabaseAdmin.from('supplement_types').select('id, nome, unidade, peso').eq('farm_id', farmId),
+      manejoService.listarAnimais(farmId),
+    ]).then(([suppRes, animalsRes]) => {
+      if (suppRes.data) setSupplementTypes(suppRes.data as SupplementType[]);
+      setAnimals(animalsRes.filter(a => a.status === 'ativo' || !a.status));
+    }).catch(() => {}).finally(() => setLoadingData(false));
+  }, [farmId]);
+
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormFields>({
+    defaultValues: { data: today, quantidade: 0 },
   });
 
-  const quantidade = watch('quantidade');
-  const periodo    = watch('periodo');
-  const sacos      = watch('sacos');
+  const selectedPasto = watch('pasto');
+  const selectedTipo  = watch('tipo');
+  const sacos         = watch('sacos');
 
-  /* Auto-calc: kg = sacos × 25; consumo = kg / (qtd × periodo) */
-  const kgCalculado = Number(sacos) > 0 ? Number(sacos) * 25 : 0;
-  const consumoCalculado =
-    Number(quantidade) > 0 && Number(periodo) > 0 && kgCalculado > 0
-      ? kgCalculado / (Number(quantidade) * Number(periodo))
-      : 0;
+  /* Auto-fill: qtd gado + lotes no pasto */
+  const pastoInfo = useMemo(() => {
+    if (!selectedPasto) return null;
+    const pasture = pastures.find(p => p.nome === selectedPasto);
+    if (!pasture) return null;
+    const lotesNoPasto = animals.filter(a => a.pasto_id === pasture.id);
+    const totalCab = lotesNoPasto.reduce((s, a) => s + a.quantidade, 0);
+    return { totalCab, nLotes: lotesNoPasto.length };
+  }, [selectedPasto, pastures, animals]);
+
+  /* Auto-fill quantidade when pasto changes */
+  useEffect(() => {
+    if (pastoInfo != null) {
+      setValue('quantidade', pastoInfo.totalCab);
+    }
+  }, [pastoInfo, setValue]);
+
+  /* Auto-fill: peso da sacaria */
+  const suppInfo = useMemo(() => {
+    if (!selectedTipo) return null;
+    const st = supplementTypes.find(s => s.nome === selectedTipo);
+    return st ? { peso: st.peso ?? 25, unidade: st.unidade } : null;
+  }, [selectedTipo, supplementTypes]);
+
+  const pesoSaco      = suppInfo?.peso ?? 25;
+  const kgCalculado   = Number(sacos) > 0 ? Number(sacos) * pesoSaco : 0;
+
+  /* Supplement options: DB first, fallback to static */
+  const tipoOptions = supplementTypes.length > 0
+    ? supplementTypes.map(s => s.nome)
+    : supplementOrder;
 
   const onAddRow = (data: FormFields) => {
     const entry: DataEntry = {
-      pasto:     data.pasto,
+      pasto:      data.pasto,
       quantidade: Number(data.quantidade),
-      tipo:      data.tipo,
-      periodo:   Number(data.periodo),
-      sacos:     Number(data.sacos),
-      kg:        kgCalculado,
-      consumo:   consumoCalculado,
+      tipo:       data.tipo,
+      periodo:    30,
+      data:       data.data,
+      sacos:      Number(data.sacos),
+      kg:         kgCalculado,
+      consumo:    0,
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ periodo: 30 });
+    reset({ data: today, quantidade: 0 });
   };
 
   const handleClearAll = () => {
@@ -128,18 +184,18 @@ export function Formulario() {
           </div>
 
           {/* Form body */}
-          <form onSubmit={handleSubmit(onAddRow)} className="p-6">
-            {/* Row 1: Pasto (select) | Quantidade | Tipo de Suplemento */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+          <form onSubmit={handleSubmit(onAddRow)} className="p-6 space-y-4">
+            {/* Row 1: Pasto | Data */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Pasto</label>
                 <select
                   {...register('pasto', { required: true })}
-                  disabled={loading}
+                  disabled={loading || loadingData}
                   className={`${inputClass} cursor-pointer ${errors.pasto ? 'ring-2 ring-red-400' : ''}`}
                 >
-                  {loading ? (
-                    <option disabled value="">Carregando pastos...</option>
+                  {(loading || loadingData) ? (
+                    <option disabled value="">Carregando...</option>
                   ) : (
                     <>
                       <option value="">Selecione</option>
@@ -149,46 +205,73 @@ export function Formulario() {
                     </>
                   )}
                 </select>
+                {/* Info: qtd gado + lotes */}
+                {pastoInfo && (
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#1a6040' }}>
+                      <Info className="w-3 h-3" />
+                      {fmtInt(pastoInfo.totalCab)} cab.
+                    </span>
+                    {pastoInfo.nLotes > 0 && (
+                      <span className="text-xs text-gray-400">
+                        {pastoInfo.nLotes} lote{pastoInfo.nLotes !== 1 ? 's' : ''} no pasto
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
-                <label className={labelClass}>Quantidade</label>
+                <label className={labelClass}>Data do lançamento</label>
                 <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="30"
-                  {...register('quantidade', { required: true, valueAsNumber: true })}
-                  className={`${inputClass} ${errors.quantidade ? 'ring-2 ring-red-400' : ''}`}
+                  type="date"
+                  max={today}
+                  {...register('data', { required: true })}
+                  className={`${inputClass} ${errors.data ? 'ring-2 ring-red-400' : ''}`}
                 />
               </div>
+            </div>
+
+            {/* Row 2: Tipo Suplemento | Quantidade */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Tipo de Suplemento</label>
                 <select
                   {...register('tipo', { required: true })}
+                  disabled={loadingData}
                   className={`${inputClass} cursor-pointer ${errors.tipo ? 'ring-2 ring-red-400' : ''}`}
                 >
                   <option value="">Selecione</option>
-                  {supplementOrder.map(t => (
+                  {tipoOptions.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+                {/* Info: peso por saco */}
+                {suppInfo && (
+                  <p className="mt-1 text-xs text-gray-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Peso por {suppInfo.unidade.toLowerCase()}: <strong className="text-gray-600">{suppInfo.peso ?? 25} kg</strong>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className={labelClass}>Quantidade (cab.)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="Auto-preenchido pelo pasto"
+                  {...register('quantidade', { valueAsNumber: true })}
+                  className={inputClass}
+                />
               </div>
             </div>
 
-            {/* Row 2: Período | Sacos | Kg consumidos (auto-calc) */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            {/* Row 3: Sacos | KG (auto-calc) */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Período (dias)</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  {...register('periodo', { required: true, valueAsNumber: true })}
-                  className={`${inputClass} ${errors.periodo ? 'ring-2 ring-red-400' : ''}`}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Sacos (25 kg)</label>
+                <label className={labelClass}>
+                  Sacos{suppInfo ? ` (${suppInfo.peso ?? 25} kg cada)` : ' (25 kg)'}
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -203,20 +286,7 @@ export function Formulario() {
                 <input
                   type="text"
                   readOnly
-                  value={kgCalculado > 0 ? kgCalculado : '0'}
-                  className="w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-400 cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            {/* Row 3: Consumo (auto-calc) */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Consumo (kg/cab dia)</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={consumoCalculado > 0 ? fmt(consumoCalculado) : '0,000'}
+                  value={kgCalculado > 0 ? fmtInt(kgCalculado) : '0'}
                   className="w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-400 cursor-not-allowed"
                 />
               </div>
@@ -256,12 +326,11 @@ export function Formulario() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pasto</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Data</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantidade</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de Suplemento</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Período</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sacos</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">KG Consumidos</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Consumo</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
@@ -275,12 +344,13 @@ export function Formulario() {
                       className="hover:bg-gray-50"
                     >
                       <td className="px-6 py-3 text-gray-900 font-medium">{entry.pasto}</td>
-                      <td className="px-4 py-3 text-gray-700 tabular-nums">{fmtInt(entry.quantidade)}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {entry.data ? new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
                       <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
-                      <td className="px-4 py-3 text-gray-700 tabular-nums">{fmtInt(entry.periodo)}</td>
-                      <td className="px-4 py-3 text-gray-700 tabular-nums">{fmtInt(entry.sacos)}</td>
-                      <td className="px-4 py-3 text-gray-700 tabular-nums">{fmtInt(entry.kg)}</td>
-                      <td className="px-4 py-3 text-gray-900 font-bold tabular-nums">{fmt(entry.consumo)}</td>
+                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
+                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => removeEntry(index)}

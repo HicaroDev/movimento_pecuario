@@ -608,6 +608,57 @@ function TransferirTab({
 type SubOp = 'categoria' | 'paricao' | 'bezerros';
 type DestinoTipo = 'existente' | 'novo';
 
+function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId, animals, catMap, categories }: {
+  destino: DestinoTipo; setDestino: (v: DestinoTipo) => void;
+  loteDestId: string; setLoteDestId: (v: string) => void;
+  novoNome: string; setNovoNome: (v: string) => void;
+  novoCatId: string; setNovoCatId: (v: string) => void;
+  excludeId?: string;
+  animals: Animal[];
+  catMap: Record<string, string>;
+  categories: AnimalCategory[];
+}) {
+  return (
+    <div className="space-y-3">
+      <label className={labelClass}>Destino dos bezerros</label>
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+        <button type="button" onClick={() => setDestino('novo')}
+          className={`flex-1 px-3 py-2 transition-colors ${destino === 'novo' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+          Criar novo lote
+        </button>
+        <button type="button" onClick={() => setDestino('existente')}
+          className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${destino === 'existente' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+          Agregar em lote existente
+        </button>
+      </div>
+      {destino === 'existente' ? (
+        <div className="relative">
+          <select value={loteDestId} onChange={e => setLoteDestId(e.target.value)} className={selectClass}>
+            <option value="">Selecione o lote…</option>
+            {animals.filter(a => a.id !== excludeId).map(a => (
+              <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)}
+            placeholder="Nome do novo lote (ex: Bezerros Jan/26)"
+            className={inputClass} />
+          <div className="relative">
+            <select value={novoCatId} onChange={e => setNovoCatId(e.target.value)} className={selectClass}>
+              <option value="">Categoria (opcional)…</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EvolucaoTab({
   animals, categories, farmId, onReload,
 }: {
@@ -739,55 +790,6 @@ function EvolucaoTab({
       onReload(); await reloadHistorico();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setSaving(false); }
-  }
-
-  /* ── helper: seletor de destino (reutilizado em Parição e Bezerros) ── */
-  function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId }: {
-    destino: DestinoTipo; setDestino: (v: DestinoTipo) => void;
-    loteDestId: string; setLoteDestId: (v: string) => void;
-    novoNome: string; setNovoNome: (v: string) => void;
-    novoCatId: string; setNovoCatId: (v: string) => void;
-    excludeId?: string;
-  }) {
-    return (
-      <div className="space-y-3">
-        <label className={labelClass}>Destino dos bezerros</label>
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-          <button type="button" onClick={() => setDestino('novo')}
-            className={`flex-1 px-3 py-2 transition-colors ${destino === 'novo' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-            Criar novo lote
-          </button>
-          <button type="button" onClick={() => setDestino('existente')}
-            className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${destino === 'existente' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-            Agregar em lote existente
-          </button>
-        </div>
-        {destino === 'existente' ? (
-          <div className="relative">
-            <select value={loteDestId} onChange={e => setLoteDestId(e.target.value)} className={selectClass}>
-              <option value="">Selecione o lote…</option>
-              {ativos.filter(a => a.id !== excludeId).map(a => (
-                <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)}
-              placeholder="Nome do novo lote (ex: Bezerros Jan/26)"
-              className={inputClass} />
-            <div className="relative">
-              <select value={novoCatId} onChange={e => setNovoCatId(e.target.value)} className={selectClass}>
-                <option value="">Categoria (opcional)…</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
-        )}
-      </div>
-    );
   }
 
   const SUB_OPS = [
@@ -939,6 +941,7 @@ function EvolucaoTab({
               novoNome={parNovoNome} setNovoNome={setParNovoNome}
               novoCatId={parNovoCatId} setNovoCatId={setParNovoCatId}
               excludeId={parLoteMaeId}
+              animals={ativos} catMap={catMap} categories={categories}
             />
             <button onClick={confirmarParicao} disabled={saving || !parLoteMaeId || !parQtd}
               className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -993,6 +996,7 @@ function EvolucaoTab({
               novoNome={bezNovoNome} setNovoNome={setBezNovoNome}
               novoCatId={bezNovoCatId} setNovoCatId={setBezNovoCatId}
               excludeId={bezLoteId}
+              animals={ativos} catMap={catMap} categories={categories}
             />
             <button onClick={confirmarBezerros} disabled={saving || !bezLoteId || !bezQtd}
               className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
