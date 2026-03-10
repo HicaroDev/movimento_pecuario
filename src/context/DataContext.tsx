@@ -298,8 +298,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   function clearAll() {
+    // Marca todos os IDs no pendingDeletesRef para que um refresh simultâneo não restaure os dados
+    const ids = entries.filter(e => e.id && !e.id.startsWith('temp-')).map(e => e.id!);
+    ids.forEach(id => pendingDeletesRef.current.add(id));
     setEntries([]);
-    if (activeFarmId) supabaseAdmin.from('data_entries').delete().eq('farm_id', activeFarmId);
+    if (activeFarmId) {
+      supabaseAdmin.from('data_entries').delete().eq('farm_id', activeFarmId).then(() => {
+        ids.forEach(id => pendingDeletesRef.current.delete(id));
+      });
+    }
   }
 
   function loadSample() {
