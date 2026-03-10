@@ -1055,7 +1055,7 @@ function SuplementosTab() {
       observacoes: data.observacoes || null,
       ...(data.peso     > 0 && { peso:     data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
-      consumo: data.consumo || null,
+      ...(data.consumo ? { consumo: data.consumo } : { consumo: null }),
     };
     const { error } = await supabaseAdmin.from('supplement_types').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
