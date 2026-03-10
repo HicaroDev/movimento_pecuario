@@ -219,7 +219,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
       if (cancelled) return;
-      if (!entriesRes.error) setEntries((entriesRes.data ?? []).map(toDataEntry));
+      if (!entriesRes.error) setEntries(
+        (entriesRes.data ?? []).map(toDataEntry).filter(e => !pendingDeletesRef.current.has(e.id))
+      );
       if (!pasturesRes.error) setPastures(
         (pasturesRes.data ?? []).map(toPasture).filter(p => !pendingDeletesRef.current.has(p.id))
       );
@@ -271,10 +273,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   function removeEntry(index: number) {
     const entry = entries[index];
-    setEntries(prev => prev.filter((_, i) => i !== index));
-    if (entry?.id && !entry.id.startsWith('temp-')) {
-      supabaseAdmin.from('data_entries').delete().eq('id', entry.id);
+    if (!entry) return;
+    if (entry.id && !entry.id.startsWith('temp-')) {
+      pendingDeletesRef.current.add(entry.id);
+      supabaseAdmin.from('data_entries').delete().eq('id', entry.id).then(() => {
+        pendingDeletesRef.current.delete(entry.id);
+      });
     }
+    setEntries(prev => prev.filter((_, i) => i !== index));
   }
 
   function clearAll() {
