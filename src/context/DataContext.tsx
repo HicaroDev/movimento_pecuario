@@ -57,6 +57,7 @@ interface DataContextType {
   loading: boolean;
   entries: DataEntry[];
   addEntry: (entry: DataEntry) => void;
+  updateEntry: (id: string, patch: Partial<DataEntry>) => void;
   removeEntry: (index: number) => void;
   clearAll: () => void;
   loadSample: () => void;
@@ -76,6 +77,7 @@ const fallbackContext: DataContextType = {
   loading: true,
   entries: [],
   addEntry: () => {},
+  updateEntry: () => {},
   removeEntry: () => {},
   clearAll: () => {},
   loadSample: () => {},
@@ -271,6 +273,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  function updateEntry(id: string, patch: Partial<DataEntry>) {
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
+    supabaseAdmin.from('data_entries').update({
+      ...(patch.pasto      !== undefined && { pasto_nome: patch.pasto }),
+      ...(patch.data       !== undefined && { data:       patch.data }),
+      ...(patch.tipo       !== undefined && { suplemento: patch.tipo }),
+      ...(patch.quantidade !== undefined && { quantidade: patch.quantidade }),
+      ...(patch.sacos      !== undefined && { sacos:      patch.sacos }),
+      ...(patch.kg         !== undefined && { kg:         patch.kg }),
+    }).eq('id', id);
+  }
+
   function removeEntry(index: number) {
     const entry = entries[index];
     if (!entry) return;
@@ -350,7 +364,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider value={{
       activeFarmId, selectFarm,
       loading,
-      entries, addEntry, removeEntry, clearAll, loadSample,
+      entries, addEntry, updateEntry, removeEntry, clearAll, loadSample,
       clientInfo, updateClientInfo,
       pastures, addPasture, deletePasture, updatePasture,
     }}>

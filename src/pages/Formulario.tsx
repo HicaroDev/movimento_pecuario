@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
@@ -28,15 +28,82 @@ interface FormFields {
   sacos: number;
 }
 
+interface EditFields { pasto: string; data: string; tipo: string; quantidade: number; sacos: number; }
+
+function EntryEditRow({ entry, pastures, tipoOptions, supplementTypes, onSave, onCancel }: {
+  entry: DataEntry;
+  pastures: { id: string; nome: string }[];
+  tipoOptions: string[];
+  supplementTypes: SupplementType[];
+  onSave: (patch: Partial<DataEntry>) => void;
+  onCancel: () => void;
+}) {
+  const { register, handleSubmit, watch } = useForm<EditFields>({
+    defaultValues: {
+      pasto: entry.pasto, data: entry.data ?? '',
+      tipo: entry.tipo, quantidade: entry.quantidade, sacos: entry.sacos,
+    },
+  });
+  const sacos = watch('sacos');
+  const tipo  = watch('tipo');
+  const suppInfo = supplementTypes.find(s => s.nome === tipo);
+  const pesoSaco = suppInfo?.peso ?? 25;
+  const kgCalc   = Number(sacos) > 0 ? Number(sacos) * pesoSaco : 0;
+  const cellClass = 'px-2 py-1.5';
+  const inp = 'w-full h-8 px-2 rounded border border-gray-300 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500';
+
+  function onSubmit(data: EditFields) {
+    onSave({ pasto: data.pasto, data: data.data, tipo: data.tipo, quantidade: Number(data.quantidade), sacos: Number(data.sacos), kg: kgCalc });
+  }
+
+  return (
+    <tr className="bg-teal-50">
+      <td className={cellClass}>
+        <select {...register('pasto')} className={`${inp} cursor-pointer`}>
+          {pastures.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+        </select>
+      </td>
+      <td className={cellClass}>
+        <input type="date" max={new Date().toISOString().split('T')[0]} {...register('data')} className={inp} />
+      </td>
+      <td className={cellClass}>
+        <input type="number" min="0" step="1" {...register('quantidade', { valueAsNumber: true })} className={inp} />
+      </td>
+      <td className={cellClass}>
+        <select {...register('tipo')} className={`${inp} cursor-pointer`}>
+          {tipoOptions.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </td>
+      <td className={cellClass}>
+        <input type="number" min="0" step="1" {...register('sacos', { valueAsNumber: true })} className={inp} />
+      </td>
+      <td className={`${cellClass} text-xs font-semibold tabular-nums`} style={{ color: '#1a6040' }}>
+        {kgCalc > 0 ? fmtInt(kgCalc) : '0'}
+      </td>
+      <td className={cellClass}>
+        <div className="flex items-center gap-1">
+          <button onClick={handleSubmit(onSubmit)} className="p-1.5 rounded bg-teal-600 hover:bg-teal-700 text-white transition-colors">
+            <Save className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onCancel} className="p-1.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 const inputClass =
   'w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 const today = new Date().toISOString().split('T')[0];
 
 export function Formulario() {
-  const { entries, addEntry, removeEntry, clearAll, loadSample, pastures, loading, activeFarmId } = useData();
+  const { entries, addEntry, updateEntry, removeEntry, clearAll, loadSample, pastures, loading, activeFarmId } = useData();
   const { user } = useAuth();
   const [showImport, setShowImport] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -335,32 +402,59 @@ export function Formulario() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {entries.map((entry, index) => (
-                    <motion.tr
-                      key={index}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: Math.min(index * 0.02, 0.3) }}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-3 text-gray-900 font-medium">{entry.pasto}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">
-                        {entry.data ? new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
-                      <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
-                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
-                      <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => removeEntry(index)}
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </motion.tr>
-                  ))}
+                  {entries.map((entry, index) => {
+                    if (editingId === entry.id) {
+                      return (
+                        <EntryEditRow
+                          key={entry.id}
+                          entry={entry}
+                          pastures={pastures}
+                          tipoOptions={tipoOptions}
+                          supplementTypes={supplementTypes}
+                          onSave={(patch) => {
+                            updateEntry(entry.id!, patch);
+                            setEditingId(null);
+                            toast.success('Registro atualizado!');
+                          }}
+                          onCancel={() => setEditingId(null)}
+                        />
+                      );
+                    }
+                    return (
+                      <motion.tr
+                        key={entry.id ?? index}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: Math.min(index * 0.02, 0.3) }}
+                        className="hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-3 text-gray-900 font-medium">{entry.pasto}</td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">
+                          {entry.data ? new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
+                        <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setEditingId(entry.id ?? null)}
+                              className="text-gray-400 hover:text-teal-600 hover:bg-teal-50 p-1.5 rounded transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => removeEntry(index)}
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
