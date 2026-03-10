@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
-import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Tag, Search, ChevronDown } from 'lucide-react';
+import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag, Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabaseAdmin } from '../lib/supabase';
 import { useData } from '../context/DataContext';
@@ -57,6 +57,7 @@ const FORRAGENS = [
 const TABS = [
   { key: 'pastos',       label: 'Pastos',       icon: Leaf    },
   { key: 'animais',      label: 'Animais',      icon: Beef    },
+  { key: 'forragens',    label: 'Forragens',    icon: Sprout  },
   { key: 'suplementos',  label: 'Suplementos',  icon: Package },
   { key: 'funcionarios', label: 'Funcionários', icon: Users   },
 ] as const;
@@ -1384,7 +1385,8 @@ export function Cadastros() {
         {/* Tab content */}
         {activeTab === 'pastos'       && <PastosTab />}
         {activeTab === 'animais'      && <AnimaisTab />}
-{activeTab === 'suplementos'  && <SuplementosTab />}
+        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} />}
+        {activeTab === 'suplementos'  && <SuplementosTab />}
         {activeTab === 'funcionarios' && <FuncionariosTab />}
 
       </motion.div>
