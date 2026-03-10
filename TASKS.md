@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-03-04
+> Última atualização: 2026-03-10
 
 ## Legenda
 - [ ] Pendente
@@ -139,9 +139,17 @@
 - [x] **T-277** PDF Pastos: botão PDF no header, layout portrait, brand bar, sumário de área total, tabela numerada
 - [x] **T-278** index.css: `print-color-adjust`, classes `.pdf-brand-bar`, `.pdf-table`, `.pdf-badge-*`
 
-### 2H — Entregas Finais (PENDENTE)
-- [ ] **T-280** Lançamento (Formulário): melhorias visuais + UX para entrega final
+### 2H — Ajustes MP_05 MAR (CONCLUÍDO ✅)
+- [x] **T-280** Formulário: date picker (sem datas futuras) + auto-fill pasto/suplemento + remover Consumo
+- [x] **T-282** fix: bug cursor desaparece no campo "Nome do novo lote" — Desmama (DestinoSelector remontava)
+- [x] **T-283** Formulário: suplementos carregados do banco (supplement_types) ao invés de lista estática
+- [x] **T-284** Formulário: ao selecionar pasto → auto-fill quantidade + badge N° lotes
+
+### 2I — Entregas Finais (PENDENTE)
 - [ ] **T-281** Relatório / Dashboard corporativo: redesign visual completo
+- [ ] **T-285** Formulário: validar/documentar formato Excel para importação
+- [ ] **T-230** Filtro de data com range (início/fim) no Relatório
+- [ ] **T-231** Responsividade tablet/mobile
 
 ---
 
@@ -166,9 +174,10 @@
 | 2A–E — Melhorias Avançadas | 19 | 17 | 🔄 89% |
 | 2F — Módulo Manejos | 10 | 10 | ✅ Concluída |
 | 2G — Ajustes MP_04 MAR + PDF | 19 | 19 | ✅ Concluída |
-| 2H — Entregas Finais | 2 | 0 | 🔄 Pendente |
+| 2H — Ajustes MP_05 MAR | 4 | 4 | ✅ Concluída |
+| 2I — Entregas Finais | 4 | 0 | 🔄 Pendente |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **118** | **109** | **92%** |
+| **TOTAL** | **126** | **117** | **93%** |
 
 ---
 
@@ -191,11 +200,9 @@ Inclui: tabelas `animals`, `supplement_types` (+ coluna `consumo`), `employees`,
 
 | Hash | Descrição |
 |------|-----------|
+| `bf34c92` | chore: bump versão sidebar para v1.17 |
+| `82aa287` | feat: v1.17 — Formulário redesign + fix cursor Desmama |
+| `214f85b` | feat: header global e por pasto com peso médio bezerros + total geral |
+| `65d1b71` | feat: Exportar PDF na aba Lotes por Pasto |
+| `7024af2` | fix: PDF limpo + farm name no Histórico + PDF button no Pastos |
 | `b0b5920` | feat: PDF profissional Histórico de Manejos e Pastos |
-| `8f3a842` | feat: Formulário Pasto no sidebar como módulo em breve |
-| `091c910` | feat: Livro Caixa no sidebar como módulo em breve |
-| `efcc5c8` | feat: evoluir peso dos bezerros junto com categoria do lote |
-| `4adb684` | feat: remover opção Desagrupar bezerros de Saída |
-| `7070d05` | feat: mostrar bezerros na lista de seleção de lotes |
-| `a06b8ec` | feat: bezerros visíveis em Lotes por Pasto e header global |
-| `41227d2` | feat: ajustes AJUSTES MP_04 MAR — UX e cadastros |
