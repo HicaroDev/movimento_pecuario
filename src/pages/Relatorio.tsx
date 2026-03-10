@@ -10,8 +10,8 @@ import { MetricCard } from '../components/MetricCard';
 import { SummaryChart } from '../components/SummaryChart';
 import { SupplementSection } from '../components/SupplementSection';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
-import { groupByType, averageConsumo, sumQuantidade, fmt } from '../lib/utils';
-import { supplementOrder, supplementColors } from '../lib/data';
+import { groupByType, averageConsumo, sumQuantidade, sortedTypes, fmt } from '../lib/utils';
+import { getSupplementColor } from '../lib/data';
 
 const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const MONTH_FULL  = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
@@ -53,6 +53,10 @@ export function Relatorio() {
   }, [entries]);
 
   /* ── Unique filter options ── */
+  const supplementOptions = useMemo(
+    () => sortedTypes(groupByType(entries)),
+    [entries]
+  );
   const pastoOptions = useMemo(
     () => Array.from(new Set(entries.map((e) => e.pasto))).sort(),
     [entries]
@@ -83,17 +87,18 @@ export function Relatorio() {
   const totalPastos    = new Set(filtered.map((e) => e.pasto)).size;
   const avgConsumption = averageConsumo(filtered);
 
-  /* ── Per-supplement averages for MetricCards ── */
-  const energeticoAvg = averageConsumo(groups['Energético 0,3%'] ?? []);
-  const mineralAvg    = averageConsumo(groups['Mineral Adensado Águas'] ?? []);
-  const creepAvg      = averageConsumo(groups['Ração Creep'] ?? []);
+  /* ── Ordered supplement types (only those with data) ── */
+  const activeTypes = useMemo(() => sortedTypes(groups), [groups]);
 
-  /* ── Summary chart data ── */
-  const summaryData = supplementOrder.map((name) => ({
+  /* ── Top-3 MetricCards (first 3 supplements with data) ── */
+  const metricTypes = activeTypes.slice(0, 3);
+
+  /* ── Summary chart data (only supplements with data) ── */
+  const summaryData = useMemo(() => activeTypes.map((name, i) => ({
     name,
     value: averageConsumo(groups[name] ?? []),
-    color: supplementColors[name] ?? '#0b6b45',
-  }));
+    color: getSupplementColor(name, i),
+  })), [activeTypes, groups]);
 
   /* ── Dynamic subtitle (farm + month) ── */
   const farmName   = clientInfo?.nomeFazenda ?? '';
@@ -203,7 +208,7 @@ export function Relatorio() {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl appearance-none bg-white text-sm pr-10 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               >
                 <option value="">Todos</option>
-                {supplementOrder.map((s) => (
+                {supplementOptions.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -283,37 +288,30 @@ export function Relatorio() {
           />
         )}
 
-        {/* ── 3 metric cards ── */}
+        {/* ── 3 metric cards (top 3 supplements with data) ── */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : (
+        ) : metricTypes.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <MetricCard
-              icon="energy"
-              title="Energético 0,3%"
-              value={fmt(energeticoAvg)}
-              subtitle={`${groups['Energético 0,3%']?.length ?? 0} pastos`}
-              color={supplementColors['Energético 0,3%']}
-              trend={5.2}
-            />
-            <MetricCard
-              icon="mineral"
-              title="Mineral Adensado Águas"
-              value={fmt(mineralAvg)}
-              subtitle={`${groups['Mineral Adensado Águas']?.length ?? 0} pastos`}
-              color={supplementColors['Mineral Adensado Águas']}
-              trend={-2.1}
-            />
-            <MetricCard
-              icon="feed"
-              title="Ração Creep"
-              value={fmt(creepAvg)}
-              subtitle={`${groups['Ração Creep']?.length ?? 0} pastos`}
-              color={supplementColors['Ração Creep']}
-              trend={8.7}
-            />
+            {metricTypes.map((tipo, i) => {
+              const typeEntries = groups[tipo] ?? [];
+              const avg = averageConsumo(typeEntries);
+              const color = getSupplementColor(tipo, i);
+              const icons = ['energy', 'mineral', 'feed'] as const;
+              return (
+                <MetricCard
+                  key={tipo}
+                  icon={icons[i % icons.length]}
+                  title={tipo}
+                  value={fmt(avg)}
+                  subtitle={`${typeEntries.length} pasto${typeEntries.length !== 1 ? 's' : ''}`}
+                  color={color}
+                  trend={undefined}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -336,10 +334,9 @@ export function Relatorio() {
         ) : (
           <>
             <div className="space-y-8">
-              {supplementOrder.map((tipo) => {
+              {activeTypes.map((tipo, i) => {
                 const sectionEntries = groups[tipo] ?? [];
-                if (sectionEntries.length === 0) return null;
-                const color = supplementColors[tipo] ?? '#0b6b45';
+                const color = getSupplementColor(tipo, i);
                 return (
                   <SupplementSection
                     key={tipo}

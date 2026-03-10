@@ -20,19 +20,20 @@ interface SupplementSectionProps {
   farmName?: string;
 }
 
-const CHART_SCALES: Record<string, { max: number; step: number }> = {
-  'Energético 0,3%':       { max: 1.5,  step: 0.25 },
-  'Mineral Adensado Águas': { max: 0.2,  step: 0.05 },
-  'Ração Creep':            { max: 1.0,  step: 0.25 },
-};
+function calcScale(dataMax: number): { max: number; step: number } {
+  if (dataMax <= 0) return { max: 1.0, step: 0.25 };
+  const step = dataMax <= 0.3 ? 0.05 : dataMax <= 1.0 ? 0.25 : dataMax <= 3.0 ? 0.5 : 1.0;
+  const max  = Math.ceil((dataMax * 1.2) / step) * step;
+  return { max, step };
+}
 
 export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025', farmName = 'FAZENDA MALHADA GRANDE' }: SupplementSectionProps) {
   const avg      = averageConsumo(entries);
   const totalQtd = sumQuantidade(entries);
 
-  const scale   = CHART_SCALES[tipo] ?? { max: 1.5, step: 0.25 };
-  const dataMax = entries.reduce((m, e) => Math.max(m, e.consumo), 0);
-  const chartMax = dataMax > scale.max ? Math.ceil(dataMax / scale.step + 1) * scale.step : scale.max;
+  const dataMax  = entries.reduce((m, e) => Math.max(m, e.consumo), 0);
+  const scale    = calcScale(dataMax);
+  const chartMax = scale.max;
 
   const chartData = entries.map((e) => ({ name: e.pasto, value: e.consumo }));
 

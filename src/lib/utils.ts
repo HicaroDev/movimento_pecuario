@@ -1,6 +1,8 @@
 import type { DataEntry } from './data';
 import { supplementOrder } from './data';
 
+export { supplementOrder };
+
 export function fmt(value: number, decimals = 3): string {
   return value.toFixed(decimals).replace('.', ',');
 }
@@ -11,14 +13,18 @@ export function fmtInt(value: number): string {
 
 export function groupByType(entries: DataEntry[]): Record<string, DataEntry[]> {
   const groups: Record<string, DataEntry[]> = {};
-  supplementOrder.forEach((t) => {
-    groups[t] = [];
-  });
   entries.forEach((entry) => {
     if (!groups[entry.tipo]) groups[entry.tipo] = [];
     groups[entry.tipo].push(entry);
   });
   return groups;
+}
+
+/* Retorna tipos únicos na ordem de supplementOrder, seguido de qualquer outro */
+export function sortedTypes(groups: Record<string, DataEntry[]>): string[] {
+  const inOrder = supplementOrder.filter(t => groups[t]?.length);
+  const others  = Object.keys(groups).filter(t => !supplementOrder.includes(t) && groups[t].length);
+  return [...inOrder, ...others];
 }
 
 export function averageConsumo(entries: DataEntry[]): number {

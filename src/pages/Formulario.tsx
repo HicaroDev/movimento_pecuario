@@ -26,9 +26,10 @@ interface FormFields {
   tipo: string;
   quantidade: number;
   sacos: number;
+  periodo: number;
 }
 
-interface EditFields { pasto: string; data: string; tipo: string; quantidade: number; sacos: number; }
+interface EditFields { pasto: string; data: string; tipo: string; quantidade: number; sacos: number; periodo: number; }
 
 function EntryEditRow({ entry, pastures, tipoOptions, supplementTypes, onSave, onCancel }: {
   entry: DataEntry;
@@ -42,18 +43,29 @@ function EntryEditRow({ entry, pastures, tipoOptions, supplementTypes, onSave, o
     defaultValues: {
       pasto: entry.pasto, data: entry.data ?? '',
       tipo: entry.tipo, quantidade: entry.quantidade, sacos: entry.sacos,
+      periodo: entry.periodo || 30,
     },
   });
-  const sacos = watch('sacos');
-  const tipo  = watch('tipo');
+  const sacos    = watch('sacos');
+  const tipo     = watch('tipo');
+  const periodo  = watch('periodo');
+  const qtd      = watch('quantidade');
   const suppInfo = supplementTypes.find(s => s.nome === tipo);
   const pesoSaco = suppInfo?.peso ?? 25;
   const kgCalc   = Number(sacos) > 0 ? Number(sacos) * pesoSaco : 0;
+  const consumoCalc = kgCalc > 0 && Number(qtd) > 0 && Number(periodo) > 0
+    ? kgCalc / (Number(qtd) * Number(periodo))
+    : 0;
   const cellClass = 'px-2 py-1.5';
   const inp = 'w-full h-8 px-2 rounded border border-gray-300 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500';
 
   function onSubmit(data: EditFields) {
-    onSave({ pasto: data.pasto, data: data.data, tipo: data.tipo, quantidade: Number(data.quantidade), sacos: Number(data.sacos), kg: kgCalc });
+    const p = Number(data.periodo) > 0 ? Number(data.periodo) : 30;
+    const kg = kgCalc;
+    const consumo = kg > 0 && Number(data.quantidade) > 0 && p > 0
+      ? kg / (Number(data.quantidade) * p)
+      : 0;
+    onSave({ pasto: data.pasto, data: data.data, tipo: data.tipo, quantidade: Number(data.quantidade), sacos: Number(data.sacos), periodo: p, kg, consumo });
   }
 
   return (
@@ -77,8 +89,14 @@ function EntryEditRow({ entry, pastures, tipoOptions, supplementTypes, onSave, o
       <td className={cellClass}>
         <input type="number" min="0" step="1" {...register('sacos', { valueAsNumber: true })} className={inp} />
       </td>
+      <td className={cellClass}>
+        <input type="number" min="1" step="1" {...register('periodo', { valueAsNumber: true })} className={inp} />
+      </td>
       <td className={`${cellClass} text-xs font-semibold tabular-nums`} style={{ color: '#1a6040' }}>
         {kgCalc > 0 ? fmtInt(kgCalc) : '0'}
+      </td>
+      <td className={`${cellClass} text-xs font-semibold tabular-nums text-gray-700`}>
+        {consumoCalc > 0 ? consumoCalc.toFixed(3).replace('.', ',') : '—'}
       </td>
       <td className={cellClass}>
         <div className="flex items-center gap-1">
@@ -124,7 +142,7 @@ export function Formulario() {
   }, [farmId]);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormFields>({
-    defaultValues: { data: today, quantidade: 0 },
+    defaultValues: { data: today, quantidade: 0, periodo: 30 },
   });
 
   const selectedPasto = watch('pasto');
@@ -164,19 +182,23 @@ export function Formulario() {
     : supplementOrder;
 
   const onAddRow = (data: FormFields) => {
+    const periodo  = Number(data.periodo) > 0 ? Number(data.periodo) : 30;
+    const consumo  = kgCalculado > 0 && Number(data.quantidade) > 0 && periodo > 0
+      ? kgCalculado / (Number(data.quantidade) * periodo)
+      : 0;
     const entry: DataEntry = {
       pasto:      data.pasto,
       quantidade: Number(data.quantidade),
       tipo:       data.tipo,
-      periodo:    30,
+      periodo,
       data:       data.data,
       sacos:      Number(data.sacos),
       kg:         kgCalculado,
-      consumo:    0,
+      consumo,
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ data: today, quantidade: 0 });
+    reset({ data: today, quantidade: 0, periodo: 30 });
   };
 
   const handleClearAll = () => {
@@ -333,8 +355,8 @@ export function Formulario() {
               </div>
             </div>
 
-            {/* Row 3: Sacos | KG (auto-calc) */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 3: Sacos | Período | KG (auto-calc) */}
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>
                   Sacos{suppInfo ? ` (${suppInfo.peso ?? 25} kg cada)` : ' (25 kg)'}
@@ -346,6 +368,17 @@ export function Formulario() {
                   placeholder="56"
                   {...register('sacos', { required: true, valueAsNumber: true })}
                   className={`${inputClass} ${errors.sacos ? 'ring-2 ring-red-400' : ''}`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Período (dias)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="30"
+                  {...register('periodo', { required: true, valueAsNumber: true })}
+                  className={`${inputClass} ${errors.periodo ? 'ring-2 ring-red-400' : ''}`}
                 />
               </div>
               <div>
@@ -397,7 +430,9 @@ export function Formulario() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantidade</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de Suplemento</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sacos</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Período</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">KG Consumidos</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Consumo</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
@@ -435,7 +470,9 @@ export function Formulario() {
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
                         <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.periodo)}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
+                        <td className="px-4 py-3 font-semibold tabular-nums text-gray-700">{entry.consumo > 0 ? entry.consumo.toFixed(3).replace('.', ',') : '—'}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <button
