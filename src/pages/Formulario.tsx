@@ -388,12 +388,12 @@ export function Formulario() {
                     style={{ background: 'rgba(26,96,64,0.05)', border: '1px solid rgba(26,96,64,0.18)' }}
                   >
                     {/* Resumo: total cab + total bez */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-bold text-base" style={{ color: '#1a6040' }}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold" style={{ color: '#1a6040' }}>
                         {fmtInt(pastoInfo.totalCab)} cab.
                       </span>
                       {pastoInfo.totalBez > 0 && (
-                        <span className="font-semibold text-sm text-orange-500">
+                        <span className="text-xs font-semibold text-orange-500">
                           + {fmtInt(pastoInfo.totalBez)} bez.
                         </span>
                       )}

@@ -406,6 +406,71 @@ export const manejoService = {
     });
   },
 
+  /** Funde 2+ lotes em um só. O primeiro lote recebe o novo nome e a quantidade total.
+   *  Os demais lotes são marcados como inativo. */
+  async fundirLotes(
+    lots: Animal[],
+    novoNome: string,
+    farmId: string,
+    data?: string,
+  ): Promise<void> {
+    if (lots.length < 2) throw new Error('Selecione pelo menos 2 lotes para fundir.');
+    const [primary, ...others] = lots;
+    const totalQtd = lots.reduce((s, a) => s + a.quantidade, 0);
+    const totalBez = lots.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+
+    const { error: errPrimary } = await supabaseAdmin.from('animals').update({
+      nome:               novoNome,
+      quantidade:         totalQtd,
+      bezerros_quantidade: totalBez > 0 ? totalBez : null,
+    }).eq('id', primary.id);
+    if (errPrimary) throw new Error(errPrimary.message);
+
+    const otherIds = others.map(a => a.id);
+    const { error: errOthers } = await supabaseAdmin.from('animals')
+      .update({ status: 'inativo' }).in('id', otherIds);
+    if (errOthers) throw new Error(errOthers.message);
+
+    const dataStr    = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    const nomesOrig  = lots.map(a => `"${a.nome}"`).join(' + ');
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  primary.id,
+      tipo:       'fusao',
+      descricao:  `Fusão: ${nomesOrig} → "${novoNome}" (${totalQtd} cab.)${dataStr}`,
+      quantidade: totalQtd,
+    });
+  },
+
+  /** Transfere parte da quantidade de um lote para outro (sem mudar pasto). */
+  async transferirParcial(
+    origem: Animal,
+    destino: Animal,
+    qtd: number,
+    farmId: string,
+    data?: string,
+  ): Promise<void> {
+    if (qtd <= 0) throw new Error('Quantidade inválida.');
+    if (qtd > origem.quantidade) throw new Error(`Quantidade maior que o disponível no lote (${origem.quantidade} cab.).`);
+
+    const { error: e1 } = await supabaseAdmin.from('animals')
+      .update({ quantidade: origem.quantidade - qtd }).eq('id', origem.id);
+    if (e1) throw new Error(e1.message);
+
+    const { error: e2 } = await supabaseAdmin.from('animals')
+      .update({ quantidade: destino.quantidade + qtd }).eq('id', destino.id);
+    if (e2) throw new Error(e2.message);
+
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  origem.id,
+      tipo:       'transf_parcial',
+      descricao:  `${qtd} cab. transferidas de "${origem.nome}" → "${destino.nome}"${dataStr}`,
+      quantidade: qtd,
+    });
+  },
+
   async listarHistorico(farmId: string, tipo?: string | string[], limit = 30): Promise<ManejoEvent[]> {
     let q = supabaseAdmin
       .from('manejo_historico')

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
-  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, Filter,
+  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, Filter, GitMerge, SplitSquareVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -33,6 +33,8 @@ const TIPO_LABELS: Record<string, string> = {
   venda:              'Venda',
   desagrupamento:     'Desagrupamento',
   ajuste_quantidade:  'Ajuste',
+  fusao:              'Fusão de Lotes',
+  transf_parcial:     'Transf. Parcial',
 };
 const TIPO_COLORS: Record<string, string> = {
   alocacao:           'bg-blue-50 text-blue-700',
@@ -44,6 +46,8 @@ const TIPO_COLORS: Record<string, string> = {
   venda:              'bg-purple-50 text-purple-700',
   desagrupamento:     'bg-cyan-50 text-cyan-700',
   ajuste_quantidade:  'bg-gray-100 text-gray-600',
+  fusao:              'bg-emerald-50 text-emerald-700',
+  transf_parcial:     'bg-violet-50 text-violet-700',
 };
 
 /* ── Histórico compartilhado ── */
@@ -605,7 +609,7 @@ function TransferirTab({
    TAB 3 — Evolução (Categoria · Parição · Bezerros)
 ══════════════════════════════════════════════════════════════ */
 
-type SubOp = 'categoria' | 'paricao' | 'bezerros';
+type SubOp = 'categoria' | 'paricao' | 'bezerros' | 'parcial';
 type DestinoTipo = 'existente' | 'novo';
 
 function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId, animals, catMap, categories }: {
@@ -695,6 +699,16 @@ function EvolucaoTab({
   const [bezLoteDestId, setBezLoteDestId] = useState('');
   const [bezNovoNome, setBezNovoNome]     = useState('');
   const [bezNovoCatId, setBezNovoCatId]   = useState('');
+
+  /* ── Fundir Lotes ── */
+  const [fundirNome, setFundirNome]     = useState('');
+  const [fundirData, setFundirData]     = useState(() => new Date().toISOString().split('T')[0]);
+
+  /* ── Transferir Parcial ── */
+  const [parcOrigId, setParcOrigId]     = useState('');
+  const [parcDestId, setParcDestId]     = useState('');
+  const [parcQtd,    setParcQtd]        = useState('');
+  const [parcData,   setParcData]       = useState(() => new Date().toISOString().split('T')[0]);
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
@@ -792,10 +806,44 @@ function EvolucaoTab({
     finally { setSaving(false); }
   }
 
+  /* ── Confirmar: Fundir Lotes ── */
+  async function confirmarFundir() {
+    if (selected.size < 2) { toast.error('Selecione pelo menos 2 lotes.'); return; }
+    if (!fundirNome.trim()) { toast.error('Informe o nome do lote resultante.'); return; }
+    setSaving(true);
+    try {
+      await manejoService.fundirLotes(selectedAnimals, fundirNome.trim(), farmId, fundirData);
+      toast.success(`Lotes fundidos em "${fundirNome.trim()}"! (${totalCab} cab.)`);
+      setSelected(new Set()); setFundirNome(''); setFundirData(new Date().toISOString().split('T')[0]);
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
+  }
+
+  /* ── Confirmar: Transferir Parcial ── */
+  async function confirmarParcial() {
+    const orig = ativos.find(a => a.id === parcOrigId);
+    const dest = ativos.find(a => a.id === parcDestId);
+    if (!orig) { toast.error('Selecione o lote de origem.'); return; }
+    if (!dest) { toast.error('Selecione o lote de destino.'); return; }
+    if (orig.id === dest.id) { toast.error('Origem e destino devem ser lotes diferentes.'); return; }
+    const qtd = Number(parcQtd);
+    if (!qtd || qtd <= 0) { toast.error('Informe a quantidade a transferir.'); return; }
+    setSaving(true);
+    try {
+      await manejoService.transferirParcial(orig, dest, qtd, farmId, parcData);
+      toast.success(`${qtd} cab. transferidas de "${orig.nome}" → "${dest.nome}"!`);
+      setParcOrigId(''); setParcDestId(''); setParcQtd(''); setParcData(new Date().toISOString().split('T')[0]);
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
+  }
+
   const SUB_OPS = [
     { id: 'categoria' as SubOp, label: 'Categoria',  icon: TrendingUp },
     { id: 'paricao'   as SubOp, label: 'Parição',    icon: Baby },
     { id: 'bezerros'  as SubOp, label: 'Desmama',    icon: Milk },
+    { id: 'parcial'   as SubOp, label: 'Transf. Parcial', icon: SplitSquareVertical },
   ];
 
   return (
@@ -859,6 +907,40 @@ function EvolucaoTab({
                 })}
               </div>
             </div>
+            {/* ── Painel Fundir (aparece quando 2+ lotes selecionados) ── */}
+            {selected.size >= 2 && (
+              <div className="rounded-xl border-2 p-4 space-y-3" style={{ borderColor: '#1a6040', background: 'rgba(26,96,64,0.04)' }}>
+                <div className="flex items-center gap-2">
+                  <GitMerge className="w-4 h-4" style={{ color: '#1a6040' }} />
+                  <span className="text-sm font-bold" style={{ color: '#1a6040' }}>Fundir Lotes</span>
+                  <span className="text-xs text-gray-500 ml-1">{selected.size} lotes · {totalCab} cab.</span>
+                </div>
+                <div>
+                  <label className={labelClass}>Nome do lote resultante</label>
+                  <input
+                    type="text"
+                    value={fundirNome}
+                    onChange={e => setFundirNome(e.target.value)}
+                    placeholder="Ex: Lote Vacas Adultas"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Data da fusão</label>
+                  <input type="date" value={fundirData} onChange={e => setFundirData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
+                </div>
+                <button
+                  onClick={confirmarFundir}
+                  disabled={saving || !fundirNome.trim()}
+                  className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#1a6040' }}
+                >
+                  <GitMerge className="w-4 h-4" />
+                  {saving ? 'Fundindo...' : `Confirmar Fusão — "${fundirNome || '...'}" (${totalCab} cab.)`}
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
               <div>
                 <label className={labelClass}>Nova categoria</label>
@@ -1002,6 +1084,93 @@ function EvolucaoTab({
               className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               <Milk className="w-4 h-4" />
               {saving ? 'Registrando...' : 'Confirmar Desmama'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Sub-op: Transferir Parcial ── */}
+        {subOp === 'parcial' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <SplitSquareVertical className="w-4 h-4" style={{ color: '#1a6040' }} />
+              <h3 className="font-semibold text-gray-900">Transferir parte do lote</h3>
+            </div>
+            <p className="text-xs text-gray-400">
+              Move uma quantidade de cabeças de um lote para outro sem alterar o pasto.
+            </p>
+
+            <div>
+              <label className={labelClass}>Lote de origem</label>
+              <div className="relative">
+                <select value={parcOrigId} onChange={e => setParcOrigId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o lote…</option>
+                  {ativos.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>
+                  Qtd. a transferir
+                  {parcOrigId && (() => { const o = ativos.find(a => a.id === parcOrigId); return o ? <span className="ml-1 text-gray-400">(máx. {o.quantidade})</span> : null; })()}
+                </label>
+                <input
+                  type="number" min="1"
+                  value={parcQtd}
+                  onChange={e => setParcQtd(e.target.value)}
+                  placeholder="Ex: 15"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Data</label>
+                <input type="date" value={parcData} onChange={e => setParcData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Lote de destino</label>
+              <div className="relative">
+                <select value={parcDestId} onChange={e => setParcDestId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o lote…</option>
+                  {ativos.filter(a => a.id !== parcOrigId).map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+              {/* Preview do resultado */}
+              {parcOrigId && parcDestId && Number(parcQtd) > 0 && (() => {
+                const orig = ativos.find(a => a.id === parcOrigId);
+                const dest = ativos.find(a => a.id === parcDestId);
+                const qtd  = Number(parcQtd);
+                if (!orig || !dest) return null;
+                return (
+                  <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                    <span><strong>{orig.nome}</strong>: {orig.quantidade} → <strong style={{ color: '#1a6040' }}>{orig.quantidade - qtd}</strong> cab.</span>
+                    <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <span><strong>{dest.nome}</strong>: {dest.quantidade} → <strong style={{ color: '#1a6040' }}>{dest.quantidade + qtd}</strong> cab.</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <button
+              onClick={confirmarParcial}
+              disabled={saving || !parcOrigId || !parcDestId || !parcQtd}
+              className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: '#1a6040' }}
+            >
+              <SplitSquareVertical className="w-4 h-4" />
+              {saving ? 'Transferindo...' : 'Confirmar Transferência Parcial'}
             </button>
           </div>
         )}
