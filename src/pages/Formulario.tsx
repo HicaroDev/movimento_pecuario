@@ -137,6 +137,7 @@ export function Formulario() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
+  const [animalCategories, setAnimalCategories] = useState<{ id: string; nome: string }[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
   const farmId = activeFarmId || user?.farmId || '';
@@ -189,9 +190,11 @@ export function Formulario() {
     Promise.all([
       supabaseAdmin.from('supplement_types').select('id, nome, unidade, peso').eq('farm_id', farmId),
       manejoService.listarAnimais(farmId),
-    ]).then(([suppRes, animalsRes]) => {
+      supabaseAdmin.from('animal_categories').select('id, nome').eq('farm_id', farmId),
+    ]).then(([suppRes, animalsRes, catRes]) => {
       if (suppRes.data) setSupplementTypes(suppRes.data as SupplementType[]);
       setAnimals(animalsRes.filter(a => a.status === 'ativo' || !a.status));
+      if (catRes.data) setAnimalCategories(catRes.data as { id: string; nome: string }[]);
     }).catch(() => {}).finally(() => setLoadingData(false));
   }, [farmId]);
 
@@ -210,8 +213,16 @@ export function Formulario() {
     if (!pasture) return null;
     const lotesNoPasto = animals.filter(a => a.pasto_id === pasture.id);
     const totalCab = lotesNoPasto.reduce((s, a) => s + a.quantidade, 0);
-    return { totalCab, nLotes: lotesNoPasto.length };
-  }, [selectedPasto, pastures, animals]);
+    const totalBez = lotesNoPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+    const categorias = [...new Set(
+      lotesNoPasto.map(a => {
+        const cat = animalCategories.find(c => c.id === a.categoria_id);
+        return cat?.nome ?? null;
+      }).filter(Boolean)
+    )];
+    const loteNomes = lotesNoPasto.map(a => a.nome).filter(Boolean);
+    return { totalCab, nLotes: lotesNoPasto.length, totalBez, categorias, loteNomes };
+  }, [selectedPasto, pastures, animals, animalCategories]);
 
   /* Auto-fill quantidade when pasto changes */
   useEffect(() => {
@@ -309,14 +320,6 @@ export function Formulario() {
               </button>
               <button
                 type="button"
-                onClick={handleLoadSample}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                Carregar Exemplo
-              </button>
-              <button
-                type="button"
                 onClick={handleSubmit(onAddRow)}
                 disabled={isActiveClosed}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
@@ -329,10 +332,10 @@ export function Formulario() {
                 onClick={handleCloseMonth}
                 disabled={isActiveClosed}
                 title={isActiveClosed ? 'Mês já fechado' : `Fechar ${ymLabel(activeMonth)}`}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm border ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm ${
                   isActiveClosed
-                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                    : 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                    ? 'border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'bg-teal-700 hover:bg-teal-800 text-white'
                 }`}
               >
                 {isActiveClosed ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
@@ -365,15 +368,27 @@ export function Formulario() {
                 </select>
                 {/* Info: qtd gado + lotes */}
                 {pastoInfo && (
-                  <div className="mt-1.5 flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#1a6040' }}>
-                      <Info className="w-3 h-3" />
-                      {fmtInt(pastoInfo.totalCab)} cab.
-                    </span>
-                    {pastoInfo.nLotes > 0 && (
-                      <span className="text-xs text-gray-400">
-                        {pastoInfo.nLotes} lote{pastoInfo.nLotes !== 1 ? 's' : ''} no pasto
+                  <div className="mt-1.5 space-y-0.5">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#1a6040' }}>
+                        <Info className="w-3 h-3" />
+                        {fmtInt(pastoInfo.totalCab)} cab.
                       </span>
+                      {pastoInfo.nLotes > 0 && (
+                        <span className="text-xs text-gray-400">
+                          {pastoInfo.nLotes} lote{pastoInfo.nLotes !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {pastoInfo.totalBez > 0 && (
+                        <span className="text-xs font-semibold text-orange-500">
+                          + {fmtInt(pastoInfo.totalBez)} bez.
+                        </span>
+                      )}
+                    </div>
+                    {pastoInfo.categorias.length > 0 && (
+                      <p className="text-xs text-gray-500 leading-tight">
+                        {pastoInfo.categorias.join(' · ')}
+                      </p>
                     )}
                   </div>
                 )}
@@ -451,7 +466,7 @@ export function Formulario() {
                 />
               </div>
               <div>
-                <label className={labelClass}>Kg consumidos no período</label>
+                <label className={labelClass}>Ofertado (kg)</label>
                 <input
                   type="text"
                   readOnly
@@ -534,7 +549,7 @@ export function Formulario() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de Suplemento</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sacos</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Período</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">KG Consumidos</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ofertado (kg)</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Consumo</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                   </tr>

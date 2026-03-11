@@ -116,10 +116,12 @@ function SimpleEditRow({ item, onSave, onCancel, predefinedOptions }: {
     <tr className="bg-teal-50">
       <td className="px-4 py-2">
         {predefinedOptions ? (
-          <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer`}>
-            <option value="">— Selecione —</option>
-            {predefinedOptions.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <>
+            <input list={`sugg-edit-${item.id}`} {...register('nome', { required: true })} className={inputClass} placeholder="Digite ou selecione..." />
+            <datalist id={`sugg-edit-${item.id}`}>
+              {predefinedOptions.map(o => <option key={o} value={o} />)}
+            </datalist>
+          </>
         ) : (
           <input {...upperReg(register('nome', { required: true }))} className={inputClass} />
         )}
@@ -208,10 +210,14 @@ function SimpleTab({
             <div>
               <label className={labelClass}>Nome *</label>
               {predefinedOptions ? (
-                <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer ${errors.nome ? 'border-red-400' : ''}`}>
-                  <option value="">— Selecione —</option>
-                  {predefinedOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <>
+                  <input list={`sugg-add-${label}`} placeholder="Digite ou selecione..."
+                    {...register('nome', { required: true })}
+                    className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+                  <datalist id={`sugg-add-${label}`}>
+                    {predefinedOptions.map(o => <option key={o} value={o} />)}
+                  </datalist>
+                </>
               ) : (
                 <input placeholder={`Ex.: ${label}`} {...upperReg(register('nome', { required: true }))}
                   className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
@@ -928,28 +934,19 @@ const SUPLEMENTOS_NOMES = [
 ] as const;
 
 const CATEGORIAS_ANIMAIS = [
-  'Bezerra Fêmea Desmama',
-  'Bezerras fêmea mamando',
-  'Bezerro Macho Desmama',
-  'Bezerros Aleitamento Creep Feeding',
+  'Vacas Adultas',
+  'Primíparas',
+  'Vaca descarte',
   'Bezerros macho mamando',
-  'Boi Gordo',
-  'Boi Magro',
+  'Bezerras fêmea mamando',
   'Femeas até 12 meses',
-  'Femeas até 13 a 24 meses (Fundo para Abate)',
-  'Garrotes',
-  'Macho > 24 meses (Abate final Fevereiro)',
-  'Macho > 24 meses (Abate final Maio)',
+  'Femeas até 13 a 24 meses',
   'Macho até 12 meses',
-  'Novilha Inseminada > 24 meses',
-  'Novilhas Precoce Chance',
-  'Novilhas Precoce Prenha',
-  'Primipara Parida',
+  'Macho > 24 meses',
   'Touros',
-  'Vaca Descarte',
-  'Vacas Adultas e Primiparas',
-  'Vacas Prenhas Paridas',
-  'Vacas Prenhas Solteiras',
+  'Novilhas Precoce',
+  'Vaca Adultas Prenhas',
+  'Vacas Adultas Paridas',
 ] as const;
 
 const CONSUMO_OPTIONS = [
@@ -958,8 +955,8 @@ const CONSUMO_OPTIONS = [
   '50 A 100 GRAMAS/100 KG PV',
   '100 A 120 GRAMAS/100 KG PV',
   '200 A 300 GRAMAS/100 KG PV',
-  '300 A 500 GRAMAS/100 KG PV',
-  '400 A 700 GRAMAS/100 KG PV',
+  '300 A 400 GRAMAS/100 KG PV',
+  '500 A 700 GRAMAS/100 KG PV',
   '1,0 A 1,50% PV',
   '1,50 A 2,30% PV',
 ] as const;
@@ -974,10 +971,10 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2">
-        <select {...register('nome', { required: true })} className={inputClass}>
-          <option value="">— Selecione —</option>
-          {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n}>{n}</option>)}
-        </select>
+        <input list="sugg-supl-edit" {...register('nome', { required: true })} className={inputClass} placeholder="Digite ou selecione..." />
+        <datalist id="sugg-supl-edit">
+          {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n} />)}
+        </datalist>
       </td>
       <td className="px-4 py-2">
         <select {...register('unidade')} className={inputClass}>
@@ -1093,10 +1090,12 @@ function SuplementosTab() {
           <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Nome *</label>
-              <select {...register('nome', { required: true })} className={`${inputClass} cursor-pointer ${errors.nome ? 'border-red-400' : ''}`}>
-                <option value="">— Selecione —</option>
-                {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
+              <input list="sugg-supl-add" placeholder="Digite ou selecione..."
+                {...register('nome', { required: true })}
+                className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+              <datalist id="sugg-supl-add">
+                {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n} />)}
+              </datalist>
             </div>
             <div>
               <label className={labelClass}>Unidade</label>

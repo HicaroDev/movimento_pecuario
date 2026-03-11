@@ -14,17 +14,12 @@ const DEFAULT_FORRAGENS = [
 ];
 
 const DEFAULT_CATEGORIAS = [
-  'Bezerra Fêmea Desmama', 'Bezerras fêmea mamando', 'Bezerro Macho Desmama',
-  'Bezerros Aleitamento Creep Feeding', 'Bezerros macho mamando',
-  'Boi Gordo', 'Boi Magro',
-  'Femeas até 12 meses', 'Femeas até 13 a 24 meses (Fundo para Abate)',
-  'Garrotes',
-  'Macho > 24 meses (Abate final Fevereiro)', 'Macho > 24 meses (Abate final Maio)',
-  'Macho até 12 meses', 'Novilha Inseminada > 24 meses',
-  'Novilhas Precoce Chance', 'Novilhas Precoce Prenha',
-  'Primipara Parida', 'Touros',
-  'Vaca Descarte', 'Vaca descarte',
-  'Vacas Adultas e Primiparas', 'Vacas Prenhas Paridas', 'Vacas Prenhas Solteiras',
+  'Vacas Adultas', 'Primíparas', 'Vaca descarte',
+  'Bezerros macho mamando', 'Bezerras fêmea mamando',
+  'Femeas até 12 meses', 'Femeas até 13 a 24 meses',
+  'Macho até 12 meses', 'Macho > 24 meses',
+  'Touros', 'Novilhas Precoce',
+  'Vaca Adultas Prenhas', 'Vacas Adultas Paridas',
 ];
 
 const DEFAULT_SUPLEMENTOS = [

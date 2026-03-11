@@ -446,7 +446,7 @@ function LotesTab({
                   <label className={labelClass}>Pasto destino</label>
                   <div className="relative">
                     <select value={pastoSel} onChange={e => setPastoSel(e.target.value)} className={selectClass}>
-                      <option value="">— Remover do pasto —</option>
+                      <option value="">— Selecionar Pasto —</option>
                       {pastures.filter(p => p.id !== alocarAnimal.pasto_id).map(p => (
                         <option key={p.id} value={p.id}>{p.nome}{p.area ? ` (${p.area} ha)` : ''}</option>
                       ))}
@@ -456,7 +456,7 @@ function LotesTab({
                 </div>
                 <div>
                   <label className={labelClass}>Data</label>
-                  <input type="date" value={dataAlocacao} onChange={e => setDataAlocacao(e.target.value)} className={inputClass} />
+                  <input type="date" value={dataAlocacao} onChange={e => setDataAlocacao(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
                 </div>
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
@@ -572,7 +572,7 @@ function TransferirTab({
         <div>
           <label className={labelClass}>Data da transferência</label>
           <input type="date" value={data} onChange={e => setData(e.target.value)}
-            className={inputClass} />
+            max={new Date().toISOString().split('T')[0]} className={inputClass} />
         </div>
 
         <div>
@@ -893,7 +893,7 @@ function EvolucaoTab({
               )}
               <div>
                 <label className={labelClass}>Data da evolução</label>
-                <input type="date" value={catData} onChange={e => setCatData(e.target.value)} className={inputClass} />
+                <input type="date" value={catData} onChange={e => setCatData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
               </div>
               <button onClick={confirmarCategoria} disabled={saving || selected.size === 0 || !novaCatId}
                 className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -933,7 +933,7 @@ function EvolucaoTab({
             </div>
             <div>
               <label className={labelClass}>Data</label>
-              <input type="date" value={parData} onChange={e => setParData(e.target.value)} className={inputClass} />
+              <input type="date" value={parData} onChange={e => setParData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
             </div>
             <DestinoSelector
               destino={parDestino} setDestino={setParDestino}
@@ -988,7 +988,7 @@ function EvolucaoTab({
             </div>
             <div>
               <label className={labelClass}>Data</label>
-              <input type="date" value={bezData} onChange={e => setBezData(e.target.value)} className={inputClass} />
+              <input type="date" value={bezData} onChange={e => setBezData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
             </div>
             <DestinoSelector
               destino={bezDestino} setDestino={setBezDestino}
@@ -1147,7 +1147,7 @@ function AbateTab({
           <div>
             <label className={labelClass}>Data</label>
             <input type="date" value={dataSaida} onChange={e => setDataSaida(e.target.value)}
-              className={inputClass} disabled={!loteId} />
+              max={new Date().toISOString().split('T')[0]} className={inputClass} disabled={!loteId} />
           </div>
 
           <div>
