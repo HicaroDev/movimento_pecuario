@@ -332,10 +332,10 @@ export function Formulario() {
                 onClick={handleCloseMonth}
                 disabled={isActiveClosed}
                 title={isActiveClosed ? 'Mês já fechado' : `Fechar ${ymLabel(activeMonth)}`}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${
                   isActiveClosed
-                    ? 'border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                    : 'bg-teal-700 hover:bg-teal-800 text-white'
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'border-[#1a6040] text-[#1a6040] bg-[#f0f7f4] hover:bg-[#e0f0ea]'
                 }`}
               >
                 {isActiveClosed ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
