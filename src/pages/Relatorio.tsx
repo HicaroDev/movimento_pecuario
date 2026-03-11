@@ -32,16 +32,22 @@ export function Relatorio() {
 
   const [filterSupplement, setFilterSupplement] = useState('');
   const [filterPasto,      setFilterPasto]      = useState('');
-  const [filterPeriodo,    setFilterPeriodo]    = useState('');
-  const [filterMonth,      setFilterMonth]      = useState('');
+  const [filterMonths,     setFilterMonths]     = useState<string[]>([]);
 
-  const hasFilters = !!filterSupplement || !!filterPasto || !!filterPeriodo || !!filterMonth;
+  const hasFilters = !!filterSupplement || !!filterPasto || filterMonths.length > 0;
 
   const clearFilters = () => {
-    setFilterSupplement(''); setFilterPasto('');
-    setFilterPeriodo('');    setFilterMonth('');
+    setFilterSupplement('');
+    setFilterPasto('');
+    setFilterMonths([]);
     toast.info('Filtros limpos');
   };
+
+  function toggleMonth(ym: string) {
+    setFilterMonths(prev =>
+      prev.includes(ym) ? prev.filter(m => m !== ym) : [...prev, ym]
+    );
+  }
 
   /* ── Month chips derived from entries ── */
   const monthOptions = useMemo(() => {
@@ -61,10 +67,6 @@ export function Relatorio() {
     () => Array.from(new Set(entries.map((e) => e.pasto))).sort(),
     [entries]
   );
-  const periodoOptions = useMemo(
-    () => Array.from(new Set(entries.map((e) => String(e.periodo)))).sort(),
-    [entries]
-  );
 
   /* ── Filtered entries ── */
   const filtered = useMemo(
@@ -72,11 +74,10 @@ export function Relatorio() {
       entries.filter((e) => {
         if (filterSupplement && e.tipo !== filterSupplement) return false;
         if (filterPasto      && e.pasto !== filterPasto)     return false;
-        if (filterPeriodo    && String(e.periodo) !== filterPeriodo) return false;
-        if (filterMonth      && (!e.data || !e.data.startsWith(filterMonth))) return false;
+        if (filterMonths.length > 0 && (!e.data || !filterMonths.some(m => e.data!.startsWith(m)))) return false;
         return true;
       }),
-    [entries, filterSupplement, filterPasto, filterPeriodo, filterMonth]
+    [entries, filterSupplement, filterPasto, filterMonths]
   );
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);
@@ -107,9 +108,11 @@ export function Relatorio() {
     color: getSupplementColor(name, i),
   })), [activeTypes, aggregatedGroups]);
 
-  /* ── Dynamic subtitle (farm + month) ── */
+  /* ── Dynamic subtitle (farm + selected months) ── */
   const farmName   = clientInfo?.nomeFazenda ?? '';
-  const periodoStr = filterMonth ? periodFull(filterMonth) : '';
+  const periodoStr = filterMonths.length > 0
+    ? filterMonths.slice().sort().map(periodFull).join(' · ')
+    : '';
   const subtitle   = [farmName, periodoStr].filter(Boolean).join(' — ');
 
   /* ── Actions ── */
@@ -180,32 +183,41 @@ export function Relatorio() {
             )}
           </div>
 
-          {/* Month chips */}
+          {/* ── Month chips (multi-select) ── */}
           {monthOptions.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-5">
               <div className="flex items-center gap-2 mb-2">
                 <CalendarDays className="w-4 h-4 text-gray-400" />
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Período</span>
+                {filterMonths.length > 0 && (
+                  <span className="text-xs text-gray-400">
+                    — {filterMonths.length} {filterMonths.length === 1 ? 'mês' : 'meses'} selecionado{filterMonths.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {monthOptions.map((ym) => (
-                  <button
-                    key={ym}
-                    onClick={() => setFilterMonth(filterMonth === ym ? '' : ym)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
-                      filterMonth === ym
-                        ? 'bg-gray-900 text-white shadow-md scale-105'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
-                    }`}
-                  >
-                    {monthLabel(ym)}
-                  </button>
-                ))}
+                {monthOptions.map((ym) => {
+                  const active = filterMonths.includes(ym);
+                  return (
+                    <button
+                      key={ym}
+                      onClick={() => toggleMonth(ym)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                        active
+                          ? 'text-white shadow-md scale-105'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                      }`}
+                      style={active ? { backgroundColor: '#1a6040' } : {}}
+                    >
+                      {monthLabel(ym)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Suplemento */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">Suplemento</label>
@@ -238,23 +250,7 @@ export function Relatorio() {
               <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
 
-            {/* Período */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Período (dias)</label>
-              <select
-                value={filterPeriodo}
-                onChange={(e) => setFilterPeriodo(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl appearance-none bg-white text-sm pr-10 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              >
-                <option value="">Todos</option>
-                {periodoOptions.map((p) => (
-                  <option key={p} value={p}>{p} dias</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
-            </div>
-
-            {/* Export buttons (4th column) */}
+            {/* Export buttons (3rd column) */}
             <div className="flex items-end gap-2">
               <button
                 onClick={handleExportExcel}
