@@ -100,7 +100,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [pastures,     setPastures]     = useState<Pasture[]>([]);
   const [clientInfo,   setClientInfo]   = useState<ClientInfo | null>(null);
   const [refreshTick,  setRefreshTick]  = useState(0);
-  const pendingDeletesRef = useRef<Set<string>>(new Set());
+  const pendingDeletesRef  = useRef<Set<string>>(new Set());
+  const pendingUpdatesRef  = useRef<Map<string, Partial<DataEntry>>>(new Map());
 
   /* Determina a fazenda ativa ao logar */
   useEffect(() => {
@@ -222,7 +223,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]).then(([entriesRes, pasturesRes, farm]) => {
       if (cancelled) return;
       if (!entriesRes.error) setEntries(
-        (entriesRes.data ?? []).map(toDataEntry).filter(e => !pendingDeletesRef.current.has(e.id))
+        (entriesRes.data ?? [])
+          .map(toDataEntry)
+          .filter(e => !pendingDeletesRef.current.has(e.id))
+          .map(e => {
+            const pending = pendingUpdatesRef.current.get(e.id!);
+            return pending ? { ...e, ...pending } : e;
+          })
       );
       if (!pasturesRes.error) setPastures(
         (pasturesRes.data ?? []).map(toPasture).filter(p => !pendingDeletesRef.current.has(p.id))
@@ -274,7 +281,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   function updateEntry(id: string, patch: Partial<DataEntry>) {
+    // Atualiza estado local imediatamente (optimistic)
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
+    // Protege contra sobrescrita por refreshes de background
+    pendingUpdatesRef.current.set(id, {
+      ...(pendingUpdatesRef.current.get(id) ?? {}),
+      ...patch,
+    });
     supabaseAdmin.from('data_entries').update({
       ...(patch.pasto      !== undefined && { pasto_nome: patch.pasto }),
       ...(patch.data       !== undefined && { data:       patch.data }),
@@ -282,7 +295,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(patch.quantidade !== undefined && { quantidade: patch.quantidade }),
       ...(patch.sacos      !== undefined && { sacos:      patch.sacos }),
       ...(patch.kg         !== undefined && { kg:         patch.kg }),
-    }).eq('id', id);
+    }).eq('id', id).then(() => {
+      pendingUpdatesRef.current.delete(id);
+    });
   }
 
   function removeEntry(index: number) {
