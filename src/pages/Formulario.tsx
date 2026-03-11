@@ -511,9 +511,10 @@ export function Formulario() {
                     onClick={() => setActiveMonth(ym)}
                     className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                       active
-                        ? 'bg-gray-900 text-white shadow'
+                        ? 'text-white shadow'
                         : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'
                     }`}
+                    style={active ? { backgroundColor: '#1a6040' } : {}}
                   >
                     {closed && <Lock className="w-3 h-3" />}
                     {ymLabel(ym)}
