@@ -135,16 +135,6 @@ export function DashboardLayout() {
           >
             <img src="/images/zooflora.png" alt="Zoo Flora Nutrição Animal" className="w-full h-auto" />
           </div>
-          {/* Movimento Pecuário — criador do software */}
-          <div
-            className="rounded-xl p-2 mb-4"
-            style={{
-              background: 'rgba(255,255,255,0.6)',
-              border: '1px solid rgba(0,0,0,0.06)',
-            }}
-          >
-            <img src="/images/logo.png" alt="Movimento Pecuário" className="w-full h-auto opacity-80" />
-          </div>
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
@@ -295,6 +285,8 @@ export function DashboardLayout() {
                 {isAdmin ? 'Admin' : 'Cliente'}
               </span>
             </div>
+            {/* Movimento Pecuário — criador do software */}
+            <img src="/images/logo.png" alt="Movimento Pecuário" className="h-6 w-auto opacity-60 flex-shrink-0" />
           </div>
           <button
             onClick={handleLogout}
