@@ -141,10 +141,17 @@ export function Formulario() {
   }, [closedKey]);
 
   const monthOptions = useMemo(() => {
-    const set = new Set<string>([todayYM]);
+    const set = new Set<string>();
     for (const e of entries) { if (e.data) set.add(e.data.slice(0, 7)); }
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [entries]);
+
+  // Ajusta activeMonth para o mês mais recente com entradas quando necessário
+  useEffect(() => {
+    if (monthOptions.length > 0 && !monthOptions.includes(activeMonth)) {
+      setActiveMonth(monthOptions[0]);
+    }
+  }, [monthOptions, activeMonth]);
 
   const visibleEntries = useMemo(
     () => entries.filter(e => !e.data || e.data.startsWith(activeMonth)),
@@ -241,7 +248,8 @@ export function Formulario() {
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ data: today, quantidade: 0 });
+    // Mantém pasto e data, limpa sacos e quantidade para próximo lançamento
+    reset({ pasto: data.pasto, data: data.data, tipo: '', quantidade: 0, sacos: 0 });
   };
 
   const handleClearAll = () => {
