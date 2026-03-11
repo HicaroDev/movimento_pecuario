@@ -76,9 +76,9 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 <th className="py-2 text-left font-bold">PASTO</th>
                 <th className="py-2 text-right font-bold w-24">QUANTIDADE</th>
                 <th className="py-2 text-left font-bold pl-4">TIPO DE SUPLEMENTO</th>
-                <th className="py-2 text-right font-bold w-28">PERÍODO (DIAS)</th>
-                <th className="py-2 text-right font-bold w-24">SACOS (25 KG)</th>
-                <th className="py-2 text-right font-bold w-36">KG CONSUMIDOS NO PERÍODO</th>
+                <th className="py-2 text-right font-bold w-28">DIAS REAIS</th>
+                <th className="py-2 text-right font-bold w-24">SACOS</th>
+                <th className="py-2 text-right font-bold w-36">TOTAL KG OFERTADO</th>
                 <th className="py-2 text-right font-bold w-32">CONSUMO (KG/CAB DIA)</th>
               </tr>
             </thead>

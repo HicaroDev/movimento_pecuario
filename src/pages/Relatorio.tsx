@@ -10,7 +10,7 @@ import { SummaryChart } from '../components/SummaryChart';
 import { SupplementSection } from '../components/SupplementSection';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { SupplementPills } from '../components/SupplementPills';
-import { groupByType, averageConsumo, sumQuantidade, sortedTypes, fmt } from '../lib/utils';
+import { groupByType, averageConsumo, sumQuantidade, sortedTypes, aggregateEntriesByPasto } from '../lib/utils';
 import { getSupplementColor } from '../lib/data';
 
 const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
@@ -81,11 +81,21 @@ export function Relatorio() {
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);
 
+  /* ── Aggregated groups: 1 linha por pasto, consumo calculado por datas reais ── */
+  const aggregatedGroups = useMemo(() => {
+    const result: Record<string, ReturnType<typeof aggregateEntriesByPasto>> = {};
+    for (const [tipo, typeEntries] of Object.entries(groups)) {
+      result[tipo] = aggregateEntriesByPasto(typeEntries);
+    }
+    return result;
+  }, [groups]);
+
   /* ── KPI stats ── */
   const totalEntries   = filtered.length;
   const totalAnimals   = sumQuantidade(filtered);
   const totalPastos    = new Set(filtered.map((e) => e.pasto)).size;
-  const avgConsumption = averageConsumo(filtered);
+  const allAggregated  = useMemo(() => Object.values(aggregatedGroups).flat(), [aggregatedGroups]);
+  const avgConsumption = averageConsumo(allAggregated);
 
   /* ── Ordered supplement types (only those with data) ── */
   const activeTypes = useMemo(() => sortedTypes(groups), [groups]);
@@ -93,9 +103,9 @@ export function Relatorio() {
   /* ── Summary chart data (only supplements with data) ── */
   const summaryData = useMemo(() => activeTypes.map((name, i) => ({
     name,
-    value: averageConsumo(groups[name] ?? []),
+    value: averageConsumo(aggregatedGroups[name] ?? []),
     color: getSupplementColor(name, i),
-  })), [activeTypes, groups]);
+  })), [activeTypes, aggregatedGroups]);
 
   /* ── Dynamic subtitle (farm + month) ── */
   const farmName   = clientInfo?.nomeFazenda ?? '';
@@ -291,7 +301,7 @@ export function Relatorio() {
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <SupplementPills activeTypes={activeTypes} groups={groups} />
+          <SupplementPills activeTypes={activeTypes} groups={aggregatedGroups} />
         )}
 
         {/* ── Summary chart ── */}
@@ -314,7 +324,7 @@ export function Relatorio() {
           <>
             <div className="space-y-8">
               {activeTypes.map((tipo, i) => {
-                const sectionEntries = groups[tipo] ?? [];
+                const sectionEntries = aggregatedGroups[tipo] ?? [];
                 const color = getSupplementColor(tipo, i);
                 return (
                   <SupplementSection
