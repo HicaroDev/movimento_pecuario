@@ -24,7 +24,6 @@ interface FormFields {
   pasto: string;
   data: string;
   tipo: string;
-  quantidade: number;
   sacos: number;
 }
 
@@ -187,8 +186,8 @@ export function Formulario() {
     }).catch(() => {}).finally(() => setLoadingData(false));
   }, [farmId]);
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormFields>({
-    defaultValues: { data: today, quantidade: 0 },
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormFields>({
+    defaultValues: { data: today },
   });
 
   const selectedPasto = watch('pasto');
@@ -203,22 +202,17 @@ export function Formulario() {
     const lotesNoPasto = animals.filter(a => a.pasto_id === pasture.id);
     const totalCab = lotesNoPasto.reduce((s, a) => s + a.quantidade, 0);
     const totalBez = lotesNoPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
-    const categorias = [...new Set(
-      lotesNoPasto.map(a => {
-        const cat = animalCategories.find(c => c.id === a.categoria_id);
-        return cat?.nome ?? null;
-      }).filter(Boolean)
-    )];
-    const loteNomes = lotesNoPasto.map(a => a.nome).filter(Boolean);
-    return { totalCab, nLotes: lotesNoPasto.length, totalBez, categorias, loteNomes };
+    const lotes = lotesNoPasto.map(a => {
+      const cat = animalCategories.find(c => c.id === a.categoria_id);
+      return {
+        nome:      a.nome || null,
+        quantidade: a.quantidade,
+        categoria: cat?.nome ?? null,
+        bez:       a.bezerros_quantidade ?? 0,
+      };
+    });
+    return { totalCab, nLotes: lotesNoPasto.length, totalBez, lotes };
   }, [selectedPasto, pastures, animals, animalCategories]);
-
-  /* Auto-fill quantidade when pasto changes */
-  useEffect(() => {
-    if (pastoInfo != null) {
-      setValue('quantidade', pastoInfo.totalCab);
-    }
-  }, [pastoInfo, setValue]);
 
   /* Auto-fill: peso da sacaria */
   const suppInfo = useMemo(() => {
@@ -238,7 +232,7 @@ export function Formulario() {
   const onAddRow = (data: FormFields) => {
     const entry: DataEntry = {
       pasto:      data.pasto,
-      quantidade: Number(data.quantidade),
+      quantidade: pastoInfo?.totalCab ?? 0,
       tipo:       data.tipo,
       periodo:    0,
       data:       data.data,
@@ -248,8 +242,7 @@ export function Formulario() {
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    // Mantém pasto e data, limpa sacos e quantidade para próximo lançamento
-    reset({ pasto: data.pasto, data: data.data, tipo: '', quantidade: 0, sacos: 0 });
+    reset({ pasto: data.pasto, data: data.data, tipo: '', sacos: 0 });
   };
 
   const handleClearAll = () => {
@@ -352,32 +345,6 @@ export function Formulario() {
                     </>
                   )}
                 </select>
-                {/* Info: qtd gado + lotes */}
-                {pastoInfo && (
-                  <div className="mt-1.5 space-y-0.5">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#1a6040' }}>
-                        <Info className="w-3 h-3" />
-                        {fmtInt(pastoInfo.totalCab)} cab.
-                      </span>
-                      {pastoInfo.nLotes > 0 && (
-                        <span className="text-xs text-gray-400">
-                          {pastoInfo.nLotes} lote{pastoInfo.nLotes !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {pastoInfo.totalBez > 0 && (
-                        <span className="text-xs font-semibold text-orange-500">
-                          + {fmtInt(pastoInfo.totalBez)} bez.
-                        </span>
-                      )}
-                    </div>
-                    {pastoInfo.categorias.length > 0 && (
-                      <p className="text-xs text-gray-500 leading-tight">
-                        {pastoInfo.categorias.join(' · ')}
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
               <div>
                 <label className={labelClass}>Data do lançamento</label>
@@ -390,7 +357,7 @@ export function Formulario() {
               </div>
             </div>
 
-            {/* Row 2: Tipo Suplemento | Quantidade */}
+            {/* Row 2: Tipo Suplemento | Animais no Pasto (read-only) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Tipo de Suplemento</label>
@@ -404,7 +371,6 @@ export function Formulario() {
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
-                {/* Info: peso por saco */}
                 {suppInfo && (
                   <p className="mt-1 text-xs text-gray-400 flex items-center gap-1">
                     <Info className="w-3 h-3" />
@@ -412,16 +378,57 @@ export function Formulario() {
                   </p>
                 )}
               </div>
+
+              {/* Card de animais no pasto — read-only */}
               <div>
-                <label className={labelClass}>Quantidade (cab.)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Auto-preenchido pelo pasto"
-                  {...register('quantidade', { valueAsNumber: true })}
-                  className={inputClass}
-                />
+                <label className={labelClass}>Animais no Pasto</label>
+                {pastoInfo ? (
+                  <div
+                    className="w-full rounded-lg px-3 py-2.5 text-sm"
+                    style={{ background: 'rgba(26,96,64,0.05)', border: '1px solid rgba(26,96,64,0.18)' }}
+                  >
+                    {/* Resumo: total cab + total bez */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-bold text-base" style={{ color: '#1a6040' }}>
+                        {fmtInt(pastoInfo.totalCab)} cab.
+                      </span>
+                      {pastoInfo.totalBez > 0 && (
+                        <span className="font-semibold text-sm text-orange-500">
+                          + {fmtInt(pastoInfo.totalBez)} bez.
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Detalhe por lote quando há mais de 1 */}
+                    {pastoInfo.nLotes > 1 && (
+                      <div className="mt-2 space-y-1" style={{ borderTop: '1px solid rgba(26,96,64,0.15)', paddingTop: '6px' }}>
+                        {pastoInfo.lotes.map((lote, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500 truncate max-w-[120px]">
+                              {lote.nome ?? `Lote ${i + 1}`}
+                              {lote.categoria && <span className="ml-1 text-gray-400">· {lote.categoria}</span>}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <span className="font-semibold" style={{ color: '#1a6040' }}>{fmtInt(lote.quantidade)} cab.</span>
+                              {lote.bez > 0 && (
+                                <span className="font-semibold text-orange-500">+{fmtInt(lote.bez)} bez.</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Categoria quando há só 1 lote */}
+                    {pastoInfo.nLotes === 1 && pastoInfo.lotes[0]?.categoria && (
+                      <p className="mt-0.5 text-xs text-gray-400">{pastoInfo.lotes[0].categoria}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-400 flex items-center">
+                    Selecione um pasto
+                  </div>
+                )}
               </div>
             </div>
 
