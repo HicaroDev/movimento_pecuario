@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
@@ -116,6 +116,19 @@ const inputClass =
   'w-full h-10 px-3 rounded-lg bg-gray-100 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 const today = new Date().toISOString().split('T')[0];
+const todayYM = today.slice(0, 7); // YYYY-MM
+
+const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+const MONTH_FULL  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function ymLabel(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_SHORT[m - 1]}/${String(y).slice(2)}`;
+}
+function nextYM(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
 
 export function Formulario() {
   const { entries, addEntry, updateEntry, removeEntry, clearAll, loadSample, pastures, loading, activeFarmId } = useData();
@@ -127,6 +140,47 @@ export function Formulario() {
   const [loadingData, setLoadingData] = useState(false);
 
   const farmId = activeFarmId || user?.farmId || '';
+
+  /* ── Controle de mês ── */
+  const closedKey = farmId ? `closedMonths_${farmId}` : null;
+  const [activeMonth, setActiveMonth] = useState<string>(todayYM);
+  const [closedMonths, setClosedMonths] = useState<Set<string>>(() => {
+    if (!closedKey) return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem(closedKey) ?? '[]')); }
+    catch { return new Set(); }
+  });
+  // Sync closedMonths when farmId changes
+  useEffect(() => {
+    if (!closedKey) return;
+    try { setClosedMonths(new Set(JSON.parse(localStorage.getItem(closedKey) ?? '[]'))); }
+    catch { setClosedMonths(new Set()); }
+    setActiveMonth(todayYM);
+  }, [closedKey]);
+
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>([todayYM]);
+    for (const e of entries) { if (e.data) set.add(e.data.slice(0, 7)); }
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [entries]);
+
+  const visibleEntries = useMemo(
+    () => entries.filter(e => !e.data || e.data.startsWith(activeMonth)),
+    [entries, activeMonth]
+  );
+
+  const isActiveClosed = closedMonths.has(activeMonth);
+
+  function handleCloseMonth() {
+    if (!closedKey) return;
+    const updated = new Set(closedMonths);
+    updated.add(activeMonth);
+    setClosedMonths(updated);
+    localStorage.setItem(closedKey, JSON.stringify(Array.from(updated)));
+    const [, m] = activeMonth.split('-').map(Number);
+    const next = nextYM(activeMonth);
+    setActiveMonth(next);
+    toast.success(`${MONTH_FULL[m - 1]} fechado!`, { description: `Agora lançando em ${ymLabel(next)}` });
+  }
 
   /* Load supplement_types and animals when farmId changes */
   useEffect(() => {
@@ -264,10 +318,25 @@ export function Formulario() {
               <button
                 type="button"
                 onClick={handleSubmit(onAddRow)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                disabled={isActiveClosed}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Plus className="w-4 h-4" />
                 Adicionar
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseMonth}
+                disabled={isActiveClosed}
+                title={isActiveClosed ? 'Mês já fechado' : `Fechar ${ymLabel(activeMonth)}`}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm border ${
+                  isActiveClosed
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                }`}
+              >
+                {isActiveClosed ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
+                {isActiveClosed ? 'Fechado' : 'Fechar Mês'}
               </button>
             </div>
           </div>
@@ -415,10 +484,44 @@ export function Formulario() {
             </div>
           </div>
 
-          {entries.length === 0 ? (
+          {/* ── Chips de mês ── */}
+          {monthOptions.length > 0 && (
+            <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 bg-gray-50/60 flex-wrap">
+              {monthOptions.map(ym => {
+                const closed = closedMonths.has(ym);
+                const active = ym === activeMonth;
+                return (
+                  <button
+                    key={ym}
+                    onClick={() => setActiveMonth(ym)}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                      active
+                        ? 'bg-gray-900 text-white shadow'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    {closed && <Lock className="w-3 h-3" />}
+                    {ymLabel(ym)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {visibleEntries.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
-              <p className="font-medium">Nenhum registro cadastrado.</p>
-              <p className="text-sm mt-1">Preencha o formulário acima ou clique em "Carregar Exemplo".</p>
+              {isActiveClosed ? (
+                <>
+                  <Lock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                  <p className="font-medium">Mês {ymLabel(activeMonth)} fechado.</p>
+                  <p className="text-sm mt-1">Selecione outro mês ou aguarde o próximo período.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Nenhum registro em {ymLabel(activeMonth)}.</p>
+                  <p className="text-sm mt-1">Preencha o formulário acima para adicionar.</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -437,7 +540,7 @@ export function Formulario() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {entries.map((entry, index) => {
+                  {visibleEntries.map((entry, index) => {
                     if (editingId === entry.id) {
                       return (
                         <EntryEditRow
@@ -474,20 +577,24 @@ export function Formulario() {
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums text-gray-700">{entry.consumo > 0 ? entry.consumo.toFixed(3).replace('.', ',') : '—'}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setEditingId(entry.id ?? null)}
-                              className="text-gray-400 hover:text-teal-600 hover:bg-teal-50 p-1.5 rounded transition-colors"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => removeEntry(index)}
-                              className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {isActiveClosed ? (
+                            <Lock className="w-4 h-4 text-gray-300" />
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setEditingId(entry.id ?? null)}
+                                className="text-gray-400 hover:text-teal-600 hover:bg-teal-50 p-1.5 rounded transition-colors"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => removeEntry(entries.indexOf(entry))}
+                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </motion.tr>
                     );
