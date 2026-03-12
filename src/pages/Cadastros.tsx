@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Leaf, Beef, Package, Users, Plus, Pencil, Trash2, Save, X, MapPin, Sprout, Tag, Search, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabaseAdmin } from '../lib/supabase';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { SkeletonTable } from '../components/Skeleton';
+import { PasswordConfirmModal } from '../components/PasswordConfirmModal';
+import { verifyPassword } from '../lib/verifyPassword';
 
 const inputClass =
   'w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors';
@@ -132,14 +135,17 @@ function SimpleEditRow({ item, onSave, onCancel, predefinedOptions }: {
   );
 }
 
+type DeleteTarget = { id: string; label: string; onDelete: () => Promise<void> };
+
 function SimpleTab({
-  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems, predefinedOptions,
+  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems, predefinedOptions, onRequestDelete,
 }: {
   table: string; label: string; icon: React.ElementType;
   emptyText: string; newLabel: string;
   onDataChange?: (items: SimpleItem[]) => void;
   initialItems?: SimpleItem[];
   predefinedOptions?: readonly string[];
+  onRequestDelete?: (target: DeleteTarget) => void;
 }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<SimpleItem[]>(initialItems ?? []);
@@ -190,12 +196,25 @@ function SimpleTab({
     toast.success(`${label} atualizado!`); setEditingId(null);
   }
 
-  async function onDelete(id: string, nome: string) {
-    if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
-    if (error) { toast.error('Erro ao remover.'); return; }
-    notify(items.filter(i => i.id !== id));
-    toast.success(`${label} removido.`);
+  function onDelete(id: string, nome: string) {
+    if (onRequestDelete) {
+      onRequestDelete({
+        id,
+        label: `Remover ${label} "${nome}"?`,
+        onDelete: async () => {
+          const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
+          if (error) throw new Error('Erro ao remover.');
+          notify(items.filter(i => i.id !== id));
+        },
+      });
+    } else {
+      if (!window.confirm(`Remover "${nome}"?`)) return;
+      supabaseAdmin.from(table).delete().eq('id', id).then(({ error }) => {
+        if (error) { toast.error('Erro ao remover.'); return; }
+        notify(items.filter(i => i.id !== id));
+        toast.success(`${label} removido.`);
+      });
+    }
   }
 
   return (
@@ -337,7 +356,7 @@ function PastureEditRow({ pasture, retiros, forragens, onSave, onCancel }: {
   );
 }
 
-function PastosTab() {
+function PastosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
   const { pastures, addPasture, deletePasture, updatePasture, loading } = useData();
   const [retiros, setRetiros] = useState<SimpleItem[]>([]);
   const [showRetiros, setShowRetiros] = useState(false);
@@ -404,13 +423,20 @@ function PastosTab() {
     });
     toast.success('Pasto atualizado!'); setEditingId(null);
   }
-  async function onDelete(p: { id: string; nome: string }) {
-    if (!window.confirm(`Remover o pasto "${p.nome}"?`)) return;
-    try {
-      await deletePasture(p.id);
-      toast.success('Pasto removido.');
-    } catch {
-      toast.error('Não foi possível excluir. Este pasto possui lançamentos ou animais vinculados.');
+  function onDelete(p: { id: string; nome: string }) {
+    if (onRequestDelete) {
+      onRequestDelete({
+        id: p.id,
+        label: `Remover o pasto "${p.nome}"?`,
+        onDelete: async () => {
+          await deletePasture(p.id);
+        },
+      });
+    } else {
+      if (!window.confirm(`Remover o pasto "${p.nome}"?`)) return;
+      deletePasture(p.id)
+        .then(() => toast.success('Pasto removido.'))
+        .catch(() => toast.error('Não foi possível excluir. Este pasto possui lançamentos ou animais vinculados.'));
     }
   }
 
@@ -439,6 +465,7 @@ function PastosTab() {
               newLabel="Novo Retiro"
               initialItems={retiros}
               onDataChange={list => setRetiros(list)}
+              onRequestDelete={onRequestDelete}
             />
           </div>
         )}
@@ -667,7 +694,7 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
   );
 }
 
-function AnimaisTab() {
+function AnimaisTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<Animal[]>(_animaisCache);
   const [categories, setCategories] = useState<AnimalCategory[]>(_acatCache);
@@ -744,12 +771,25 @@ function AnimaisTab() {
     toast.success('Lote atualizado!'); setEditingId(null);
   }
 
-  async function onDelete(id: string, nome: string) {
-    if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabaseAdmin.from('animals').delete().eq('id', id);
-    if (error) { toast.error('Erro ao remover.'); return; }
-    _animaisCache = _animaisCache.filter(a => a.id !== id); setItems(_animaisCache);
-    toast.success('Lote removido.');
+  function onDelete(id: string, nome: string) {
+    if (onRequestDelete) {
+      onRequestDelete({
+        id,
+        label: `Remover lote "${nome}"?`,
+        onDelete: async () => {
+          const { error } = await supabaseAdmin.from('animals').delete().eq('id', id);
+          if (error) throw new Error('Erro ao remover.');
+          _animaisCache = _animaisCache.filter(a => a.id !== id); setItems(_animaisCache);
+        },
+      });
+    } else {
+      if (!window.confirm(`Remover "${nome}"?`)) return;
+      supabaseAdmin.from('animals').delete().eq('id', id).then(({ error }) => {
+        if (error) { toast.error('Erro ao remover.'); return; }
+        _animaisCache = _animaisCache.filter(a => a.id !== id); setItems(_animaisCache);
+        toast.success('Lote removido.');
+      });
+    }
   }
 
   function getCatName(id?: string) {
@@ -783,6 +823,7 @@ function AnimaisTab() {
               initialItems={categories}
               onDataChange={(list) => { _acatCache = list as AnimalCategory[]; setCategories(_acatCache); }}
               predefinedOptions={CATEGORIAS_ANIMAIS}
+              onRequestDelete={onRequestDelete}
             />
           </div>
         )}
@@ -1030,7 +1071,7 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
   );
 }
 
-function SuplementosTab() {
+function SuplementosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<SupplementType[]>(_suplementosCache);
   const [loading, setLoading] = useState(false);
@@ -1096,12 +1137,25 @@ function SuplementosTab() {
     setItems(_suplementosCache);
     toast.success('Suplemento atualizado!'); setEditingId(null);
   }
-  async function onDelete(id: string, nome: string) {
-    if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabaseAdmin.from('supplement_types').delete().eq('id', id);
-    if (error) { toast.error('Erro ao remover.'); return; }
-    _suplementosCache = _suplementosCache.filter(s => s.id !== id); setItems(_suplementosCache);
-    toast.success('Suplemento removido.');
+  function onDelete(id: string, nome: string) {
+    if (onRequestDelete) {
+      onRequestDelete({
+        id,
+        label: `Remover suplemento "${nome}"?`,
+        onDelete: async () => {
+          const { error } = await supabaseAdmin.from('supplement_types').delete().eq('id', id);
+          if (error) throw new Error('Erro ao remover.');
+          _suplementosCache = _suplementosCache.filter(s => s.id !== id); setItems(_suplementosCache);
+        },
+      });
+    } else {
+      if (!window.confirm(`Remover "${nome}"?`)) return;
+      supabaseAdmin.from('supplement_types').delete().eq('id', id).then(({ error }) => {
+        if (error) { toast.error('Erro ao remover.'); return; }
+        _suplementosCache = _suplementosCache.filter(s => s.id !== id); setItems(_suplementosCache);
+        toast.success('Suplemento removido.');
+      });
+    }
   }
 
   return (
@@ -1250,7 +1304,7 @@ function EmpEditRow({ item, onSave, onCancel }: { item: Employee; onSave: (d: Em
   );
 }
 
-function FuncionariosTab() {
+function FuncionariosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<Employee[]>(_funcionariosCache);
   const [loading, setLoading] = useState(false);
@@ -1312,12 +1366,25 @@ function FuncionariosTab() {
     _funcionariosCache = _funcionariosCache.map(e => e.id === id ? { ...e, ...data } : e); setItems(_funcionariosCache);
     toast.success('Funcionário atualizado!'); setEditingId(null);
   }
-  async function onDelete(id: string, nome: string) {
-    if (!window.confirm(`Remover "${nome}"?`)) return;
-    const { error } = await supabaseAdmin.from('employees').delete().eq('id', id);
-    if (error) { toast.error('Erro ao remover.'); return; }
-    _funcionariosCache = _funcionariosCache.filter(e => e.id !== id); setItems(_funcionariosCache);
-    toast.success('Funcionário removido.');
+  function onDelete(id: string, nome: string) {
+    if (onRequestDelete) {
+      onRequestDelete({
+        id,
+        label: `Remover funcionário "${nome}"?`,
+        onDelete: async () => {
+          const { error } = await supabaseAdmin.from('employees').delete().eq('id', id);
+          if (error) throw new Error('Erro ao remover.');
+          _funcionariosCache = _funcionariosCache.filter(e => e.id !== id); setItems(_funcionariosCache);
+        },
+      });
+    } else {
+      if (!window.confirm(`Remover "${nome}"?`)) return;
+      supabaseAdmin.from('employees').delete().eq('id', id).then(({ error }) => {
+        if (error) { toast.error('Erro ao remover.'); return; }
+        _funcionariosCache = _funcionariosCache.filter(e => e.id !== id); setItems(_funcionariosCache);
+        toast.success('Funcionário removido.');
+      });
+    }
   }
 
   return (
@@ -1384,11 +1451,22 @@ function FuncionariosTab() {
    Cadastros — página principal
 ═══════════════════════════════════════════════════════════════ */
 export function Cadastros() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('aba') ?? 'pastos') as TabKey;
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   function setTab(key: TabKey) {
     setSearchParams({ aba: key }, { replace: true });
+  }
+
+  async function handleDeleteConfirm(password: string) {
+    if (!user?.email) throw new Error('Usuário não autenticado.');
+    const ok = await verifyPassword(user.email, password);
+    if (!ok) throw new Error('Senha incorreta');
+    await deleteTarget!.onDelete();
+    setDeleteTarget(null);
+    toast.success('Excluído com sucesso.');
   }
 
   return (
@@ -1419,13 +1497,24 @@ export function Cadastros() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'pastos'       && <PastosTab />}
-        {activeTab === 'animais'      && <AnimaisTab />}
-        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} />}
-        {activeTab === 'suplementos'  && <SuplementosTab />}
-        {activeTab === 'funcionarios' && <FuncionariosTab />}
+        {activeTab === 'pastos'       && <PastosTab onRequestDelete={setDeleteTarget} />}
+        {activeTab === 'animais'      && <AnimaisTab onRequestDelete={setDeleteTarget} />}
+        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setDeleteTarget} />}
+        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setDeleteTarget} />}
+        {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setDeleteTarget} />}
 
       </motion.div>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <PasswordConfirmModal
+            title="Confirmar Exclusão"
+            description={deleteTarget.label}
+            onConfirm={handleDeleteConfirm}
+            onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

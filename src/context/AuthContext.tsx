@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { AuthUser, Module } from '../types/user';
+import type { AuthUser, Module, ModulePermission } from '../types/user';
 import { supabase, supabaseAdmin } from '../lib/supabase';
 
-export type { Role, Module } from '../types/user';
+export type { Role, Module, ModulePermission } from '../types/user';
 export type { AuthUser } from '../types/user';
 
 interface AuthContextValue {
@@ -12,6 +12,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   isAdmin: boolean;
   hasModule: (m: Module) => boolean;
+  hasEditPermission: (m: Module) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -47,12 +48,13 @@ async function fetchProfile(userId: string): Promise<AuthUser | null> {
   if (error || !data || !data.active) return null;
   const farmIds = (data.farm_ids as string[]) ?? [];
   return {
-    id:      data.id,
-    name:    data.name,
-    email:   data.email ?? '',
-    role:    data.role,
-    modules: data.modules ?? [],
-    farmId:  data.farm_id ?? farmIds[0] ?? undefined,
+    id:                data.id,
+    name:              data.name,
+    email:             data.email ?? '',
+    role:              data.role,
+    modules:           data.modules ?? [],
+    modulePermissions: (data.module_permissions as Partial<Record<Module, ModulePermission>>) ?? undefined,
+    farmId:            data.farm_id ?? farmIds[0] ?? undefined,
     farmIds,
   };
 }
@@ -165,12 +167,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user?.modules?.includes(m) ?? false;
   }
 
+  function hasEditPermission(m: Module): boolean {
+    if (user?.role === 'admin') return true;
+    if (!user?.modules?.includes(m)) return false;
+    // Backwards compat: se modulePermissions não definido, todos os módulos são 'edit'
+    if (!user.modulePermissions) return true;
+    const perm = user.modulePermissions[m];
+    if (perm === undefined) return true; // módulo existe mas sem permissão específica = edit
+    return perm === 'edit';
+  }
+
   return (
     <AuthContext.Provider value={{
       user, loading,
       login, logout,
       isAdmin: user?.role === 'admin',
       hasModule,
+      hasEditPermission,
     }}>
       {children}
     </AuthContext.Provider>

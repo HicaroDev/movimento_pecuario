@@ -5,6 +5,7 @@ import {
   UserCog, Plus, Pencil, Trash2, Save, X, Eye, EyeOff,
   ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2, ClipboardList,
 } from 'lucide-react';
+import type { ModulePermission } from '../types/user';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
@@ -60,6 +61,21 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
 }) {
   const availableModules = restrictModules ?? ALL_MODULES;
 
+  // Inicializa o mapa de permissões 3-estados
+  function initModulePerms(): Record<Module, 'none' | 'view' | 'edit'> {
+    const result = {} as Record<Module, 'none' | 'view' | 'edit'>;
+    for (const m of availableModules) {
+      if (editing?.modulePermissions?.[m]) {
+        result[m] = editing.modulePermissions[m] as 'view' | 'edit';
+      } else if (editing?.modules?.includes(m)) {
+        result[m] = 'edit'; // backwards compat: módulo sem permissão explícita = edit
+      } else {
+        result[m] = 'none';
+      }
+    }
+    return result;
+  }
+
   const [farms, setFarms]         = useState<Farm[]>(_modalFarmsCache);
   const [selectedFarmIds, setSelectedFarmIds] = useState<string[]>(
     editing?.farmIds?.length ? editing.farmIds
@@ -67,9 +83,7 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
       : restrictFarmIds       ? restrictFarmIds   // novo usuário criado por cliente herda fazendas
       : []
   );
-  const [modules, setModules]     = useState<Module[]>(
-    editing?.modules?.filter(m => availableModules.includes(m as Module)) ?? availableModules
-  );
+  const [modulePerms, setModulePerms] = useState<Record<Module, 'none' | 'view' | 'edit'>>(initModulePerms);
   const [active, setActive]       = useState<boolean>(editing?.active ?? true);
   const [showPwd, setShowPwd]     = useState(false);
   const [saving, setSaving]       = useState(false);
@@ -107,19 +121,30 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
     );
   }
 
-  function toggleModule(m: Module) {
-    setModules(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+  function cycleModulePerm(m: Module) {
+    setModulePerms(prev => {
+      const cur = prev[m];
+      const next: 'none' | 'view' | 'edit' = cur === 'none' ? 'view' : cur === 'view' ? 'edit' : 'none';
+      return { ...prev, [m]: next };
+    });
   }
 
   async function onSubmit(data: UserFormData) {
     setSaving(true);
     try {
       const farmIds = data.role === 'admin' ? [] : selectedFarmIds;
+      // Módulos = aqueles com permissão != 'none'
+      const modules: Module[] = availableModules.filter(m => modulePerms[m] !== 'none');
+      // modulePermissions = apenas os que têm acesso
+      const modulePermissions: Partial<Record<Module, ModulePermission>> = {};
+      for (const m of modules) {
+        modulePermissions[m] = modulePerms[m] as ModulePermission;
+      }
       const payload: Partial<FarmUser> = {
         name: data.name, email: data.email, role: data.role,
         farmIds,
         farmId: farmIds[0] ?? undefined,
-        modules, active,
+        modules, modulePermissions, active,
       };
       if (data.password) payload.password = data.password;
 
@@ -241,22 +266,34 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
 
             <div>
               <label className={labelClass}>Módulos de acesso</label>
+              <p className="text-[10px] text-gray-400 mb-2">Clique para alternar: Sem acesso → Visualização → Edição</p>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 {availableModules.map(m => {
                   const Icon = MODULE_ICONS[m] ?? FolderOpen;
-                  const on = modules.includes(m);
+                  const perm = modulePerms[m] ?? 'none';
+                  const isNone = perm === 'none';
+                  const isView = perm === 'view';
+                  const isEdit = perm === 'edit';
                   return (
-                    <label key={m}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                        on ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    <button key={m} type="button" onClick={() => cycleModulePerm(m)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none text-left w-full ${
+                        isNone ? 'border-gray-200 text-gray-400 bg-white hover:border-gray-300'
+                        : isView ? 'border-blue-300 bg-blue-50 text-blue-700'
+                        : 'border-teal-500 bg-teal-50 text-teal-700'
                       }`}>
-                      <input type="checkbox" checked={on} onChange={() => toggleModule(m)} className="sr-only" />
                       <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium">{MODULE_LABELS[m]}</span>
-                      {on && <Shield className="w-3 h-3 ml-auto text-teal-500" />}
-                    </label>
+                      <span className="text-sm font-medium flex-1">{MODULE_LABELS[m]}</span>
+                      {isNone && <X className="w-3 h-3 text-gray-400" />}
+                      {isView && <Eye className="w-3 h-3 text-blue-500" />}
+                      {isEdit && <Shield className="w-3 h-3 text-teal-500" />}
+                    </button>
                   );
                 })}
+              </div>
+              <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><X className="w-3 h-3" /> Sem acesso</span>
+                <span className="flex items-center gap-1 text-blue-500"><Eye className="w-3 h-3" /> Visualização</span>
+                <span className="flex items-center gap-1 text-teal-600"><Shield className="w-3 h-3" /> Edição</span>
               </div>
             </div>
 
@@ -352,10 +389,13 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
           {u.modules.map(m => {
             const Icon = MODULE_ICONS[m] ?? FolderOpen;
             const colors = MODULE_COLORS[m] ?? 'bg-gray-50 text-gray-600 border-gray-100';
+            const perm = u.modulePermissions?.[m];
             return (
               <span key={m} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium ${colors}`}>
                 <Icon className="w-2.5 h-2.5" />
                 {MODULE_LABELS[m]}
+                {perm === 'view' && <Eye className="w-2 h-2 opacity-70" />}
+                {(perm === 'edit' || !perm) && <Pencil className="w-2 h-2 opacity-70" />}
               </span>
             );
           })}

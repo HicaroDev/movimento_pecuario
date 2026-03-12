@@ -12,6 +12,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { manejoService, type Animal } from '../services/manejoService';
 import { fmtInt } from '../lib/utils';
 import { ImportExcelModal } from '../components/ImportExcelModal';
+import { logActivity } from '../services/activityLogService';
 
 interface SupplementType {
   id: string;
@@ -324,6 +325,14 @@ export function Formulario() {
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
+    logActivity({
+      farmId:      farmId,
+      userId:      user?.id ?? '',
+      userName:    user?.name ?? '',
+      module:      'formulario',
+      action:      'criou',
+      description: `${entry.pasto} · ${entry.tipo} · ${entry.sacos} sac. · ${entry.kg} kg`,
+    });
 
     // Lançamento de bezerros (quando preenchido)
     if (data.tipoBez && Number(data.sacosBez) > 0 && pastoInfo && pastoInfo.totalBez > 0) {
@@ -340,6 +349,14 @@ export function Formulario() {
       };
       addEntry(entryBez);
       toast.success('Bezerros adicionados!', { description: `${entryBez.pasto} — ${entryBez.tipo} (${fmtInt(pastoInfo.totalBez)} bez.)` });
+      logActivity({
+        farmId:      farmId,
+        userId:      user?.id ?? '',
+        userName:    user?.name ?? '',
+        module:      'formulario',
+        action:      'criou',
+        description: `${entryBez.pasto} · ${entryBez.tipo} (bezerros) · ${entryBez.sacos} sac. · ${entryBez.kg} kg`,
+      });
     }
 
     reset({ data: data.data, tipo: '', sacos: 0, pasto: '', funcionario: '', tipoBez: '', sacosBez: 0 });
@@ -847,10 +864,12 @@ export function Formulario() {
                 onChange={e => { setDeletePassword(e.target.value); setDeletePasswordError(false); }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && deletePassword === SENHA_MES) {
+                    const label = confirmDelete!.label;
                     removeEntry(confirmDelete!.index);
                     setConfirmDelete(null);
                     setDeletePassword('');
                     toast.success('Registro excluído.');
+                    logActivity({ farmId, userId: user?.id ?? '', userName: user?.name ?? '', module: 'formulario', action: 'excluiu', description: label });
                   }
                 }}
                 placeholder="Digite a senha"
@@ -871,11 +890,13 @@ export function Formulario() {
                     setDeletePasswordError(true);
                     return;
                   }
+                  const label = confirmDelete!.label;
                   removeEntry(confirmDelete!.index);
                   setConfirmDelete(null);
                   setDeletePassword('');
                   setDeletePasswordError(false);
                   toast.success('Registro excluído.');
+                  logActivity({ farmId, userId: user?.id ?? '', userName: user?.name ?? '', module: 'formulario', action: 'excluiu', description: label });
                 }}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
               >

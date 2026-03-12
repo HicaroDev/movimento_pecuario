@@ -1,6 +1,6 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
 import { logger } from '../lib/logger';
-import type { FarmUser, Module } from '../types/user';
+import type { FarmUser, Module, ModulePermission } from '../types/user';
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL as string;
 const SERVICE_ROLE_KEY  = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string;
@@ -62,16 +62,17 @@ function toFarmUser(row: Record<string, unknown>): FarmUser {
   const farmIds = (row.farm_ids as string[]) ?? [];
   const farmId  = (row.farm_id as string) ?? farmIds[0] ?? undefined;
   return {
-    id:        row.id as string,
-    name:      row.name as string,
-    email:     (row.email as string) ?? '',
-    password:  '',
-    role:      row.role as 'admin' | 'client',
+    id:                row.id as string,
+    name:              row.name as string,
+    email:             (row.email as string) ?? '',
+    password:          '',
+    role:              row.role as 'admin' | 'client',
     farmId,
     farmIds,
-    modules:   (row.modules as Module[]) ?? [],
-    active:    row.active as boolean,
-    createdAt: row.created_at as string,
+    modules:           (row.modules as Module[]) ?? [],
+    modulePermissions: (row.module_permissions as Partial<Record<Module, ModulePermission>>) ?? undefined,
+    active:            row.active as boolean,
+    createdAt:         row.created_at as string,
   };
 }
 
@@ -152,13 +153,14 @@ export const userService = {
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
       .update({
-        name:     d.name,
-        email:    d.email,
-        role:     d.role,
-        farm_id:  ids[0] ?? null,
-        farm_ids: ids,
-        modules:  d.modules,
-        active:   d.active,
+        name:               d.name,
+        email:              d.email,
+        role:               d.role,
+        farm_id:            ids[0] ?? null,
+        farm_ids:           ids,
+        modules:            d.modules,
+        module_permissions: d.modulePermissions ?? null,
+        active:             d.active,
       })
       .eq('id', userId)
       .select().single();
@@ -178,8 +180,9 @@ export const userService = {
       patch.farm_id  = d.farmId ?? null;
       patch.farm_ids = d.farmId ? [d.farmId] : [];
     }
-    if (d.modules !== undefined) patch.modules = d.modules;
-    if (d.active  !== undefined) patch.active  = d.active;
+    if (d.modules            !== undefined) patch.modules            = d.modules;
+    if (d.modulePermissions  !== undefined) patch.module_permissions = d.modulePermissions ?? null;
+    if (d.active             !== undefined) patch.active             = d.active;
 
     logger.info('userService.update', `atualizando perfil ${id}`, patch);
 
