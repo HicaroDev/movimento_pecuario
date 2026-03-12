@@ -612,6 +612,7 @@ export function Formulario() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de Suplemento</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sacos</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ofertado (kg)</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Funcionário</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
@@ -650,6 +651,7 @@ export function Formulario() {
                         <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.kg)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{entry.funcionario ?? '—'}</td>
                         <td className="px-4 py-3">
                           {isActiveClosed ? (
                             <Lock className="w-4 h-4 text-gray-300" />
