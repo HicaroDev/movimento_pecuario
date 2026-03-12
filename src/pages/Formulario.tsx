@@ -312,9 +312,16 @@ export function Formulario() {
     : supplementOrder;
 
   const onAddRow = (data: FormFields) => {
+    // Se bezerros têm suplemento próprio, NÃO aplica equivalente no adulto.
+    // Caso contrário, inclui bezerros como equivalente (⌊bez÷3⌋ = 1 adulto).
+    const bezTemSuppProprio = !!(data.tipoBez && Number(data.sacosBez) > 0 && (pastoInfo?.totalBez ?? 0) > 0);
+    const qtdAdulto = bezTemSuppProprio
+      ? (pastoInfo?.totalCab ?? 0)
+      : (pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0);
+
     const entry: DataEntry = {
       pasto:        data.pasto,
-      quantidade:   pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0,
+      quantidade:   qtdAdulto,
       tipo:         data.tipo,
       periodo:      0,
       data:         data.data,
