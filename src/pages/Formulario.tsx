@@ -580,7 +580,7 @@ export function Formulario() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>
-                  Sacos{suppInfo ? ` (${suppInfo.peso ?? 25} kg cada)` : ' (25 kg)'}
+                  {suppInfo ? `${suppInfo.unidade} (${suppInfo.peso ?? 25} kg cada)` : 'Sacos (25 kg)'}
                 </label>
                 <input
                   type="number"
@@ -645,7 +645,7 @@ export function Formulario() {
                   {/* Sacos Bezerros */}
                   <div>
                     <label className={labelClass}>
-                      Sacos por Bezerros{suppInfoBez ? ` (${suppInfoBez.peso ?? 25} kg cada)` : ''}
+                      {suppInfoBez ? `${suppInfoBez.unidade} por Bezerros (${suppInfoBez.peso ?? 25} kg cada)` : 'Sacos por Bezerros'}
                     </label>
                     <input
                       type="number"
