@@ -226,7 +226,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!entriesRes.error) setEntries(
         (entriesRes.data ?? [])
           .map(toDataEntry)
-          .filter(e => !pendingDeletesRef.current.has(e.id))
+          .filter(e => !pendingDeletesRef.current.has(e.id ?? ''))
           .map(e => {
             const pending = pendingUpdatesRef.current.get(e.id!);
             return pending ? { ...e, ...pending } : e;
@@ -308,7 +308,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (entry.id && !entry.id.startsWith('temp-')) {
       pendingDeletesRef.current.add(entry.id);
       supabaseAdmin.from('data_entries').delete().eq('id', entry.id).then(() => {
-        pendingDeletesRef.current.delete(entry.id);
+        pendingDeletesRef.current.delete(entry.id!);
       });
     }
     setEntries(prev => prev.filter((_, i) => i !== index));

@@ -131,19 +131,20 @@ function LotesTab({
 
   // ── Somatória global da fazenda ──
   const globalStats = useMemo(() => {
-    const totalHA      = pastosComLotes.reduce((s, p) => s + (p.area ?? 0), 0);
-    const totalLotes   = pastosComLotes.length;
-    const totalCab     = ativos.reduce((s, a) => s + a.quantidade, 0);
-    const pesoNum      = ativos.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
-    const pesoDen      = ativos.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+    const base = search.trim() ? ativosFiltrados : ativos;
+    const filteredPastos = search.trim() ? pastures.filter(p => byPasto[p.id]?.length) : pastosComLotes;
+    const totalHA      = filteredPastos.reduce((s, p) => s + (p.area ?? 0), 0);
+    const totalLotes   = filteredPastos.length;
+    const totalCab     = base.reduce((s, a) => s + a.quantidade, 0);
+    const pesoNum      = base.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+    const pesoDen      = base.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
     const pesoMedio    = pesoDen > 0 ? pesoNum / pesoDen : null;
-    const totalBez     = ativos.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
-    const bezPesoNum   = ativos.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
-    const bezPesoDen   = ativos.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+    const totalBez     = base.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+    const bezPesoNum   = base.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+    const bezPesoDen   = base.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
     const bezPesoMedio = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
     return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pastosComLotes, animals]);
+  }, [pastosComLotes, ativosFiltrados, ativos, search, byPasto, pastures]);
 
   async function confirmarAlocacao() {
     if (!alocarAnimal || !pastoSel) return;
@@ -444,7 +445,11 @@ function LotesTab({
                 <div>
                   <label className={labelClass}>Lote</label>
                   <p className="text-sm font-semibold text-gray-900">{alocarAnimal.nome}</p>
-                  <p className="text-xs text-gray-500">{alocarAnimal.quantidade} cabeças</p>
+                  <p className="text-xs text-gray-500">
+                    {alocarAnimal.quantidade} cabeças
+                    {alocarAnimal.categoria_id ? ` · ${catMap[alocarAnimal.categoria_id] ?? ''}` : ''}
+                    {(alocarAnimal.bezerros_quantidade ?? 0) > 0 ? ` · ${alocarAnimal.bezerros_quantidade} bez.` : ''}
+                  </p>
                 </div>
                 <div>
                   <label className={labelClass}>Pasto destino</label>
@@ -487,9 +492,9 @@ function LotesTab({
 ══════════════════════════════════════════════════════════════ */
 
 function TransferirTab({
-  animals, pastures, farmId, onReload,
+  animals, pastures, farmId, onReload, categories,
 }: {
-  animals: Animal[]; pastures: Pasture[]; farmId: string; onReload: () => void;
+  animals: Animal[]; pastures: Pasture[]; farmId: string; onReload: () => void; categories: AnimalCategory[];
 }) {
   const [loteId, setLoteId]       = useState('');
   const [destId, setDestId]       = useState('');
@@ -501,6 +506,7 @@ function TransferirTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const pastoMap = useMemo(() => Object.fromEntries(pastures.map(p => [p.id, p.nome])), [pastures]);
+  const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
   const lote = ativos.find(a => a.id === loteId);
 
   useEffect(() => {
@@ -539,15 +545,19 @@ function TransferirTab({
         </div>
 
         <div>
-          <label className={labelClass}>Lote</label>
+          <label className={labelClass}>Lote de Origem</label>
           <div className="relative">
             <select value={loteId} onChange={e => { setLoteId(e.target.value); setDestId(''); }} className={selectClass}>
               <option value="">Selecione um lote…</option>
-              {ativos.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.nome} ({a.quantidade} cab.) {a.pasto_id ? `· ${pastoMap[a.pasto_id] ?? ''}` : '· sem pasto'}
-                </option>
-              ))}
+              {ativos.map(a => {
+                const catNome = a.categoria_id ? (catMap[a.categoria_id] ?? '') : '';
+                const bezInfo = (a.bezerros_quantidade ?? 0) > 0 ? ` +${a.bezerros_quantidade} bez.` : '';
+                return (
+                  <option key={a.id} value={a.id}>
+                    {a.nome} ({a.quantidade} cab.{catNome ? ` · ${catNome}` : ''}{bezInfo}) {a.pasto_id ? `· ${pastoMap[a.pasto_id] ?? ''}` : '· sem pasto'}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
@@ -1739,7 +1749,7 @@ export function Manejos() {
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
-                  farmId={activeFarmId} onReload={reload} />
+                  farmId={activeFarmId} onReload={reload} categories={categories} />
               )}
               {tab === 'evolucao' && (
                 <EvolucaoTab animals={animals} categories={categories}

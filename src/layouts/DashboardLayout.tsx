@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -13,6 +13,7 @@ const navItems = [
   { path: '/formulario', label: 'Lançamento', icon: FileText,      module: 'formulario' as Module },
   { path: '/',           label: 'Relatórios', icon: BarChart3,     module: 'relatorio'  as Module },
   { path: '/cadastros',  label: 'Cadastros',  icon: FolderOpen,    module: 'cadastros'  as Module },
+  { path: '/historico',  label: 'Histórico',  icon: History,       module: 'historico'  as Module },
   { path: '/usuarios',   label: 'Usuários',   icon: Users,         module: 'usuarios'   as Module },
   { path: '/fazendas',   label: 'Fazenda',    icon: Building2,     module: 'fazendas'   as Module },
 ];
@@ -83,7 +84,9 @@ export function DashboardLayout() {
   const { user, logout, isAdmin, hasModule } = useAuth();
   const [showEmDev, setShowEmDev] = useState(false);
 
-  const visibleNavItems = navItems.filter(item => hasModule(item.module));
+  const visibleNavItems = navItems.filter(item =>
+    item.module === 'historico' ? (isAdmin || hasModule(item.module)) : hasModule(item.module)
+  );
 
   async function handleLogout() {
     try {
@@ -139,7 +142,7 @@ export function DashboardLayout() {
             <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
               style={{ background: 'rgba(26,96,64,0.08)', color: '#1a6040', borderColor: 'rgba(26,96,64,0.18)' }}>
-              v1.18
+              v1.18a
             </span>
           </div>
           <p className="text-xs mt-0.5 truncate text-gray-400">{user?.name}</p>

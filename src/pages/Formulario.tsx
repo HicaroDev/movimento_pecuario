@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen, KeyRound } from 'lucide-react';
+import { Plus, BarChart3, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen, KeyRound, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
@@ -122,7 +122,7 @@ function nextYM(ym: string) {
 }
 
 export function Formulario() {
-  const { entries, addEntry, updateEntry, removeEntry, clearAll, loadSample, pastures, loading, activeFarmId } = useData();
+  const { entries, addEntry, updateEntry, removeEntry, pastures, loading, activeFarmId } = useData();
   const { user } = useAuth();
   const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -134,6 +134,8 @@ export function Formulario() {
 
   /* ── Confirmação de exclusão ── */
   const [confirmDelete, setConfirmDelete] = useState<{ index: number; label: string } | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePasswordError, setDeletePasswordError] = useState(false);
 
   const farmId = activeFarmId || user?.farmId || '';
 
@@ -192,10 +194,22 @@ export function Formulario() {
     }
   }, [monthOptions, activeMonth]);
 
+  const [savedFilter, setSavedFilter] = useState('');
+
   const visibleEntries = useMemo(
     () => entries.filter(e => !e.data || e.data.startsWith(activeMonth)),
     [entries, activeMonth]
   );
+
+  const filteredEntries = useMemo(() => {
+    if (!savedFilter.trim()) return visibleEntries;
+    const q = savedFilter.toLowerCase();
+    return visibleEntries.filter(e =>
+      e.pasto.toLowerCase().includes(q) ||
+      e.tipo.toLowerCase().includes(q) ||
+      (e.funcionario ?? '').toLowerCase().includes(q)
+    );
+  }, [visibleEntries, savedFilter]);
 
   const isActiveClosed = closedMonths.has(activeMonth);
 
@@ -264,7 +278,9 @@ export function Formulario() {
         bez:       a.bezerros_quantidade ?? 0,
       };
     });
-    return { totalCab, nLotes: lotesNoPasto.length, totalBez, lotes };
+    const bezEquiv = Math.floor(totalBez / 3);
+    const equivalentCab = totalCab + bezEquiv;
+    return { totalCab, nLotes: lotesNoPasto.length, totalBez, bezEquiv, equivalentCab, lotes };
   }, [selectedPasto, pastures, animals, animalCategories]);
 
   /* Auto-fill: peso da sacaria */
@@ -285,7 +301,7 @@ export function Formulario() {
   const onAddRow = (data: FormFields) => {
     const entry: DataEntry = {
       pasto:        data.pasto,
-      quantidade:   pastoInfo?.totalCab ?? 0,
+      quantidade:   pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0,
       tipo:         data.tipo,
       periodo:      0,
       data:         data.data,
@@ -296,17 +312,7 @@ export function Formulario() {
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ pasto: data.pasto, data: data.data, tipo: '', sacos: 0, funcionario: data.funcionario });
-  };
-
-  const handleClearAll = () => {
-    clearAll();
-    toast.info('Todos os registros foram removidos.');
-  };
-
-  const handleLoadSample = () => {
-    loadSample();
-    toast.success('Dados de exemplo carregados!', { description: '29 registros.' });
+    reset({ data: data.data, tipo: '', sacos: 0, pasto: '', funcionario: '' });
   };
 
   return (
@@ -454,6 +460,11 @@ export function Formulario() {
                         </span>
                       )}
                     </div>
+                    {pastoInfo.bezEquiv > 0 && (
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Equiv. adulto: <span className="font-semibold" style={{color:'#1a6040'}}>{pastoInfo.equivalentCab} cab.</span> <span className="text-gray-400">(gado + ⌊bez÷3⌋)</span>
+                      </p>
+                    )}
 
                     {/* Detalhe por lote quando há mais de 1 */}
                     {pastoInfo.nLotes > 1 && (
@@ -523,7 +534,8 @@ export function Formulario() {
                   step="1"
                   placeholder="56"
                   {...register('sacos', { required: true, valueAsNumber: true })}
-                  className={`${inputClass} ${errors.sacos ? 'ring-2 ring-red-400' : ''}`}
+                  disabled={!!selectedTipo && (!suppInfo || !suppInfo.peso)}
+                  className={`${inputClass} ${errors.sacos ? 'ring-2 ring-red-400' : ''} ${!!selectedTipo && (!suppInfo || !suppInfo.peso) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div>
@@ -547,16 +559,20 @@ export function Formulario() {
           className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900">Registros Salvos</h2>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleClearAll}
-                disabled={entries.length === 0}
-                className="px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Limpar Tudo
-              </button>
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold text-gray-900">Registros Salvos</h2>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={savedFilter}
+                  onChange={e => setSavedFilter(e.target.value)}
+                  placeholder="Filtrar..."
+                  className="h-8 pl-8 pr-3 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  style={{ width: 160 }}
+                />
+                {savedFilter && <button onClick={() => setSavedFilter('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"><X className="w-3 h-3" /></button>}
+              </div>
             </div>
           </div>
 
@@ -591,7 +607,7 @@ export function Formulario() {
             </div>
           )}
 
-          {visibleEntries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               {isActiveClosed ? (
                 <>
@@ -622,7 +638,7 @@ export function Formulario() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {visibleEntries.map((entry, index) => {
+                  {filteredEntries.map((entry, index) => {
                     if (editingId === entry.id) {
                       return (
                         <EntryEditRow
@@ -684,6 +700,20 @@ export function Formulario() {
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-200">
+                    <td className="px-6 py-2.5 text-xs font-semibold text-gray-500" colSpan={4}>
+                      {savedFilter ? `${filteredEntries.length} de ${visibleEntries.length} registros` : `${visibleEntries.length} registro${visibleEntries.length !== 1 ? 's' : ''}`}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-bold tabular-nums" style={{ color: '#1a6040' }}>
+                      {filteredEntries.reduce((s, e) => s + e.sacos, 0).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-bold tabular-nums" style={{ color: '#1a6040' }}>
+                      {filteredEntries.reduce((s, e) => s + e.kg, 0).toLocaleString('pt-BR')}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -696,7 +726,7 @@ export function Formulario() {
       {confirmDelete && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setConfirmDelete(null)}
+          onClick={() => { setConfirmDelete(null); setDeletePassword(''); setDeletePasswordError(false); }}
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <motion.div
@@ -715,18 +745,44 @@ export function Formulario() {
                 <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{confirmDelete.label}</p>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
+            <p className="text-sm text-gray-500 mb-2">Esta ação não pode ser desfeita.</p>
+            <div className="mt-3 mb-4">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Senha de confirmação</label>
+              <input
+                type="password"
+                autoFocus
+                value={deletePassword}
+                onChange={e => { setDeletePassword(e.target.value); setDeletePasswordError(false); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && deletePassword === SENHA_MES) {
+                    removeEntry(confirmDelete!.index);
+                    setConfirmDelete(null);
+                    setDeletePassword('');
+                    toast.success('Registro excluído.');
+                  }
+                }}
+                placeholder="Digite a senha"
+                className={`w-full h-9 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-colors ${deletePasswordError ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-200 bg-gray-50 focus:ring-teal-500'}`}
+              />
+              {deletePasswordError && <p className="text-xs text-red-500 mt-0.5">Senha incorreta.</p>}
+            </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setConfirmDelete(null)}
+                onClick={() => { setConfirmDelete(null); setDeletePassword(''); setDeletePasswordError(false); }}
                 className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => {
-                  removeEntry(confirmDelete.index);
+                  if (deletePassword !== SENHA_MES) {
+                    setDeletePasswordError(true);
+                    return;
+                  }
+                  removeEntry(confirmDelete!.index);
                   setConfirmDelete(null);
+                  setDeletePassword('');
+                  setDeletePasswordError(false);
                   toast.success('Registro excluído.');
                 }}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"

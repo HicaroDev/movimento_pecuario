@@ -172,6 +172,8 @@ function SimpleTab({
 
   async function onAdd(data: SimpleForm) {
     if (!activeFarmId) return;
+    const dup = items.find(i => i.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
+    if (dup) { toast.error(`Já existe um "${label}" com este nome.`); return; }
     const { data: row, error } = await supabaseAdmin.from(table)
       .insert({ nome: data.nome, observacoes: data.observacoes || null, farm_id: activeFarmId })
       .select().single();
@@ -291,9 +293,10 @@ function SimpleTab({
 ═══════════════════════════════════════════════════════════════ */
 interface PastureForm { nome: string; area: number; retiro_id: string; forragem: string; qualidade_forragem: string; observacoes: string; }
 
-function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
+function PastureEditRow({ pasture, retiros, forragens, onSave, onCancel }: {
   pasture: { id: string; nome: string; area?: number; retiro_id?: string; forragem?: string; qualidade_forragem?: string; observacoes?: string };
   retiros: SimpleItem[];
+  forragens: string[];
   onSave: (data: PastureForm) => void; onCancel: () => void;
 }) {
   const { register, handleSubmit } = useForm<PastureForm>({
@@ -319,7 +322,7 @@ function PastureEditRow({ pasture, retiros, onSave, onCancel }: {
       <td className="px-4 py-2">
         <select {...register('forragem')} className={inputClass}>
           <option value="">— Selecione —</option>
-          {FORRAGENS.map(f => <option key={f} value={f}>{f}</option>)}
+          {forragens.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
       </td>
       <td className="px-4 py-2">
@@ -342,6 +345,7 @@ function PastosTab() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [filterRetiro, setFilterRetiro] = useState('');
+  const [dbForragens, setDbForragens] = useState<string[]>([]);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PastureForm>();
   const { activeFarmId } = useData();
 
@@ -356,6 +360,18 @@ function PastosTab() {
     })();
     return () => { mounted = false; };
   }, [activeFarmId]);
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    supabaseAdmin.from('forage_types').select('nome').eq('farm_id', activeFarmId)
+      .then(({ data }) => {
+        if (data) {
+          const names = (data as {nome:string}[]).map(f => f.nome).filter(n => !(FORRAGENS as readonly string[]).includes(n));
+          setDbForragens(names);
+        }
+      });
+  }, [activeFarmId]);
+  const allForragens = [...FORRAGENS, ...dbForragens];
 
   function getRetiroName(id?: string) { return retiros.find(r => r.id === id)?.nome; }
 
@@ -484,7 +500,7 @@ function PastosTab() {
                 <label className={labelClass}>Forragem</label>
                 <select {...register('forragem')} className={`${inputClass} cursor-pointer`}>
                   <option value="">— Selecione —</option>
-                  {FORRAGENS.map(f => <option key={f} value={f}>{f}</option>)}
+                  {allForragens.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
               <div>
@@ -536,7 +552,7 @@ function PastosTab() {
                       </tr>
                     ) : filteredPastures.map(p =>
                       editingId === p.id ? (
-                        <PastureEditRow key={p.id} pasture={p} retiros={retiros}
+                        <PastureEditRow key={p.id} pasture={p} retiros={retiros} forragens={allForragens}
                           onSave={d => onEditSave(p.id, d)} onCancel={() => setEditingId(null)} />
                       ) : (
                         <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
@@ -624,6 +640,7 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
           <option value="">—</option>
           <option value="MACHO">MACHO</option>
           <option value="FÊMEA">FÊMEA</option>
+          <option value="MISTURADO">MISTURADO</option>
         </select>
       </td>
       <td className="px-4 py-2">
@@ -687,6 +704,8 @@ function AnimaisTab() {
 
   async function onAdd(data: AnimalForm) {
     if (!activeFarmId) return;
+    const dup = _animaisCache.find(a => a.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
+    if (dup) { toast.error('Já existe um lote com este nome.'); return; }
     const pesoMedio = data.peso_medio > 0 ? data.peso_medio : null;
     const bezQtd    = temBezerros && data.bezerros_quantidade > 0 ? data.bezerros_quantidade : null;
     const bezPeso   = temBezerros && data.bezerros_peso_medio > 0 ? data.bezerros_peso_medio : null;
@@ -813,6 +832,7 @@ function AnimaisTab() {
                   <option value="">—</option>
                   <option value="MACHO">MACHO</option>
                   <option value="FÊMEA">FÊMEA</option>
+                  <option value="MISTURADO">MISTURADO</option>
                 </select>
               </div>
               <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
@@ -961,13 +981,26 @@ const CONSUMO_OPTIONS = [
   '1,50 A 2,30% PV',
 ] as const;
 
+const META_CONSUMO: Record<string, string> = {
+  '20 A 30 GRAMAS/100 KG PV':  '0,030%',
+  '35 A 45 GRAMAS/100 KG PV':  '0,400%',
+  '50 A 100 GRAMAS/100 KG PV': '0,060%',
+  '100 A 120 GRAMAS/100 KG PV':'0,110%',
+  '200 A 300 GRAMAS/100 KG PV':'0,250%',
+  '300 A 400 GRAMAS/100 KG PV':'0,350%',
+  '500 A 700 GRAMAS/100 KG PV':'0,600%',
+  '1,0 A 1,50% PV':            '1,300%',
+  '1,50 A 2,30% PV':           '2,000%',
+};
+
 let _suplementosCache: SupplementType[] = [];
 interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; consumo: string; observacoes: string; }
 
 function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: (d: SupplementForm) => void; onCancel: () => void; }) {
-  const { register, handleSubmit } = useForm<SupplementForm>({
+  const { register, handleSubmit, watch } = useForm<SupplementForm>({
     defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '' },
   });
+  const consumoWatch = watch('consumo');
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2">
@@ -990,6 +1023,7 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
           {CONSUMO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       </td>
+      <td className="px-4 py-2 text-xs text-gray-500">{META_CONSUMO[consumoWatch] || '—'}</td>
       <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
@@ -1028,6 +1062,8 @@ function SuplementosTab() {
 
   async function onAdd(data: SupplementForm) {
     if (!activeFarmId) return;
+    const dup = _suplementosCache.find(s => s.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
+    if (dup) { toast.error('Já existe um suplemento com este nome.'); return; }
     const payload: Record<string, unknown> = {
       nome: data.nome,
       unidade: data.unidade,
@@ -1139,7 +1175,7 @@ function SuplementosTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Obs', 'Ações'].map(h => (
+                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Meta (% PV)', 'Obs', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -1147,7 +1183,7 @@ function SuplementosTab() {
                 <tbody className="divide-y divide-gray-100">
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-10 text-center text-sm text-gray-400">
+                      <td colSpan={8} className="py-10 text-center text-sm text-gray-400">
                         Nenhum suplemento encontrado para "{filterText}"
                       </td>
                     </tr>
@@ -1160,6 +1196,7 @@ function SuplementosTab() {
                       <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{item.consumo || '—'}</td>
+                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>{item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—'}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                       <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
                     </motion.tr>
@@ -1168,7 +1205,7 @@ function SuplementosTab() {
                 {filterText && (
                   <tfoot>
                     <tr>
-                      <td colSpan={7} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+                      <td colSpan={8} className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
                         {filteredItems.length} de {items.length} suplementos
                       </td>
                     </tr>

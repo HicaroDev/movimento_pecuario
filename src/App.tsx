@@ -11,6 +11,7 @@ import { Fazendas } from './pages/Fazendas';
 import { Usuarios } from './pages/Usuarios';
 import { Cadastros } from './pages/Cadastros';
 import { Manejos } from './pages/Manejos';
+import { Historico } from './pages/Historico';
 
 const router = createBrowserRouter([
   { path: '/login', Component: Login },
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
           element: <ModuleRoute module="usuarios" />,
           children: [{ path: 'usuarios', Component: Usuarios }],
         },
+        { path: 'historico', Component: Historico },
       ],
     }],
   },
