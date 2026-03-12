@@ -32,6 +32,8 @@ interface FormFields {
   tipo: string;
   sacos: number;
   funcionario: string;
+  tipoBez: string;
+  sacosBez: number;
 }
 
 interface EditFields { pasto: string; data: string; tipo: string; quantidade: number; sacos: number; }
@@ -260,6 +262,8 @@ export function Formulario() {
   const selectedPasto = watch('pasto');
   const selectedTipo  = watch('tipo');
   const sacos         = watch('sacos');
+  const selectedTipoBez = watch('tipoBez');
+  const sacosBez        = watch('sacosBez');
 
   /* Auto-fill: qtd gado + lotes no pasto */
   const pastoInfo = useMemo(() => {
@@ -290,8 +294,16 @@ export function Formulario() {
     return st ? { peso: st.peso ?? 25, unidade: st.unidade } : null;
   }, [selectedTipo, supplementTypes]);
 
+  const suppInfoBez = useMemo(() => {
+    if (!selectedTipoBez) return null;
+    const st = supplementTypes.find(s => s.nome === selectedTipoBez);
+    return st ? { peso: st.peso ?? 25, unidade: st.unidade } : null;
+  }, [selectedTipoBez, supplementTypes]);
+
   const pesoSaco      = suppInfo?.peso ?? 25;
   const kgCalculado   = Number(sacos) > 0 ? Number(sacos) * pesoSaco : 0;
+  const pesoSacoBez   = suppInfoBez?.peso ?? 25;
+  const kgCalculadoBez = Number(sacosBez) > 0 ? Number(sacosBez) * pesoSacoBez : 0;
 
   /* Supplement options: DB first, fallback to static */
   const tipoOptions = supplementTypes.length > 0
@@ -312,7 +324,25 @@ export function Formulario() {
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ data: data.data, tipo: '', sacos: 0, pasto: '', funcionario: '' });
+
+    // Lançamento de bezerros (quando preenchido)
+    if (data.tipoBez && Number(data.sacosBez) > 0 && pastoInfo && pastoInfo.totalBez > 0) {
+      const entryBez: DataEntry = {
+        pasto:       data.pasto,
+        quantidade:  pastoInfo.totalBez,
+        tipo:        data.tipoBez,
+        periodo:     0,
+        data:        data.data,
+        sacos:       Number(data.sacosBez),
+        kg:          kgCalculadoBez,
+        consumo:     0,
+        funcionario: data.funcionario || undefined,
+      };
+      addEntry(entryBez);
+      toast.success('Bezerros adicionados!', { description: `${entryBez.pasto} — ${entryBez.tipo} (${fmtInt(pastoInfo.totalBez)} bez.)` });
+    }
+
+    reset({ data: data.data, tipo: '', sacos: 0, pasto: '', funcionario: '', tipoBez: '', sacosBez: 0 });
   };
 
   return (
@@ -548,6 +578,68 @@ export function Formulario() {
                 />
               </div>
             </div>
+
+            {/* ── Seção Bezerros (condicional) ── */}
+            {(pastoInfo?.totalBez ?? 0) > 0 && (
+              <div
+                className="rounded-xl p-4 space-y-3"
+                style={{ background: 'rgba(251,146,60,0.07)', border: '1px solid rgba(251,146,60,0.25)' }}
+              >
+                {/* Header da seção */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: '#f97316' }}
+                  />
+                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#ea580c' }}>
+                    Suplemento dos Bezerros — {fmtInt(pastoInfo!.totalBez)} cab.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Tipo Suplemento Bezerro */}
+                  <div>
+                    <label className={labelClass}>Tipo de Suplemento do Bezerro</label>
+                    <select
+                      {...register('tipoBez')}
+                      disabled={loadingData}
+                      className={`${inputClass} cursor-pointer`}
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      {tipoOptions.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    {suppInfoBez && (
+                      <p className="mt-1 text-xs text-gray-400 flex items-center gap-1">
+                        <Info className="w-3 h-3" />
+                        Peso por {suppInfoBez.unidade.toLowerCase()}: <strong className="text-gray-600">{suppInfoBez.peso ?? 25} kg</strong>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Sacos Bezerros */}
+                  <div>
+                    <label className={labelClass}>
+                      Sacos por Bezerros{suppInfoBez ? ` (${suppInfoBez.peso ?? 25} kg cada)` : ''}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      {...register('sacosBez', { valueAsNumber: true })}
+                      className={inputClass}
+                    />
+                    {kgCalculadoBez > 0 && (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Ofertado: <strong className="text-gray-600">{fmtInt(kgCalculadoBez)} kg</strong>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 
