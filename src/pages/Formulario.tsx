@@ -489,22 +489,27 @@ export function Formulario() {
             </div>
 
             {/* Row 3: Funcionário */}
-            {employees.length > 0 && (
-              <div>
-                <label className={labelClass}>Funcionário</label>
-                <select
-                  {...register('funcionario')}
-                  className={`${inputClass} cursor-pointer`}
-                >
-                  <option value="">Selecione (opcional)</option>
-                  {employees.map(e => (
-                    <option key={e.id} value={e.nome}>
-                      {e.nome}{e.funcao ? ` — ${e.funcao}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className={labelClass}>Funcionário</label>
+              <select
+                {...register('funcionario')}
+                disabled={loadingData || employees.length === 0}
+                className={`${inputClass} cursor-pointer`}
+              >
+                {employees.length === 0 ? (
+                  <option value="">Nenhum funcionário cadastrado</option>
+                ) : (
+                  <>
+                    <option value="">Selecione (opcional)</option>
+                    {employees.map(e => (
+                      <option key={e.id} value={e.nome}>
+                        {e.nome}{e.funcao ? ` — ${e.funcao}` : ''}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
 
             {/* Row 4: Sacos | KG (auto-calc) */}
             <div className="grid grid-cols-2 gap-4">
