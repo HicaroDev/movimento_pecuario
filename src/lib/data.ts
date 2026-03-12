@@ -1,13 +1,14 @@
 export interface DataEntry {
-  id?: string;     // UUID do Supabase
-  data?: string;   // YYYY-MM-DD
+  id?: string;          // UUID do Supabase
+  data?: string;        // YYYY-MM-DD
   pasto: string;
   quantidade: number;
   tipo: string;
   periodo: number;
   sacos: number;
   kg: number;
-  consumo: number; // kg/cab/dia = kg / (quantidade * periodo)
+  consumo: number;      // kg/cab/dia = kg / (quantidade * periodo)
+  funcionario?: string; // nome do funcionário responsável
 }
 
 export const STORAGE_KEY = 'suplementoControlData';

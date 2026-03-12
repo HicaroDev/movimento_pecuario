@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen } from 'lucide-react';
+import { Plus, BarChart3, FileText, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
@@ -20,11 +20,18 @@ interface SupplementType {
   peso?: number;
 }
 
+interface Employee {
+  id: string;
+  nome: string;
+  funcao?: string;
+}
+
 interface FormFields {
   pasto: string;
   data: string;
   tipo: string;
   sacos: number;
+  funcionario: string;
 }
 
 interface EditFields { pasto: string; data: string; tipo: string; quantidade: number; sacos: number; }
@@ -99,6 +106,9 @@ const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 const today = new Date().toISOString().split('T')[0];
 const todayYM = today.slice(0, 7); // YYYY-MM
 
+/** Senha para fechar/reabrir mês — altere conforme necessário */
+const SENHA_MES = '1234';
+
 const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const MONTH_FULL  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -119,9 +129,39 @@ export function Formulario() {
   const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [animalCategories, setAnimalCategories] = useState<{ id: string; nome: string }[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
+  /* ── Confirmação de exclusão ── */
+  const [confirmDelete, setConfirmDelete] = useState<{ index: number; label: string } | null>(null);
+
   const farmId = activeFarmId || user?.farmId || '';
+
+  /* ── Modal de senha ── */
+  const [senhaModal, setSenhaModal] = useState<{ acao: 'fechar' | 'reabrir'; alvo: string } | null>(null);
+  const [senhaInput, setSenhaInput] = useState('');
+  const [senhaErro,  setSenhaErro]  = useState(false);
+
+  function abrirModalSenha(acao: 'fechar' | 'reabrir', alvo: string) {
+    setSenhaInput('');
+    setSenhaErro(false);
+    setSenhaModal({ acao, alvo });
+  }
+
+  function confirmarSenha() {
+    if (senhaInput !== SENHA_MES) {
+      setSenhaErro(true);
+      setSenhaInput('');
+      return;
+    }
+    if (!senhaModal) return;
+    if (senhaModal.acao === 'fechar') {
+      executarFecharMes(senhaModal.alvo);
+    } else {
+      executarReopenMes(senhaModal.alvo);
+    }
+    setSenhaModal(null);
+  }
 
   /* ── Controle de mês ── */
   const closedKey = farmId ? `closedMonths_${farmId}` : null;
@@ -159,16 +199,27 @@ export function Formulario() {
 
   const isActiveClosed = closedMonths.has(activeMonth);
 
-  function handleCloseMonth() {
+  function executarFecharMes(ym: string) {
     if (!closedKey) return;
     const updated = new Set(closedMonths);
-    updated.add(activeMonth);
+    updated.add(ym);
     setClosedMonths(updated);
     localStorage.setItem(closedKey, JSON.stringify(Array.from(updated)));
-    const [, m] = activeMonth.split('-').map(Number);
-    const next = nextYM(activeMonth);
+    const [, m] = ym.split('-').map(Number);
+    const next = nextYM(ym);
     setActiveMonth(next);
-    toast.success(`${MONTH_FULL[m - 1]} fechado!`, { description: `Agora lançando em ${ymLabel(next)}` });
+    toast.success(`${MONTH_FULL[m - 1]} fechado!`, { description: `Agora em ${ymLabel(next)}` });
+  }
+
+  function executarReopenMes(ym: string) {
+    if (!closedKey) return;
+    const updated = new Set(closedMonths);
+    updated.delete(ym);
+    setClosedMonths(updated);
+    localStorage.setItem(closedKey, JSON.stringify(Array.from(updated)));
+    const [, m] = ym.split('-').map(Number);
+    toast.success(`${MONTH_FULL[m - 1]} reaberto!`);
+    setActiveMonth(ym);
   }
 
   /* Load supplement_types and animals when farmId changes */
@@ -179,15 +230,17 @@ export function Formulario() {
       supabaseAdmin.from('supplement_types').select('id, nome, unidade, peso').eq('farm_id', farmId),
       manejoService.listarAnimais(farmId),
       supabaseAdmin.from('animal_categories').select('id, nome').eq('farm_id', farmId),
-    ]).then(([suppRes, animalsRes, catRes]) => {
+      supabaseAdmin.from('employees').select('id, nome, funcao').eq('farm_id', farmId).order('nome'),
+    ]).then(([suppRes, animalsRes, catRes, empRes]) => {
       if (suppRes.data) setSupplementTypes(suppRes.data as SupplementType[]);
       setAnimals(animalsRes.filter(a => a.status === 'ativo' || !a.status));
       if (catRes.data) setAnimalCategories(catRes.data as { id: string; nome: string }[]);
+      if (empRes.data) setEmployees(empRes.data as Employee[]);
     }).catch(() => {}).finally(() => setLoadingData(false));
   }, [farmId]);
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormFields>({
-    defaultValues: { data: today },
+    defaultValues: { data: today, funcionario: '' },
   });
 
   const selectedPasto = watch('pasto');
@@ -231,18 +284,19 @@ export function Formulario() {
 
   const onAddRow = (data: FormFields) => {
     const entry: DataEntry = {
-      pasto:      data.pasto,
-      quantidade: pastoInfo?.totalCab ?? 0,
-      tipo:       data.tipo,
-      periodo:    0,
-      data:       data.data,
-      sacos:      Number(data.sacos),
-      kg:         kgCalculado,
-      consumo:    0,
+      pasto:        data.pasto,
+      quantidade:   pastoInfo?.totalCab ?? 0,
+      tipo:         data.tipo,
+      periodo:      0,
+      data:         data.data,
+      sacos:        Number(data.sacos),
+      kg:           kgCalculado,
+      consumo:      0,
+      funcionario:  data.funcionario || undefined,
     };
     addEntry(entry);
     toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    reset({ pasto: data.pasto, data: data.data, tipo: '', sacos: 0 });
+    reset({ pasto: data.pasto, data: data.data, tipo: '', sacos: 0, funcionario: data.funcionario });
   };
 
   const handleClearAll = () => {
@@ -308,17 +362,19 @@ export function Formulario() {
               </button>
               <button
                 type="button"
-                onClick={handleCloseMonth}
-                disabled={isActiveClosed}
-                title={isActiveClosed ? 'Mês já fechado' : `Fechar ${ymLabel(activeMonth)}`}
+                onClick={() => isActiveClosed
+                  ? abrirModalSenha('reabrir', activeMonth)
+                  : abrirModalSenha('fechar', activeMonth)
+                }
+                title={isActiveClosed ? `Reabrir ${ymLabel(activeMonth)}` : `Fechar ${ymLabel(activeMonth)}`}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${
                   isActiveClosed
-                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    ? 'border-amber-400 text-amber-600 bg-amber-50 hover:bg-amber-100'
                     : 'border-[#1a6040] text-[#1a6040] bg-[#f0f7f4] hover:bg-[#e0f0ea]'
                 }`}
               >
-                {isActiveClosed ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
-                {isActiveClosed ? 'Fechado' : 'Fechar Mês'}
+                {isActiveClosed ? <LockOpen className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                {isActiveClosed ? 'Reabrir Mês' : 'Fechar Mês'}
               </button>
             </div>
           </div>
@@ -432,7 +488,25 @@ export function Formulario() {
               </div>
             </div>
 
-            {/* Row 3: Sacos | KG (auto-calc) */}
+            {/* Row 3: Funcionário */}
+            {employees.length > 0 && (
+              <div>
+                <label className={labelClass}>Funcionário</label>
+                <select
+                  {...register('funcionario')}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">Selecione (opcional)</option>
+                  {employees.map(e => (
+                    <option key={e.id} value={e.nome}>
+                      {e.nome}{e.funcao ? ` — ${e.funcao}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Row 4: Sacos | KG (auto-calc) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>
@@ -490,13 +564,19 @@ export function Formulario() {
                 return (
                   <button
                     key={ym}
-                    onClick={() => setActiveMonth(ym)}
+                    onClick={() => {
+                      setActiveMonth(ym);
+                      if (closed && !active) abrirModalSenha('reabrir', ym);
+                    }}
+                    title={closed ? `Clique para reabrir ${ymLabel(ym)}` : ymLabel(ym)}
                     className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                       active
                         ? 'text-white shadow'
-                        : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'
+                        : closed
+                          ? 'bg-amber-50 border border-amber-300 text-amber-600 hover:bg-amber-100'
+                          : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'
                     }`}
-                    style={active ? { backgroundColor: '#1a6040' } : {}}
+                    style={active && !closed ? { backgroundColor: '#1a6040' } : active && closed ? { backgroundColor: '#d97706' } : {}}
                   >
                     {closed && <Lock className="w-3 h-3" />}
                     {ymLabel(ym)}
@@ -582,7 +662,10 @@ export function Formulario() {
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => removeEntry(entries.indexOf(entry))}
+                                onClick={() => setConfirmDelete({
+                                  index: entries.indexOf(entry),
+                                  label: `${entry.pasto} — ${entry.tipo}${entry.data ? ' (' + new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') + ')' : ''}`,
+                                })}
                                 className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -601,6 +684,116 @@ export function Formulario() {
       </motion.div>
 
       {showImport && <ImportExcelModal onClose={() => setShowImport(false)} />}
+
+      {/* ── Modal de confirmação de exclusão ── */}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <motion.div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 p-6"
+            initial={{ opacity: 0, scale: 0.92, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50">
+                <Trash2 className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Excluir registro?</h2>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{confirmDelete.label}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  removeEntry(confirmDelete.index);
+                  setConfirmDelete(null);
+                  toast.success('Registro excluído.');
+                }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Modal de senha (fechar / reabrir mês) ── */}
+      {senhaModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setSenhaModal(null)}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <motion.div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 p-6"
+            initial={{ opacity: 0, scale: 0.92, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: senhaModal.acao === 'fechar' ? 'rgba(26,96,64,0.1)' : 'rgba(217,119,6,0.1)' }}>
+                <KeyRound className="w-5 h-5" style={{ color: senhaModal.acao === 'fechar' ? '#1a6040' : '#d97706' }} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">
+                  {senhaModal.acao === 'fechar' ? `Fechar ${ymLabel(senhaModal.alvo)}` : `Reabrir ${ymLabel(senhaModal.alvo)}`}
+                </h2>
+                <p className="text-xs text-gray-400">Digite a senha para confirmar</p>
+              </div>
+            </div>
+
+            <input
+              type="password"
+              autoFocus
+              value={senhaInput}
+              onChange={e => { setSenhaInput(e.target.value); setSenhaErro(false); }}
+              onKeyDown={e => e.key === 'Enter' && confirmarSenha()}
+              placeholder="Senha"
+              className={`w-full h-10 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-colors mb-1 ${
+                senhaErro
+                  ? 'border-red-400 bg-red-50 focus:ring-red-400'
+                  : 'border-gray-200 bg-gray-50 focus:ring-teal-500'
+              }`}
+            />
+            {senhaErro && (
+              <p className="text-xs text-red-500 mb-3">Senha incorreta. Tente novamente.</p>
+            )}
+
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setSenhaModal(null)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarSenha}
+                disabled={!senhaInput}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
+                style={{ background: senhaModal.acao === 'fechar' ? '#1a6040' : '#d97706' }}
+              >
+                {senhaModal.acao === 'fechar' ? 'Fechar Mês' : 'Reabrir Mês'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
