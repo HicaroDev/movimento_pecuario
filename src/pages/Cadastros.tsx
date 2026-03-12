@@ -1454,7 +1454,9 @@ export function Cadastros() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('aba') ?? 'pastos') as TabKey;
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteTarget, setDeleteTarget]             = useState<DeleteTarget | null>(null);
+  const [simpleDeleteTarget, setSimpleDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [simpleDeleting, setSimpleDeleting]         = useState(false);
 
   function setTab(key: TabKey) {
     setSearchParams({ aba: key }, { replace: true });
@@ -1467,6 +1469,20 @@ export function Cadastros() {
     await deleteTarget!.onDelete();
     setDeleteTarget(null);
     toast.success('Excluído com sucesso.');
+  }
+
+  async function handleSimpleDeleteConfirm() {
+    if (!simpleDeleteTarget) return;
+    setSimpleDeleting(true);
+    try {
+      await simpleDeleteTarget.onDelete();
+      setSimpleDeleteTarget(null);
+      toast.success('Excluído com sucesso.');
+    } catch {
+      toast.error('Erro ao excluir.');
+    } finally {
+      setSimpleDeleting(false);
+    }
   }
 
   return (
@@ -1499,12 +1515,13 @@ export function Cadastros() {
         {/* Tab content */}
         {activeTab === 'pastos'       && <PastosTab onRequestDelete={setDeleteTarget} />}
         {activeTab === 'animais'      && <AnimaisTab onRequestDelete={setDeleteTarget} />}
-        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setDeleteTarget} />}
-        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setDeleteTarget} />}
-        {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setDeleteTarget} />}
+        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setSimpleDeleteTarget} />}
+        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setSimpleDeleteTarget} />}
+        {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setSimpleDeleteTarget} />}
 
       </motion.div>
 
+      {/* Exclusão com senha (Pastos e Animais) */}
       <AnimatePresence>
         {deleteTarget && (
           <PasswordConfirmModal
@@ -1513,6 +1530,54 @@ export function Cadastros() {
             onConfirm={handleDeleteConfirm}
             onCancel={() => setDeleteTarget(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Confirmação simples — sem senha (Suplementos, Funcionários, Forragens) */}
+      <AnimatePresence>
+        {simpleDeleteTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => !simpleDeleting && setSimpleDeleteTarget(null)}
+          >
+            <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+            <motion.div
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 p-6"
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 12 }}
+              transition={{ duration: 0.18 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">Confirmar exclusão</h2>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{simpleDeleteTarget.label}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mb-5">Você deseja mesmo excluir? Esta ação não pode ser desfeita.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSimpleDeleteTarget(null)}
+                  disabled={simpleDeleting}
+                  className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSimpleDeleteConfirm}
+                  disabled={simpleDeleting}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-40"
+                >
+                  {simpleDeleting ? 'Excluindo...' : 'Excluir'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

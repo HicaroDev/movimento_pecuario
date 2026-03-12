@@ -13,6 +13,8 @@ import { manejoService, type Animal } from '../services/manejoService';
 import { fmtInt } from '../lib/utils';
 import { ImportExcelModal } from '../components/ImportExcelModal';
 import { logActivity } from '../services/activityLogService';
+import { PasswordConfirmModal } from '../components/PasswordConfirmModal';
+import { verifyPassword } from '../lib/verifyPassword';
 
 interface SupplementType {
   id: string;
@@ -137,8 +139,6 @@ export function Formulario() {
 
   /* ── Confirmação de exclusão ── */
   const [confirmDelete, setConfirmDelete] = useState<{ index: number; label: string } | null>(null);
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deletePasswordError, setDeletePasswordError] = useState(false);
 
   const farmId = activeFarmId || user?.farmId || '';
 
@@ -831,80 +831,22 @@ export function Formulario() {
 
       {showImport && <ImportExcelModal onClose={() => setShowImport(false)} />}
 
-      {/* ── Modal de confirmação de exclusão ── */}
+      {/* ── Modal de confirmação de exclusão (senha do login) ── */}
       {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => { setConfirmDelete(null); setDeletePassword(''); setDeletePasswordError(false); }}
-        >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <motion.div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 p-6"
-            initial={{ opacity: 0, scale: 0.92, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50">
-                <Trash2 className="w-5 h-5 text-red-500" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-gray-900">Excluir registro?</h2>
-                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{confirmDelete.label}</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-500 mb-2">Esta ação não pode ser desfeita.</p>
-            <div className="mt-3 mb-4">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Senha de confirmação</label>
-              <input
-                type="password"
-                autoFocus
-                value={deletePassword}
-                onChange={e => { setDeletePassword(e.target.value); setDeletePasswordError(false); }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && deletePassword === SENHA_MES) {
-                    const label = confirmDelete!.label;
-                    removeEntry(confirmDelete!.index);
-                    setConfirmDelete(null);
-                    setDeletePassword('');
-                    toast.success('Registro excluído.');
-                    logActivity({ farmId, userId: user?.id ?? '', userName: user?.name ?? '', module: 'formulario', action: 'excluiu', description: label });
-                  }
-                }}
-                placeholder="Digite a senha"
-                className={`w-full h-9 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-colors ${deletePasswordError ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-200 bg-gray-50 focus:ring-teal-500'}`}
-              />
-              {deletePasswordError && <p className="text-xs text-red-500 mt-0.5">Senha incorreta.</p>}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setConfirmDelete(null); setDeletePassword(''); setDeletePasswordError(false); }}
-                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  if (deletePassword !== SENHA_MES) {
-                    setDeletePasswordError(true);
-                    return;
-                  }
-                  const label = confirmDelete!.label;
-                  removeEntry(confirmDelete!.index);
-                  setConfirmDelete(null);
-                  setDeletePassword('');
-                  setDeletePasswordError(false);
-                  toast.success('Registro excluído.');
-                  logActivity({ farmId, userId: user?.id ?? '', userName: user?.name ?? '', module: 'formulario', action: 'excluiu', description: label });
-                }}
-                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
-              >
-                Excluir
-              </button>
-            </div>
-          </motion.div>
-        </div>
+        <PasswordConfirmModal
+          title="Excluir registro?"
+          description={confirmDelete.label}
+          onConfirm={async (password) => {
+            const ok = await verifyPassword(user!.email, password);
+            if (!ok) throw new Error('Senha incorreta');
+            const label = confirmDelete!.label;
+            removeEntry(confirmDelete!.index);
+            setConfirmDelete(null);
+            toast.success('Registro excluído.');
+            logActivity({ farmId, userId: user?.id ?? '', userName: user?.name ?? '', module: 'formulario', action: 'excluiu', description: label });
+          }}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
 
       {/* ── Modal de senha (fechar / reabrir mês) ── */}
