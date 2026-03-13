@@ -312,34 +312,43 @@ export function Formulario() {
     : supplementOrder;
 
   const onAddRow = (data: FormFields) => {
-    // Se bezerros têm suplemento próprio, NÃO aplica equivalente no adulto.
-    // Caso contrário, inclui bezerros como equivalente (⌊bez÷3⌋ = 1 adulto).
     const bezTemSuppProprio = !!(data.tipoBez && Number(data.sacosBez) > 0 && (pastoInfo?.totalBez ?? 0) > 0);
+    const adultoPreenchido  = !!(data.tipo && Number(data.sacos) > 0);
+
+    // Validação: pelo menos adulto OU bezerro deve estar preenchido
+    if (!adultoPreenchido && !bezTemSuppProprio) {
+      toast.error('Preencha o suplemento do adulto ou dos bezerros.');
+      return;
+    }
+
     const qtdAdulto = bezTemSuppProprio
       ? (pastoInfo?.totalCab ?? 0)
       : (pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0);
 
-    const entry: DataEntry = {
-      pasto:        data.pasto,
-      quantidade:   qtdAdulto,
-      tipo:         data.tipo,
-      periodo:      0,
-      data:         data.data,
-      sacos:        Number(data.sacos),
-      kg:           kgCalculado,
-      consumo:      0,
-      funcionario:  data.funcionario || undefined,
-    };
-    addEntry(entry);
-    toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
-    logActivity({
-      farmId:      farmId,
-      userId:      user?.id ?? '',
-      userName:    user?.name ?? '',
-      module:      'formulario',
-      action:      'criou',
-      description: `${entry.pasto} · ${entry.tipo} · ${entry.sacos} sac. · ${entry.kg} kg`,
-    });
+    // Lançamento adulto (somente se preenchido)
+    if (adultoPreenchido) {
+      const entry: DataEntry = {
+        pasto:        data.pasto,
+        quantidade:   qtdAdulto,
+        tipo:         data.tipo,
+        periodo:      0,
+        data:         data.data,
+        sacos:        Number(data.sacos),
+        kg:           kgCalculado,
+        consumo:      0,
+        funcionario:  data.funcionario || undefined,
+      };
+      addEntry(entry);
+      toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
+      logActivity({
+        farmId:      farmId,
+        userId:      user?.id ?? '',
+        userName:    user?.name ?? '',
+        module:      'formulario',
+        action:      'criou',
+        description: `${entry.pasto} · ${entry.tipo} · ${entry.sacos} sac. · ${entry.kg} kg`,
+      });
+    }
 
     // Lançamento de bezerros (quando preenchido)
     if (data.tipoBez && Number(data.sacosBez) > 0 && pastoInfo && pastoInfo.totalBez > 0) {
@@ -478,9 +487,9 @@ export function Formulario() {
               <div>
                 <label className={labelClass}>Tipo de Suplemento</label>
                 <select
-                  {...register('tipo', { required: true })}
+                  {...register('tipo')}
                   disabled={loadingData}
-                  className={`${inputClass} cursor-pointer ${errors.tipo ? 'ring-2 ring-red-400' : ''}`}
+                  className={`${inputClass} cursor-pointer`}
                 >
                   <option value="">Selecione</option>
                   {tipoOptions.map(t => (
@@ -587,9 +596,9 @@ export function Formulario() {
                   min="0"
                   step="1"
                   placeholder="56"
-                  {...register('sacos', { required: true, valueAsNumber: true })}
+                  {...register('sacos', { valueAsNumber: true })}
                   disabled={!!selectedTipo && (!suppInfo || !suppInfo.peso)}
-                  className={`${inputClass} ${errors.sacos ? 'ring-2 ring-red-400' : ''} ${!!selectedTipo && (!suppInfo || !suppInfo.peso) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`${inputClass} ${!!selectedTipo && (!suppInfo || !suppInfo.peso) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div>

@@ -172,12 +172,16 @@ function LotesTab({
           <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
           <td className="px-4 py-2.5 no-print">
-            <button
-              onClick={() => { setAlocarAnimal(a); setPastoSel(a.pasto_id ?? ''); }}
-              className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
-            >
-              {a.pasto_id ? 'Mover' : 'Alocar'}
-            </button>
+            {!a.pasto_id ? (
+              <button
+                onClick={() => { setAlocarAnimal(a); setPastoSel(''); }}
+                className="text-xs px-2.5 py-1 rounded-lg border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors font-medium"
+              >
+                Alocar
+              </button>
+            ) : (
+              <span className="text-[10px] text-gray-400 italic">use Transferir</span>
+            )}
           </td>
         </tr>
         {(a.bezerros_quantidade ?? 0) > 0 && (
@@ -549,12 +553,12 @@ function TransferirTab({
           <div className="relative">
             <select value={loteId} onChange={e => { setLoteId(e.target.value); setDestId(''); }} className={selectClass}>
               <option value="">Selecione um lote…</option>
-              {ativos.map(a => {
+              {ativos.filter(a => !!a.pasto_id).map(a => {
                 const catNome = a.categoria_id ? (catMap[a.categoria_id] ?? '') : '';
                 const bezInfo = (a.bezerros_quantidade ?? 0) > 0 ? ` +${a.bezerros_quantidade} bez.` : '';
                 return (
                   <option key={a.id} value={a.id}>
-                    {a.nome} ({a.quantidade} cab.{catNome ? ` · ${catNome}` : ''}{bezInfo}) {a.pasto_id ? `· ${pastoMap[a.pasto_id] ?? ''}` : '· sem pasto'}
+                    {a.nome} ({a.quantidade} cab.{catNome ? ` · ${catNome}` : ''}{bezInfo}) · {pastoMap[a.pasto_id!] ?? ''}
                   </option>
                 );
               })}
@@ -723,6 +727,16 @@ function EvolucaoTab({
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
 
+  const [evolSearch, setEvolSearch] = useState('');
+  const ativosFiltradosEvol = useMemo(() => {
+    if (!evolSearch.trim()) return ativos;
+    const q = evolSearch.toLowerCase();
+    return ativos.filter(a =>
+      a.nome.toLowerCase().includes(q) ||
+      (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q))
+    );
+  }, [ativos, evolSearch, catMap]);
+
   const EVOLUCAO_TIPOS = ['evolucao_categoria', 'paricao', 'manejo_bezerros'];
 
   useEffect(() => {
@@ -881,21 +895,36 @@ function EvolucaoTab({
         {subOp === 'categoria' && (
           <>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-teal-600" />
                   <h3 className="font-semibold text-gray-900 text-sm">Selecione os lotes</h3>
                 </div>
-                {selected.size > 0 && (
-                  <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
-                    {selected.size} sel. · {totalCab} cab.
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {selected.size > 0 && (
+                    <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
+                      {selected.size} sel. · {totalCab} cab.
+                    </span>
+                  )}
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={evolSearch}
+                      onChange={e => setEvolSearch(e.target.value)}
+                      placeholder="Filtrar lotes..."
+                      className="h-7 pl-6 pr-2 rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      style={{ width: 120 }}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
                 {ativos.length === 0 ? (
                   <p className="text-center py-8 text-sm text-gray-400">Nenhum lote ativo.</p>
-                ) : ativos.map(a => {
+                ) : ativosFiltradosEvol.length === 0 ? (
+                  <p className="text-center py-8 text-sm text-gray-400">Nenhum lote encontrado.</p>
+                ) : ativosFiltradosEvol.map(a => {
                   const on = selected.has(a.id);
                   return (
                     <label key={a.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${on ? 'bg-teal-50' : 'hover:bg-gray-50'}`}>
