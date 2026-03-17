@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
-  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, Filter, GitMerge, SplitSquareVertical,
+  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, GitMerge, SplitSquareVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -106,15 +106,16 @@ function LotesTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
-  // Search filter on active animals
+  // Search filter on active animals (nome, categoria ou pasto)
   const ativosFiltrados = useMemo(() => {
     if (!search.trim()) return ativos;
     const q = search.toLowerCase();
     return ativos.filter(a =>
       a.nome.toLowerCase().includes(q) ||
-      (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q))
+      (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q)) ||
+      (a.pasto_id && (pastoMap[a.pasto_id] ?? '').toLowerCase().includes(q))
     );
-  }, [ativos, search, catMap]);
+  }, [ativos, search, catMap, pastoMap]);
 
   const byPasto = useMemo(() => {
     const map: Record<string, Animal[]> = {};
@@ -288,7 +289,7 @@ function LotesTab({
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Filtrar lotes por nome ou categoria…"
+            placeholder="Filtrar lotes por nome, categoria ou pasto…"
             className="w-full h-9 pl-9 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           {search && (
@@ -460,9 +461,17 @@ function LotesTab({
                   <div className="relative">
                     <select value={pastoSel} onChange={e => setPastoSel(e.target.value)} className={selectClass}>
                       <option value="">— Selecionar Pasto —</option>
-                      {pastures.filter(p => p.id !== alocarAnimal.pasto_id).map(p => (
-                        <option key={p.id} value={p.id}>{p.nome}{p.area ? ` (${p.area} ha)` : ''}</option>
-                      ))}
+                      {pastures.filter(p => p.id !== alocarAnimal.pasto_id).map(p => {
+                        const lotesNoPasto = ativos.filter(a => a.pasto_id === p.id);
+                        const lotesDesc = lotesNoPasto.map(a =>
+                          `${a.nome} (${a.quantidade} cab.${a.categoria_id ? ' · ' + (catMap[a.categoria_id] ?? '') : ''})`
+                        ).join(', ');
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.nome}{p.area ? ` · ${p.area} ha` : ''}{lotesDesc ? ` — ${lotesDesc}` : ' — sem lotes'}
+                          </option>
+                        );
+                      })}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   </div>
@@ -1391,299 +1400,16 @@ function AbateTab({
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════════════════════════ */
 
-/* ══════════════════════════════════════════════════════════════
-   TAB 5 — Histórico Completo
-══════════════════════════════════════════════════════════════ */
-
-function HistoricoTab({ farmId, animals, pastures, farmName }: {
-  farmId: string; animals: Animal[]; pastures: Pasture[]; farmName: string;
-}) {
-  const today      = new Date().toISOString().split('T')[0];
-  const fom        = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-  const [dataInicio, setDataInicio] = useState(fom);
-  const [dataFim,    setDataFim]    = useState(today);
-  const [tiposSel,   setTiposSel]   = useState<string[]>([]);
-  const [pastoFiltro, setPastoFiltro] = useState('');
-  const [events,     setEvents]     = useState<ManejoEvent[]>([]);
-  const [loading,    setLoading]    = useState(true);
-
-  // animal_id → pasto_id (current)
-  const animalPastoMap = useMemo(
-    () => Object.fromEntries(animals.filter(a => a.pasto_id).map(a => [a.id, a.pasto_id!])),
-    [animals]
-  );
-
-  // Last 12 months as quick chips
-  const monthChips = useMemo(() => {
-    const chips: { label: string; start: string; end: string }[] = [];
-    const now = new Date();
-    for (let i = 0; i < 12; i++) {
-      const d    = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-      const start = d.toISOString().split('T')[0];
-      const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-      chips.push({ label, start, end });
-    }
-    return chips;
-  }, []);
-
-  useEffect(() => {
-    if (!farmId) return;
-    setLoading(true);
-    manejoService.listarHistorico(farmId, undefined, 500)
-      .then(setEvents).catch(() => {}).finally(() => setLoading(false));
-  }, [farmId]);
-
-  const filtered = useMemo(() =>
-    events.filter(e => {
-      const d = e.created_at.split('T')[0];
-      const inRange = d >= dataInicio && d <= dataFim;
-      const inType  = tiposSel.length === 0 || tiposSel.includes(e.tipo);
-      const inPasto = !pastoFiltro ||
-        e.pasto_origem === pastoFiltro ||
-        e.pasto_destino === pastoFiltro ||
-        animalPastoMap[e.animal_id] === pastoFiltro;
-      return inRange && inType && inPasto;
-    }),
-  [events, dataInicio, dataFim, tiposSel, pastoFiltro, animalPastoMap]);
-
-  function toggleTipo(tipo: string) {
-    setTiposSel(prev => prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]);
-  }
-
-  const fmtPrintDate = (d: string) =>
-    new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
-
-  return (
-    <div>
-      {/* ── Filters (hidden on print) ── */}
-      <div className="no-print space-y-4 mb-6">
-
-        {/* Period card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-teal-600" />
-              <h3 className="font-semibold text-gray-800">Período</h3>
-            </div>
-            <button onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors shadow-sm">
-              <FileText className="w-4 h-4" />
-              Exportar PDF
-            </button>
-          </div>
-
-          {/* Month chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {monthChips.map(chip => {
-              const active = dataInicio === chip.start && dataFim === chip.end;
-              return (
-                <button key={chip.start}
-                  onClick={() => { setDataInicio(chip.start); setDataFim(chip.end); }}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors capitalize ${
-                    active
-                      ? 'bg-teal-600 text-white border-teal-600'
-                      : 'border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 bg-white'
-                  }`}>
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Date range inputs */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <label className={labelClass}>De</label>
-              <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={inputClass} />
-            </div>
-            <div className="flex-1">
-              <label className={labelClass}>Até</label>
-              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={inputClass} />
-            </div>
-          </div>
-        </div>
-
-        {/* Type filter */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Tipo:</span>
-          <button onClick={() => setTiposSel([])}
-            className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
-              tiposSel.length === 0
-                ? 'bg-gray-800 text-white border-gray-800'
-                : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'
-            }`}>
-            Todos
-          </button>
-          {Object.keys(TIPO_LABELS).map(tipo => {
-            const sel = tiposSel.includes(tipo);
-            return (
-              <button key={tipo} onClick={() => toggleTipo(tipo)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
-                  sel
-                    ? TIPO_COLORS[tipo] + ' border-current'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
-                }`}>
-                {TIPO_LABELS[tipo]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Pasture filter — select */}
-        {pastures.length > 0 && (
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">Pasto:</label>
-            <div className="relative flex-1 max-w-xs">
-              <select
-                value={pastoFiltro}
-                onChange={e => setPastoFiltro(e.target.value)}
-                className="w-full h-9 pl-3 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none transition-colors"
-              >
-                <option value="">Todos os pastos</option>
-                {pastures.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome}{p.area ? ` (${p.area} ha)` : ''}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            </div>
-            {pastoFiltro && (
-              <button onClick={() => setPastoFiltro('')}
-                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors flex-shrink-0">
-                <X className="w-3 h-3" /> Limpar
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Print-only header ── */}
-      <div className="print-only mb-6">
-        {/* Brand bar */}
-        <div className="pdf-brand-bar rounded-xl px-6 py-4 mb-5 flex items-center justify-between">
-          <div>
-            <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80 mb-0.5">
-              Movimento Pecuário · Suplemento Control{farmName ? ` · ${farmName}` : ''}
-            </p>
-            <h1 className="text-white text-xl font-bold">Histórico de Manejos</h1>
-          </div>
-          <div className="text-right">
-            <p className="text-white text-xs opacity-70">Emitido em</p>
-            <p className="text-white text-sm font-semibold">
-              {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-        </div>
-
-        {/* Period + stats row */}
-        <div className="flex items-start gap-6 mb-5">
-          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Período</p>
-            <p className="text-sm font-bold text-gray-800">{fmtPrintDate(dataInicio)} — {fmtPrintDate(dataFim)}</p>
-          </div>
-          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Total de Eventos</p>
-            <p className="text-sm font-bold text-gray-800">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</p>
-          </div>
-          {tiposSel.length > 0 && (
-            <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Filtro de Tipo</p>
-              <p className="text-sm font-bold text-gray-800">{tiposSel.map(t => TIPO_LABELS[t]).join(', ')}</p>
-            </div>
-          )}
-          {/* Summary by type */}
-          <div className="flex-1 border border-gray-200 rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Por Tipo</p>
-            <div className="space-y-0.5">
-              {Object.keys(TIPO_LABELS)
-                .map(tipo => ({ tipo, count: filtered.filter(e => e.tipo === tipo).length }))
-                .filter(({ count }) => count > 0)
-                .map(({ tipo, count }) => (
-                  <div key={tipo} className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-gray-600">{TIPO_LABELS[tipo]}</span>
-                    <span className="text-[10px] font-bold text-gray-800">{count}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Stats bar ── */}
-      <div className="flex items-center gap-2 mb-4 no-print">
-        <span className="text-sm text-gray-500">
-          <strong className="text-gray-900">{filtered.length}</strong>{' '}
-          evento{filtered.length !== 1 ? 's' : ''} no período
-        </span>
-      </div>
-
-      {/* ── Table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <SkeletonTable rows={8} cols={3} />
-        ) : filtered.length === 0 ? (
-          <div className="py-20 text-center">
-            <History className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">Nenhum evento neste período</p>
-            <p className="text-xs text-gray-400 mt-1">Tente ampliar o intervalo de datas</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm pdf-table">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap w-40">Data / Hora</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider w-28">Tipo</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Descrição</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map(e => {
-                  const badgeClass: Record<string, string> = {
-                    alocacao: 'pdf-badge pdf-badge-blue',
-                    transferencia: 'pdf-badge pdf-badge-indigo',
-                    evolucao_categoria: 'pdf-badge pdf-badge-amber',
-                    paricao: 'pdf-badge pdf-badge-pink',
-                    manejo_bezerros: 'pdf-badge pdf-badge-orange',
-                    abate: 'pdf-badge pdf-badge-red',
-                    venda: 'pdf-badge pdf-badge-purple',
-                    desagrupamento: 'pdf-badge pdf-badge-gray',
-                    ajuste_quantidade: 'pdf-badge pdf-badge-gray',
-                  };
-                  return (
-                    <tr key={e.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full no-print ${TIPO_COLORS[e.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {TIPO_LABELS[e.tipo] ?? e.tipo}
-                        </span>
-                        <span className={`print-only ${badgeClass[e.tipo] ?? 'pdf-badge pdf-badge-gray'}`}>
-                          {TIPO_LABELS[e.tipo] ?? e.tipo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-700 leading-relaxed">{e.descricao ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ── tabs ── */
 
-type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate' | 'historico';
+type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'lotes',     label: 'Lotes por Pasto',    icon: MapPin },
   { id: 'transferir',label: 'Transferir',          icon: ArrowRight },
   { id: 'evolucao',  label: 'Evolução',            icon: TrendingUp },
   { id: 'abate',     label: 'Saída',               icon: Scissors },
-  { id: 'historico', label: 'Histórico',           icon: History },
 ];
 
 export function Manejos() {
@@ -1786,9 +1512,6 @@ export function Manejos() {
               )}
               {tab === 'abate' && (
                 <AbateTab animals={animals} categories={categories} farmId={activeFarmId} onReload={reload} />
-              )}
-              {tab === 'historico' && (
-                <HistoricoTab farmId={activeFarmId} animals={animals} pastures={pastures} farmName={farmName} />
               )}
             </motion.div>
           </AnimatePresence>

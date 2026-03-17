@@ -589,13 +589,13 @@ export function Formulario() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>
-                  {suppInfo ? `${suppInfo.unidade} (${suppInfo.peso ?? 25} kg cada)` : 'Sacos (25 kg)'}
+                  {suppInfo?.peso ? `PESO SACARIA (${suppInfo.peso} kg)` : 'PESO SACARIA'}
                 </label>
                 <input
                   type="number"
                   min="0"
                   step="1"
-                  placeholder="56"
+                  placeholder="0"
                   {...register('sacos', { valueAsNumber: true })}
                   disabled={!!selectedTipo && (!suppInfo || !suppInfo.peso)}
                   className={`${inputClass} ${!!selectedTipo && (!suppInfo || !suppInfo.peso) ? 'opacity-50 cursor-not-allowed' : ''}`}
