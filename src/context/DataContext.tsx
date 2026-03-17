@@ -67,7 +67,7 @@ interface DataContextType {
   pastures: Pasture[];
   addPasture: (pasture: Omit<Pasture, 'id'>) => void;
   deletePasture: (id: string) => Promise<void>;
-  updatePasture: (id: string, data: Partial<Pasture>) => void;
+  updatePasture: (id: string, data: Partial<Pasture>) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -371,26 +371,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function updatePasture(id: string, patch: Partial<Pasture>) {
-    // Para área: só sobrescreve o estado local se o valor é válido (> 0)
-    // Evita que um NaN/0 acidental apague a área exibida antes do próximo refresh
+  async function updatePasture(id: string, patch: Partial<Pasture>): Promise<void> {
+    // Atualiza estado local imediatamente (optimistic)
     const statePatch: Partial<Pasture> = { ...patch };
     if ('area' in statePatch) {
       const a = statePatch.area;
-      if (a == null || typeof a !== 'number' || isNaN(a) || a <= 0) {
-        delete statePatch.area;
-      }
+      if (a == null || typeof a !== 'number' || isNaN(a) || a <= 0) delete statePatch.area;
     }
     setPastures(prev => prev.map(p => p.id === id ? { ...p, ...statePatch } : p));
-    supabaseAdmin.from('pastures').update({
-      ...(patch.nome               !== undefined && { nome:               patch.nome }),
-      ...('area' in patch && { area: (typeof patch.area === 'number' && !isNaN(patch.area) && patch.area > 0) ? patch.area : null }),
-      ...(patch.observacoes        !== undefined && { observacoes:        patch.observacoes ?? null }),
-      ...(patch.retiro_id          !== undefined && { retiro_id:          patch.retiro_id ?? null }),
-      // só inclui as colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
-      ...(patch.forragem           ? { forragem:           patch.forragem }           : {}),
-      ...(patch.qualidade_forragem ? { qualidade_forragem: patch.qualidade_forragem } : {}),
-    }).eq('id', id);
+
+    // Payload base — sempre incluído
+    const payload: Record<string, unknown> = {
+      ...(patch.nome        !== undefined && { nome:        patch.nome }),
+      ...('area' in patch   && { area: (typeof patch.area === 'number' && !isNaN(patch.area) && patch.area > 0) ? patch.area : null }),
+      ...(patch.observacoes !== undefined && { observacoes: patch.observacoes ?? null }),
+      ...(patch.retiro_id   !== undefined && { retiro_id:   patch.retiro_id ?? null }),
+    };
+
+    // Tenta salvar com forragem + qualidade; se falhar (coluna não existe), salva sem elas
+    const payloadFull = {
+      ...payload,
+      ...(patch.forragem           !== undefined && { forragem:           patch.forragem ?? null }),
+      ...(patch.qualidade_forragem !== undefined && { qualidade_forragem: patch.qualidade_forragem ?? null }),
+    };
+
+    const { error } = await supabaseAdmin.from('pastures').update(payloadFull).eq('id', id);
+    if (error) {
+      // fallback: tenta sem as colunas novas (caso ainda não existam no banco)
+      const { error: err2 } = await supabaseAdmin.from('pastures').update(payload).eq('id', id);
+      if (err2) throw new Error(err2.message);
+    }
   }
 
   return (

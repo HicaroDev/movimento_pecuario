@@ -437,16 +437,20 @@ function PastosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (targ
     toast.success('Pasto adicionado!', { description: data.nome });
     reset(); setShowAddForm(false);
   }
-  function onEditSave(id: string, data: PastureForm) {
-    updatePasture(id, {
-      nome: data.nome,
-      area: data.area > 0 ? data.area : undefined,
-      retiro_id: data.retiro_id || undefined,
-      forragem: data.forragem || undefined,
-      qualidade_forragem: data.qualidade_forragem || undefined,
-      observacoes: data.observacoes,
-    });
-    toast.success('Pasto atualizado!'); setEditingId(null);
+  async function onEditSave(id: string, data: PastureForm) {
+    try {
+      await updatePasture(id, {
+        nome:               data.nome,
+        area:               data.area > 0 ? data.area : undefined,
+        retiro_id:          data.retiro_id || undefined,
+        forragem:           data.forragem || undefined,
+        qualidade_forragem: data.qualidade_forragem || undefined,
+        observacoes:        data.observacoes,
+      });
+      toast.success('Pasto atualizado!'); setEditingId(null);
+    } catch (err) {
+      toast.error(`Erro ao salvar pasto: ${(err as Error).message}`);
+    }
   }
   function onDelete(p: { id: string; nome: string }) {
     if (onRequestDelete) {
