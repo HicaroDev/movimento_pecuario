@@ -9,6 +9,9 @@ export interface DataEntry {
   kg: number;
   consumo: number;      // kg/cab/dia = kg / (quantidade * periodo)
   funcionario?: string; // nome do funcionário responsável
+  lote?: string;        // nome(s) do lote animal no pasto
+  meta?: number;        // META KG/cab/dia = peso_medio_pasto × consumo_pct / 100
+  desembolso?: number;  // R$/cab/dia = consumo × valor_kg
 }
 
 export const STORAGE_KEY = 'suplementoControlData';

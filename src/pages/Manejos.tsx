@@ -375,6 +375,14 @@ function LotesTab({
           const bezPesoNum     = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
           const bezPesoDen     = animaisPasto.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
           const bezPesoMedioPasto = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
+
+          // Taxa de lotação UA/HA
+          const uaTotal = (
+            animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0) +
+            animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0)
+          ) / 450;
+          const taxaLotacao = p.area && uaTotal > 0 ? uaTotal / p.area : null;
+
           return (
           <section key={p.id}>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -405,6 +413,11 @@ function LotesTab({
                 <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
                   {animaisPasto.length} lote{animaisPasto.length !== 1 ? 's' : ''}
                 </span>
+                {taxaLotacao != null && (
+                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold border border-green-200">
+                    TAXA: {taxaLotacao.toFixed(2).replace('.', ',')} UA/HA
+                  </span>
+                )}
               </div>
             </div>
             <TableWrap>

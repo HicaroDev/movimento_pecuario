@@ -136,9 +136,10 @@ function SimpleEditRow({ item, onSave, onCancel, predefinedOptions }: {
 }
 
 type DeleteTarget = { id: string; label: string; onDelete: () => Promise<void> };
+type EditTarget   = { id: string; label: string; onEdit: () => void };
 
 function SimpleTab({
-  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems, predefinedOptions, onRequestDelete,
+  table, label, icon: Icon, emptyText, newLabel, onDataChange, initialItems, predefinedOptions, onRequestDelete, onRequestEdit,
 }: {
   table: string; label: string; icon: React.ElementType;
   emptyText: string; newLabel: string;
@@ -146,12 +147,14 @@ function SimpleTab({
   initialItems?: SimpleItem[];
   predefinedOptions?: readonly string[];
   onRequestDelete?: (target: DeleteTarget) => void;
+  onRequestEdit?: (target: EditTarget) => void;
 }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<SimpleItem[]>(initialItems ?? []);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState('');
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SimpleForm>();
 
   useEffect(() => {
@@ -217,9 +220,23 @@ function SimpleTab({
     }
   }
 
+  const filteredSimple = search.trim()
+    ? items.filter(i => i.nome.toLowerCase().includes(search.toLowerCase()))
+    : items;
+
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Filtrar ${label.toLowerCase()}...`}
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+          />
+        </div>
         <AddBtn label={newLabel} onClick={() => setShowAdd(v => !v)} />
       </div>
 
@@ -279,7 +296,9 @@ function SimpleTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {items.map(item =>
+                  {filteredSimple.length === 0 && search ? (
+                    <tr><td colSpan={3} className="py-8 text-center text-sm text-gray-400">Nenhum resultado para "{search}"</td></tr>
+                  ) : filteredSimple.map(item =>
                     editingId === item.id ? (
                       <SimpleEditRow key={item.id} item={item}
                         onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)}
@@ -292,7 +311,11 @@ function SimpleTab({
                         </td>
                         <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                         <td className="px-4 py-3">
-                          <ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} />
+                          <ActionBtns
+                            onEdit={() => onRequestEdit
+                              ? onRequestEdit({ id: item.id, label: `Editar ${label} "${item.nome}"`, onEdit: () => setEditingId(item.id) })
+                              : setEditingId(item.id)}
+                            onDelete={() => onDelete(item.id, item.nome)} />
                         </td>
                       </motion.tr>
                     )
@@ -356,7 +379,7 @@ function PastureEditRow({ pasture, retiros, forragens, onSave, onCancel }: {
   );
 }
 
-function PastosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
+function PastosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (target: DeleteTarget) => void; onRequestEdit?: (target: EditTarget) => void }) {
   const { pastures, addPasture, deletePasture, updatePasture, loading } = useData();
   const [retiros, setRetiros] = useState<SimpleItem[]>([]);
   const [showRetiros, setShowRetiros] = useState(false);
@@ -401,6 +424,8 @@ function PastosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarge
   });
 
   function onAdd(data: PastureForm) {
+    const dup = pastures.find(p => p.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
+    if (dup) { toast.error('Já existe um pasto com este nome.'); return; }
     addPasture({
       nome: data.nome,
       area: data.area > 0 ? data.area : undefined,   // NaN/0 vira undefined
@@ -601,7 +626,11 @@ function PastosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarge
                               : <span className="text-gray-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.observacoes || '—'}</td>
-                          <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(p.id)} onDelete={() => onDelete(p)} /></td>
+                          <td className="px-4 py-3"><ActionBtns
+                            onEdit={() => onRequestEdit
+                              ? onRequestEdit({ id: p.id, label: `Editar pasto "${p.nome}"`, onEdit: () => setEditingId(p.id) })
+                              : setEditingId(p.id)}
+                            onDelete={() => onDelete(p)} /></td>
                         </motion.tr>
                       )
                     )}
@@ -694,7 +723,7 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
   );
 }
 
-function AnimaisTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
+function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (target: DeleteTarget) => void; onRequestEdit?: (target: EditTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<Animal[]>(_animaisCache);
   const [categories, setCategories] = useState<AnimalCategory[]>(_acatCache);
@@ -702,6 +731,7 @@ function AnimaisTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarg
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCatSection, setShowCatSection] = useState(false);
+  const [search, setSearch] = useState('');
   const [temBezerros, setTemBezerros] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<AnimalForm>({
     defaultValues: { quantidade: 0, peso_medio: 0, bezerros_quantidade: 0, bezerros_peso_medio: 0 },
@@ -831,7 +861,17 @@ function AnimaisTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarg
 
       {/* ── Lotes ── */}
       <div>
-        <div className="flex justify-end mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filtrar lote por nome..."
+              className="w-full h-9 pl-8 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+            />
+          </div>
           <AddBtn label="Novo Lote" onClick={() => setShowAddForm(v => !v)} />
         </div>
 
@@ -939,29 +979,41 @@ function AnimaisTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarg
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {items.map(item =>
-                      editingId === item.id ? (
-                        <AnimalEditRow key={item.id} item={item} categories={categories}
-                          onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-                      ) : (
-                        <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.quantidade}</td>
-                          <td className="px-4 py-3">
-                            {item.categoria_id
-                              ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">{getCatName(item.categoria_id)}</span>
-                              : <span className="text-gray-400">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">{item.peso_medio ? `${item.peso_medio} kg` : '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.raca || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.sexo || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.bezerros_quantidade ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.bezerros_peso_medio ? `${item.bezerros_peso_medio} kg` : '—'}</td>
-                          <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
-                          <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
-                        </motion.tr>
-                      )
-                    )}
+                    {(() => {
+                      const filtered = search.trim()
+                        ? items.filter(a => a.nome.toLowerCase().includes(search.toLowerCase()))
+                        : items;
+                      if (filtered.length === 0 && search) return (
+                        <tr><td colSpan={10} className="py-8 text-center text-sm text-gray-400">Nenhum resultado para "{search}"</td></tr>
+                      );
+                      return filtered.map(item =>
+                        editingId === item.id ? (
+                          <AnimalEditRow key={item.id} item={item} categories={categories}
+                            onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
+                        ) : (
+                          <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.quantidade}</td>
+                            <td className="px-4 py-3">
+                              {item.categoria_id
+                                ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">{getCatName(item.categoria_id)}</span>
+                                : <span className="text-gray-400">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{item.peso_medio ? `${item.peso_medio} kg` : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.raca || '—'}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.sexo || '—'}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.bezerros_quantidade ?? '—'}</td>
+                            <td className="px-4 py-3 text-gray-600">{item.bezerros_peso_medio ? `${item.bezerros_peso_medio} kg` : '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
+                            <td className="px-4 py-3"><ActionBtns
+                              onEdit={() => onRequestEdit
+                                ? onRequestEdit({ id: item.id, label: `Editar lote "${item.nome}"`, onEdit: () => setEditingId(item.id) })
+                                : setEditingId(item.id)}
+                              onDelete={() => onDelete(item.id, item.nome)} /></td>
+                          </motion.tr>
+                        )
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -1071,7 +1123,7 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
   );
 }
 
-function SuplementosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
+function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (target: DeleteTarget) => void; onRequestEdit?: (target: EditTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<SupplementType[]>(_suplementosCache);
   const [loading, setLoading] = useState(false);
@@ -1252,7 +1304,11 @@ function SuplementosTab({ onRequestDelete }: { onRequestDelete?: (target: Delete
                       <td className="px-4 py-3 text-gray-500 text-xs">{item.consumo || '—'}</td>
                       <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>{item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—'}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
-                      <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
+                      <td className="px-4 py-3"><ActionBtns
+                        onEdit={() => onRequestEdit
+                          ? onRequestEdit({ id: item.id, label: `Editar suplemento "${item.nome}"`, onEdit: () => setEditingId(item.id) })
+                          : setEditingId(item.id)}
+                        onDelete={() => onDelete(item.id, item.nome)} /></td>
                     </motion.tr>
                   ))}
                 </tbody>
@@ -1304,12 +1360,13 @@ function EmpEditRow({ item, onSave, onCancel }: { item: Employee; onSave: (d: Em
   );
 }
 
-function FuncionariosTab({ onRequestDelete }: { onRequestDelete?: (target: DeleteTarget) => void }) {
+function FuncionariosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (target: DeleteTarget) => void; onRequestEdit?: (target: EditTarget) => void }) {
   const { activeFarmId } = useData();
   const [items, setItems] = useState<Employee[]>(_funcionariosCache);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [search, setSearch] = useState('');
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<EmployeeForm>();
 
   const contatoReg = register('contato');
@@ -1347,6 +1404,8 @@ function FuncionariosTab({ onRequestDelete }: { onRequestDelete?: (target: Delet
       toast.error('Fazenda não selecionada.');
       return;
     }
+    const dup = _funcionariosCache.find(e => e.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
+    if (dup) { toast.error('Já existe um funcionário com este nome.'); return; }
     const { data: row, error } = await supabaseAdmin
       .from('employees')
       .insert({ nome: data.nome, funcao: data.funcao || null, contato: data.contato || null, farm_id: activeFarmId })
@@ -1389,7 +1448,19 @@ function FuncionariosTab({ onRequestDelete }: { onRequestDelete?: (target: Delet
 
   return (
     <div>
-      <div className="flex justify-end mb-4"><AddBtn label="Novo Funcionário" onClick={() => setShowAddForm(v => !v)} /></div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filtrar funcionário..."
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+          />
+        </div>
+        <AddBtn label="Novo Funcionário" onClick={() => setShowAddForm(v => !v)} />
+      </div>
       {showAddForm && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl border border-teal-200 shadow-sm p-6 mb-6">
@@ -1428,16 +1499,28 @@ function FuncionariosTab({ onRequestDelete }: { onRequestDelete?: (target: Delet
           ) : (
             <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead><tr className="bg-gray-50 border-b border-gray-200">{['Nome', 'Função', 'Contato', 'Ações'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>))}</tr></thead>
-              <tbody className="divide-y divide-gray-100">{items.map(item => editingId === item.id ? (
-                <EmpEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-              ) : (
-                <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.funcao || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.contato || '—'}</td>
-                  <td className="px-4 py-3"><ActionBtns onEdit={() => setEditingId(item.id)} onDelete={() => onDelete(item.id, item.nome)} /></td>
-                </motion.tr>
-              ))}</tbody>
+              <tbody className="divide-y divide-gray-100">{(() => {
+                const filteredEmp = search.trim()
+                  ? items.filter(e => e.nome.toLowerCase().includes(search.toLowerCase()) || (e.funcao ?? '').toLowerCase().includes(search.toLowerCase()))
+                  : items;
+                if (filteredEmp.length === 0 && search) return (
+                  <tr><td colSpan={4} className="py-8 text-center text-sm text-gray-400">Nenhum resultado para "{search}"</td></tr>
+                );
+                return filteredEmp.map(item => editingId === item.id ? (
+                  <EmpEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
+                ) : (
+                  <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
+                    <td className="px-4 py-3 text-gray-600">{item.funcao || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{item.contato || '—'}</td>
+                    <td className="px-4 py-3"><ActionBtns
+                      onEdit={() => onRequestEdit
+                        ? onRequestEdit({ id: item.id, label: `Editar funcionário "${item.nome}"`, onEdit: () => setEditingId(item.id) })
+                        : setEditingId(item.id)}
+                      onDelete={() => onDelete(item.id, item.nome)} /></td>
+                  </motion.tr>
+                ));
+              })()}</tbody>
             </table></div>
           )}
         </div>
@@ -1457,6 +1540,7 @@ export function Cadastros() {
   const [deleteTarget, setDeleteTarget]             = useState<DeleteTarget | null>(null);
   const [simpleDeleteTarget, setSimpleDeleteTarget] = useState<DeleteTarget | null>(null);
   const [simpleDeleting, setSimpleDeleting]         = useState(false);
+  const [editTarget, setEditTarget]                 = useState<EditTarget | null>(null);
 
   function setTab(key: TabKey) {
     setSearchParams({ aba: key }, { replace: true });
@@ -1469,6 +1553,15 @@ export function Cadastros() {
     await deleteTarget!.onDelete();
     setDeleteTarget(null);
     toast.success('Excluído com sucesso.');
+  }
+
+  async function handleEditConfirm(password: string) {
+    if (!user?.email) throw new Error('Usuário não autenticado.');
+    const ok = await verifyPassword(user.email, password);
+    if (!ok) throw new Error('Senha incorreta');
+    const onEdit = editTarget!.onEdit;
+    setEditTarget(null);          // fecha o modal primeiro
+    setTimeout(() => onEdit(), 50); // abre o form depois que o modal fechou
   }
 
   async function handleSimpleDeleteConfirm() {
@@ -1513,11 +1606,11 @@ export function Cadastros() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'pastos'       && <PastosTab onRequestDelete={setDeleteTarget} />}
-        {activeTab === 'animais'      && <AnimaisTab onRequestDelete={setDeleteTarget} />}
-        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setSimpleDeleteTarget} />}
-        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setSimpleDeleteTarget} />}
-        {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setSimpleDeleteTarget} />}
+        {activeTab === 'pastos'       && <PastosTab onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'animais'      && <AnimaisTab onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
 
       </motion.div>
 
@@ -1529,6 +1622,18 @@ export function Cadastros() {
             description={deleteTarget.label}
             onConfirm={handleDeleteConfirm}
             onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edição com senha (todas as abas) */}
+      <AnimatePresence>
+        {editTarget && (
+          <PasswordConfirmModal
+            title="Confirmar Edição"
+            description={editTarget.label}
+            onConfirm={handleEditConfirm}
+            onCancel={() => setEditTarget(null)}
           />
         )}
       </AnimatePresence>

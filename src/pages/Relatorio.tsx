@@ -1,16 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { FileDown, FileSpreadsheet, ChevronDown, Filter, CalendarDays } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { supabaseAdmin } from '../lib/supabase';
 import { StatsOverview } from '../components/StatsOverview';
 import { SummaryChart } from '../components/SummaryChart';
 import { SupplementSection } from '../components/SupplementSection';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { SupplementPills } from '../components/SupplementPills';
-import { groupByType, averageConsumo, sumQuantidade, sortedTypes, aggregateEntriesByPasto } from '../lib/utils';
+import { manejoService, type Animal } from '../services/manejoService';
+import { groupByType, averageConsumo, sortedTypes, aggregateEntriesByPasto } from '../lib/utils';
 import { getSupplementColor } from '../lib/data';
 
 const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
@@ -26,20 +28,52 @@ function periodFull(ym: string) {
   return `${MONTH_FULL[m - 1]} ${y}`;
 }
 
+interface SuppType {
+  nome: string;
+  consumo?: string | number | null;
+  valor_kg?: number | null;
+}
+
 export function Relatorio() {
-  const { entries, loading, clientInfo } = useData();
+  const { entries, loading, clientInfo, pastures, activeFarmId } = useData();
   const { user, isAdmin } = useAuth();
+  const farmId = activeFarmId || user?.farmId || '';
 
   const [filterSupplement, setFilterSupplement] = useState('');
   const [filterPasto,      setFilterPasto]      = useState('');
+  const [filterLote,       setFilterLote]       = useState('');
   const [filterMonths,     setFilterMonths]     = useState<string[]>([]);
+  const [dateFrom,         setDateFrom]         = useState('');
+  const [dateTo,           setDateTo]           = useState('');
 
-  const hasFilters = !!filterSupplement || !!filterPasto || filterMonths.length > 0;
+  // Animals + supplement_types para meta/desembolso/lote
+  const [animals,    setAnimals]    = useState<Animal[]>([]);
+  const [suppTypes,  setSuppTypes]  = useState<SuppType[]>([]);
+  const [evolucaoHistorico, setEvolucaoHistorico] = useState<Array<{animal_id: string; created_at: string; peso_medio: number}>>([]);
+
+  useEffect(() => {
+    if (!farmId) return;
+    manejoService.listarAnimais(farmId).then(setAnimals).catch(() => {});
+    supabaseAdmin.from('supplement_types').select('nome, consumo, valor_kg').eq('farm_id', farmId)
+      .then(({ data }) => setSuppTypes((data ?? []) as SuppType[])).catch(() => {});
+    supabaseAdmin.from('manejo_historico')
+      .select('animal_id, created_at, peso_medio')
+      .eq('farm_id', farmId)
+      .eq('tipo', 'evolucao_categoria')
+      .not('peso_medio', 'is', null)
+      .then(({ data }) => setEvolucaoHistorico((data ?? []) as Array<{animal_id: string; created_at: string; peso_medio: number}>))
+      .catch(() => {});
+  }, [farmId]);
+
+  const hasFilters = !!filterSupplement || !!filterPasto || !!filterLote || filterMonths.length > 0 || !!dateFrom || !!dateTo;
 
   const clearFilters = () => {
     setFilterSupplement('');
     setFilterPasto('');
+    setFilterLote('');
     setFilterMonths([]);
+    setDateFrom('');
+    setDateTo('');
     toast.info('Filtros limpos');
   };
 
@@ -58,6 +92,89 @@ export function Relatorio() {
     return Array.from(set).sort((a, b) => b.localeCompare(a)); // newest first
   }, [entries]);
 
+  /* ── Mapa pastoId → nome ── */
+  const pastoIdToNome = useMemo(
+    () => Object.fromEntries(pastures.map(p => [p.id, p.nome])),
+    [pastures]
+  );
+
+  /* ── Mapa pastoNome → [lote names] ── */
+  const pastoLotesMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const a of animals) {
+      if (!a.pasto_id || (a.status !== 'ativo' && a.status)) continue;
+      const nome = pastoIdToNome[a.pasto_id];
+      if (!nome) continue;
+      if (!map[nome]) map[nome] = [];
+      map[nome].push(a.nome);
+    }
+    return map;
+  }, [animals, pastoIdToNome]);
+
+  /* ── Mapa pastoNome → peso médio ponderado ── */
+  const pastoNomePesoMap = useMemo(() => {
+    const map: Record<string, { peso: number; qtd: number }> = {};
+    for (const a of animals) {
+      if (!a.pasto_id || !a.peso_medio) continue;
+      const nome = pastoIdToNome[a.pasto_id];
+      if (!nome) continue;
+      if (!map[nome]) map[nome] = { peso: 0, qtd: 0 };
+      map[nome].peso += a.quantidade * a.peso_medio;
+      map[nome].qtd  += a.quantidade;
+    }
+    const result: Record<string, number | null> = {};
+    for (const [nome, { peso, qtd }] of Object.entries(map)) {
+      result[nome] = qtd > 0 ? peso / qtd : null;
+    }
+    return result;
+  }, [animals, pastoIdToNome]);
+
+  /* ── Histórico de evoluções por animal (ordenado por data) ── */
+  const evolucaoByAnimal = useMemo(() => {
+    const map: Record<string, Array<{ date: string; peso: number }>> = {};
+    for (const h of evolucaoHistorico) {
+      if (!map[h.animal_id]) map[h.animal_id] = [];
+      map[h.animal_id].push({ date: h.created_at.slice(0, 10), peso: h.peso_medio });
+    }
+    for (const id of Object.keys(map)) {
+      map[id].sort((a, b) => a.date.localeCompare(b.date));
+    }
+    return map;
+  }, [evolucaoHistorico]);
+
+  /* ── Mapa pastoNome → [animals] (para cálculo histórico de peso) ── */
+  const pastoAnimaisMap = useMemo(() => {
+    const map: Record<string, Animal[]> = {};
+    for (const a of animals) {
+      if (!a.pasto_id) continue;
+      const nome = pastoIdToNome[a.pasto_id];
+      if (!nome) continue;
+      if (!map[nome]) map[nome] = [];
+      map[nome].push(a);
+    }
+    return map;
+  }, [animals, pastoIdToNome]);
+
+  /* ── Mapa suppNome → { consumo_pct, valor_kg } ── */
+  const suppTypeMap = useMemo(() => {
+    const map: Record<string, { consumoPct: number | null; valorKg: number | null }> = {};
+    for (const s of suppTypes) {
+      let consumoPct: number | null = null;
+      if (s.consumo != null && s.consumo !== '') {
+        const v = parseFloat(String(s.consumo).replace('%', '').replace(',', '.'));
+        if (!isNaN(v)) consumoPct = v;
+      }
+      map[s.nome] = { consumoPct, valorKg: typeof s.valor_kg === 'number' ? s.valor_kg : null };
+    }
+    return map;
+  }, [suppTypes]);
+
+  /* ── Lote options ── */
+  const loteOptions = useMemo(() => {
+    const all = animals.filter(a => a.status === 'ativo' || !a.status).map(a => a.nome);
+    return Array.from(new Set(all)).sort();
+  }, [animals]);
+
   /* ── Unique filter options ── */
   const supplementOptions = useMemo(
     () => sortedTypes(groupByType(entries)),
@@ -74,10 +191,13 @@ export function Relatorio() {
       entries.filter((e) => {
         if (filterSupplement && e.tipo !== filterSupplement) return false;
         if (filterPasto      && e.pasto !== filterPasto)     return false;
+        if (filterLote && !pastoLotesMap[e.pasto]?.includes(filterLote)) return false;
         if (filterMonths.length > 0 && (!e.data || !filterMonths.some(m => e.data!.startsWith(m)))) return false;
+        if (dateFrom && e.data && e.data < dateFrom) return false;
+        if (dateTo   && e.data && e.data > dateTo)   return false;
         return true;
       }),
-    [entries, filterSupplement, filterPasto, filterMonths]
+    [entries, filterSupplement, filterPasto, filterLote, filterMonths, dateFrom, dateTo, pastoLotesMap]
   );
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);
@@ -91,12 +211,66 @@ export function Relatorio() {
     return result;
   }, [groups]);
 
+  /* ── Peso histórico ponderado de um pasto em uma data específica ── */
+  function getPesoHistorico(pastoNome: string, date: string | undefined): number | null {
+    const animaisPasto = pastoAnimaisMap[pastoNome] ?? [];
+    if (animaisPasto.length === 0) return pastoNomePesoMap[pastoNome] ?? null;
+    let pesoTotal = 0;
+    let qtdTotal  = 0;
+    for (const a of animaisPasto) {
+      const history = evolucaoByAnimal[a.id] ?? [];
+      let pesoAnimal: number | null = null;
+      if (date && history.length > 0) {
+        const antes = history.filter(h => h.date <= date);
+        if (antes.length > 0) pesoAnimal = antes[antes.length - 1].peso;
+      }
+      if (pesoAnimal === null) pesoAnimal = a.peso_medio ?? null;
+      if (pesoAnimal !== null) {
+        pesoTotal += a.quantidade * pesoAnimal;
+        qtdTotal  += a.quantidade;
+      }
+    }
+    return qtdTotal > 0 ? pesoTotal / qtdTotal : null;
+  }
+
+  /* ── Aggregated groups enriquecidos com meta, desembolso, lote ── */
+  const aggregatedGroupsWithMeta = useMemo(() => {
+    const result: Record<string, ReturnType<typeof aggregateEntriesByPasto>> = {};
+    for (const [tipo, typeEntries] of Object.entries(aggregatedGroups)) {
+      const suppInfo   = suppTypeMap[tipo];
+      const consumoPct = suppInfo?.consumoPct ?? null;
+      const valorKg    = suppInfo?.valorKg    ?? null;
+
+      result[tipo] = typeEntries.map(e => {
+        const pesoPasto = getPesoHistorico(e.pasto, e.data);
+        const meta = pesoPasto != null && consumoPct != null && consumoPct > 0
+          ? pesoPasto * (consumoPct / 100)
+          : undefined;
+        const desembolso = valorKg != null && e.consumo > 0
+          ? e.consumo * valorKg
+          : undefined;
+        const lote = (pastoLotesMap[e.pasto] ?? []).join(', ') || undefined;
+        return { ...e, meta, desembolso, lote };
+      });
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aggregatedGroups, suppTypeMap, pastoLotesMap, pastoAnimaisMap, evolucaoByAnimal, pastoNomePesoMap]);
+
   /* ── KPI stats ── */
-  const totalEntries   = filtered.length;
-  const totalAnimals   = sumQuantidade(filtered);
-  const totalPastos    = new Set(filtered.map((e) => e.pasto)).size;
-  const allAggregated  = useMemo(() => Object.values(aggregatedGroups).flat(), [aggregatedGroups]);
+  const totalEntries  = filtered.length;
+  const totalPastos   = new Set(filtered.map((e) => e.pasto)).size;
+  const allAggregated = useMemo(() => Object.values(aggregatedGroupsWithMeta).flat(), [aggregatedGroupsWithMeta]);
   const avgConsumption = averageConsumo(allAggregated);
+
+  /* ── Total cabeças: max por pasto (sem duplicidade) ── */
+  const totalAnimals = useMemo(() => {
+    const pastoMax = new Map<string, number>();
+    for (const e of allAggregated) {
+      pastoMax.set(e.pasto, Math.max(pastoMax.get(e.pasto) ?? 0, e.quantidade));
+    }
+    return Array.from(pastoMax.values()).reduce((sum, q) => sum + q, 0);
+  }, [allAggregated]);
 
   /* ── Ordered supplement types (only those with data) ── */
   const activeTypes = useMemo(() => sortedTypes(groups), [groups]);
@@ -104,21 +278,32 @@ export function Relatorio() {
   /* ── Summary chart data (only supplements with data) ── */
   const summaryData = useMemo(() => activeTypes.map((name, i) => ({
     name,
-    value: averageConsumo(aggregatedGroups[name] ?? []),
+    value: averageConsumo(aggregatedGroupsWithMeta[name] ?? []),
     color: getSupplementColor(name, i),
-  })), [activeTypes, aggregatedGroups]);
+  })), [activeTypes, aggregatedGroupsWithMeta]);
 
   /* ── Dynamic subtitle (farm + selected months) ── */
   const farmName   = clientInfo?.nomeFazenda ?? '';
   const periodoStr = filterMonths.length > 0
     ? filterMonths.slice().sort().map(periodFull).join(' · ')
+    : dateFrom || dateTo
+    ? [dateFrom, dateTo].filter(Boolean).join(' a ')
     : '';
   const subtitle   = [farmName, periodoStr].filter(Boolean).join(' — ');
 
   /* ── Actions ── */
   const handleExportPDF = () => {
+    // Inject portrait page rule for this print
+    const style = document.createElement('style');
+    style.id = 'relatorio-print-portrait';
+    style.textContent = `@page { size: A4 portrait; margin: 14mm; }`;
+    document.head.appendChild(style);
     toast.success('Exportando relatório...', { description: 'O PDF será gerado em breve' });
-    window.print();
+    setTimeout(() => {
+      window.print();
+      const injected = document.getElementById('relatorio-print-portrait');
+      if (injected) injected.remove();
+    }, 200);
   };
 
   const handleExportExcel = () => {
@@ -217,7 +402,30 @@ export function Relatorio() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* ── Filtro de data De/Até ── */}
+          <div className="flex items-center gap-3 mb-5 flex-wrap">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Data</span>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500">De</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500">Até</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Suplemento */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">Suplemento</label>
@@ -250,7 +458,23 @@ export function Relatorio() {
               <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
 
-            {/* Export buttons (3rd column) */}
+            {/* Lote */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lote</label>
+              <select
+                value={filterLote}
+                onChange={(e) => setFilterLote(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl appearance-none bg-white text-sm pr-10 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              >
+                <option value="">Todos</option>
+                {loteOptions.map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
+            </div>
+
+            {/* Export buttons (4th column) */}
             <div className="flex items-end gap-2">
               <button
                 onClick={handleExportExcel}
@@ -297,7 +521,7 @@ export function Relatorio() {
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <SupplementPills activeTypes={activeTypes} groups={aggregatedGroups} />
+          <SupplementPills activeTypes={activeTypes} groups={aggregatedGroupsWithMeta} />
         )}
 
         {/* ── Summary chart ── */}
@@ -320,7 +544,7 @@ export function Relatorio() {
           <>
             <div className="space-y-8">
               {activeTypes.map((tipo, i) => {
-                const sectionEntries = aggregatedGroups[tipo] ?? [];
+                const sectionEntries = aggregatedGroupsWithMeta[tipo] ?? [];
                 const color = getSupplementColor(tipo, i);
                 return (
                   <SupplementSection

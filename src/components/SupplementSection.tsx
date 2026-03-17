@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Cell,
+  LabelList,
 } from 'recharts';
 import type { DataEntry } from '../lib/data';
 import { fmt, fmtInt, averageConsumo, sumQuantidade } from '../lib/utils';
@@ -30,6 +31,17 @@ function calcScale(dataMax: number): { max: number; step: number } {
 export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025', farmName = 'FAZENDA MALHADA GRANDE' }: SupplementSectionProps) {
   const avg      = averageConsumo(entries);
   const totalQtd = sumQuantidade(entries);
+
+  const hasMeta = entries.some(e => e.meta != null);
+  const hasLote = entries.some(e => !!e.lote);
+
+  const avgMeta = hasMeta
+    ? entries.filter(e => e.meta != null).reduce((s, e) => s + e.meta!, 0) / entries.filter(e => e.meta != null).length
+    : null;
+
+  const avgDesembolso = entries.some(e => e.desembolso != null)
+    ? entries.filter(e => e.desembolso != null).reduce((s, e) => s + e.desembolso!, 0) / entries.filter(e => e.desembolso != null).length
+    : null;
 
   const dataMax  = entries.reduce((m, e) => Math.max(m, e.consumo), 0);
   const scale    = calcScale(dataMax);
@@ -74,12 +86,14 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
             <thead>
               <tr style={{ borderBottom: '2px solid #000' }}>
                 <th className="py-2 text-left font-bold">PASTO</th>
+                {hasLote && <th className="py-2 text-left font-bold pl-3">LOTE</th>}
                 <th className="py-2 text-right font-bold w-24">QUANTIDADE</th>
                 <th className="py-2 text-left font-bold pl-4">TIPO DE SUPLEMENTO</th>
-                <th className="py-2 text-right font-bold w-28">DIAS REAIS</th>
+                <th className="py-2 text-right font-bold w-32">DIAS DE CONSUMO</th>
                 <th className="py-2 text-right font-bold w-24">SACOS</th>
                 <th className="py-2 text-right font-bold w-36">TOTAL KG OFERTADO</th>
                 <th className="py-2 text-right font-bold w-32">CONSUMO (KG/CAB DIA)</th>
+                {hasMeta && <th className="py-2 text-right font-bold w-32">META (KG/CAB DIA)</th>}
               </tr>
             </thead>
             <tbody>
@@ -89,12 +103,35 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                   className={`border-b border-gray-100 ${ri % 2 === 1 ? 'bg-gray-50/40' : ''}`}
                 >
                   <td className="py-2 pr-2 font-medium text-gray-800">{row.pasto}</td>
+                  {hasLote && <td className="py-2 pl-3 text-gray-500 text-xs">{row.lote ?? '—'}</td>}
                   <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.quantidade)}</td>
                   <td className="py-2 pl-4 text-gray-400">{row.tipo}</td>
                   <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.periodo)}</td>
                   <td className="py-2 text-right tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(row.sacos)}</td>
                   <td className="py-2 text-right text-gray-700 tabular-nums">{fmtInt(row.kg)}</td>
                   <td className="py-2 text-right font-bold text-gray-900 tabular-nums">{fmt(row.consumo)}</td>
+                  {hasMeta && (() => {
+                    const over = row.meta != null && row.consumo > row.meta;
+                    const ok   = row.meta != null && row.consumo <= row.meta;
+                    return (
+                      <td
+                        className="py-2 text-right tabular-nums font-bold rounded-sm"
+                        style={{
+                          color:           row.meta != null ? (over ? '#991b1b' : '#14532d') : '#6b7280',
+                          backgroundColor: row.meta != null ? (over ? '#fee2e2' : '#dcfce7') : 'transparent',
+                          paddingRight: '6px',
+                          paddingLeft:  '6px',
+                        }}
+                        title={over ? 'Acima da meta' : ok ? 'Dentro da meta' : ''}
+                      >
+                        {row.meta != null ? (
+                          <span className="flex items-center justify-end gap-1">
+                            {over ? '▲' : '▼'} {fmt(row.meta)}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    );
+                  })()}
                 </tr>
               ))}
             </tbody>
@@ -102,12 +139,34 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
         </div>
 
         {/* ── Totals ── */}
-        <div className="flex justify-between items-center pt-3 pb-6 px-1 text-sm font-bold border-t-2 border-gray-300">
+        <div className="flex flex-wrap justify-between items-center pt-3 pb-6 px-1 text-sm font-bold border-t-2 border-gray-300 gap-4">
           <span className="text-gray-900">Total cabeças: {fmtInt(totalQtd)}</span>
-          <span className="text-gray-900">
-            Média consumo:{' '}
-            <strong style={{ color }}>{fmt(avg)}</strong> kg/cab dia
-          </span>
+          <div className="flex flex-wrap gap-4 items-center">
+            <span className="text-gray-900">
+              Média consumo:{' '}
+              <strong style={{ color }}>{fmt(avg)}</strong> kg/cab dia
+            </span>
+            {avgMeta != null && (() => {
+              const over = avg > avgMeta;
+              return (
+                <span
+                  className="px-3 py-1 rounded-full text-sm font-bold"
+                  style={{
+                    backgroundColor: over ? '#fee2e2' : '#dcfce7',
+                    color:           over ? '#991b1b' : '#14532d',
+                  }}
+                >
+                  {over ? '▲ ACIMA' : '▼ DENTRO'} DA META — {fmt(avgMeta)} kg/cab dia
+                </span>
+              );
+            })()}
+            {avgDesembolso != null && (
+              <span className="text-gray-900">
+                Desembolso:{' '}
+                <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolso, 2)}</strong>/cab/dia
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Gráfico full-width abaixo ── */}
@@ -115,7 +174,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 15, right: 50, left: 10, bottom: 100 }}
+              margin={{ top: 28, right: 50, left: 10, bottom: 100 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
               <XAxis
@@ -154,10 +213,31 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                   fontWeight: 'bold',
                 }}
               />
+              {avgMeta != null && (
+                <ReferenceLine
+                  y={avgMeta}
+                  stroke="#1a4a7a"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  label={{
+                    value: `meta ${fmt(avgMeta)}`,
+                    position: 'right',
+                    fill: '#1a4a7a',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                  }}
+                />
+              )}
               <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                 {chartData.map((_, idx) => (
                   <Cell key={idx} fill={color} />
                 ))}
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  formatter={(v: number) => fmt(v)}
+                  style={{ fontSize: 10, fill: '#444', fontWeight: 600 }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

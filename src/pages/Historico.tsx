@@ -78,18 +78,20 @@ export function Historico() {
   const { user } = useAuth();
   const farmId = activeFarmId || user?.farmId || '';
   const [manejos, setManejos] = useState<{ id: string; tipo: string; descricao: string; created_at: string; user_name?: string }[]>([]);
-  const [lancamentos, setLancamentos] = useState<{ id: string; pasto: string; tipo: string; data: string | null; quantidade: number; sacos: number; kg: number; funcionario?: string; created_at?: string }[]>([]);
+  const [lancamentos, setLancamentos] = useState<{ id: string; pasto_nome: string; tipo: string; data: string | null; quantidade: number; sacos: number; kg: number; funcionario?: string; created_at?: string }[]>([]);
   const [activityLogs, setActivityLogs] = useState<{ id: string; module: string; action: string; description: string; user_name?: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
 
   useEffect(() => {
     if (!farmId) return;
     setLoading(true);
     Promise.all([
       supabaseAdmin.from('manejo_historico').select('id, tipo, descricao, created_at, user_name').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
-      supabaseAdmin.from('data_entries').select('id, pasto, tipo, data, quantidade, sacos, kg, funcionario, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
+      supabaseAdmin.from('data_entries').select('id, pasto_nome, tipo, data, quantidade, sacos, kg, funcionario, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('activity_log').select('id, module, action, description, user_name, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
     ]).then(([manRes, lanRes, actRes]) => {
       setManejos(manRes.data ?? []);
@@ -111,7 +113,7 @@ export function Historico() {
       id: `l_${l.id}`,
       source: 'lancamento',
       tipo: 'lancamento',
-      descricao: `${l.pasto} · ${l.tipo} · ${l.quantidade} cab. · ${l.sacos} sac. · ${l.kg} kg${l.funcionario ? ` · ${l.funcionario}` : ''}`,
+      descricao: `${l.pasto_nome} · ${l.tipo} · ${l.quantidade} cab. · ${l.sacos} sac. · ${l.kg} kg${l.funcionario ? ` · ${l.funcionario}` : ''}`,
       created_at: l.created_at || l.data || '',
     }));
     const actItems: HistoricoEntry[] = activityLogs.map(a => ({
@@ -133,6 +135,9 @@ export function Historico() {
     if (filterType === 'manejo') entries = entries.filter(e => e.source === 'manejo');
     else if (filterType === 'lancamento') entries = entries.filter(e => e.source === 'lancamento');
     else if (filterType === 'activity') entries = entries.filter(e => e.source === 'activity');
+    // Filter by date range
+    if (dateFrom) entries = entries.filter(e => e.created_at >= dateFrom);
+    if (dateTo)   entries = entries.filter(e => e.created_at.slice(0, 10) <= dateTo);
     // Filter by search
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -144,7 +149,7 @@ export function Historico() {
       );
     }
     return entries;
-  }, [allEntries, search, filterType]);
+  }, [allEntries, search, filterType, dateFrom, dateTo]);
 
   function fmtDate(iso: string) {
     if (!iso) return '—';
@@ -167,6 +172,37 @@ export function Historico() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
           <h1 className="text-3xl font-bold text-gray-900">Histórico</h1>
           <p className="text-sm text-gray-500 mt-1">Registro completo de manejos, lançamentos e atividades do sistema.</p>
+        </div>
+
+        {/* Filtro de datas */}
+        <div className="flex items-center gap-3 flex-wrap bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Período</span>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">De</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">Até</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-xs text-teal-600 hover:text-teal-700 font-medium transition-colors"
+            >
+              Limpar datas
+            </button>
+          )}
         </div>
 
         {/* Chips de filtro */}
