@@ -797,8 +797,9 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
       bezerros_quantidade: bezQtd,
       bezerros_peso_medio: bezPeso,
     };
-    const { error } = await supabaseAdmin.from('animals').update(payload).eq('id', id);
-    if (error) { toast.error('Erro ao atualizar.'); return; }
+    const { data: updated, error } = await supabaseAdmin.from('animals').update(payload).eq('id', id).select();
+    if (error) { toast.error(`Erro ao atualizar: ${error.message}`); return; }
+    if (!updated || updated.length === 0) { toast.error('Não foi possível salvar. Verifique as permissões do banco.'); return; }
     _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, ...payload } : a);
     setItems(_animaisCache);
     toast.success('Lote atualizado!'); setEditingId(null);
