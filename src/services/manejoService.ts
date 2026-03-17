@@ -396,6 +396,13 @@ export const manejoService = {
       descrDestino = `novo lote "${destino.nome}" criado`;
     }
 
+    // Reduz (ou zera) bezerros_quantidade no lote de origem
+    const bezRestantes = (loteOrigem.bezerros_quantidade ?? 0) - qtdBezerros;
+    await supabaseAdmin.from('animals').update({
+      bezerros_quantidade: bezRestantes > 0 ? bezRestantes : null,
+      bezerros_peso_medio: bezRestantes > 0 ? (loteOrigem.bezerros_peso_medio ?? null) : null,
+    }).eq('id', loteOrigem.id);
+
     await insertHistorico({
       farm_id:    farmId,
       animal_id:  loteOrigem.id,

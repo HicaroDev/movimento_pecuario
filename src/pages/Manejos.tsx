@@ -691,6 +691,7 @@ function EvolucaoTab({
 }: {
   animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
 }) {
+  const { pastures } = useData();
   const [subOp, setSubOp]         = useState<SubOp>('categoria');
   const [saving, setSaving]       = useState(false);
   const [events, setEvents]       = useState<ManejoEvent[]>([]);
@@ -1187,11 +1188,32 @@ function EvolucaoTab({
               <div className="relative">
                 <select value={parcDestId} onChange={e => setParcDestId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.filter(a => a.id !== parcOrigId).map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
-                    </option>
-                  ))}
+                  {/* Agrupa lotes por pasto */}
+                  {pastures.map(p => {
+                    const lotesNoPasto = ativos.filter(a => a.pasto_id === p.id && a.id !== parcOrigId);
+                    return (
+                      <optgroup key={p.id} label={`${p.nome}${p.area ? ` (${p.area} ha)` : ''}`}>
+                        {lotesNoPasto.length === 0
+                          ? <option disabled value="">— sem lotes —</option>
+                          : lotesNoPasto.map(a => (
+                            <option key={a.id} value={a.id}>
+                              {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
+                            </option>
+                          ))
+                        }
+                      </optgroup>
+                    );
+                  })}
+                  {/* Lotes sem pasto */}
+                  {ativos.filter(a => !a.pasto_id && a.id !== parcOrigId).length > 0 && (
+                    <optgroup label="Sem pasto alocado">
+                      {ativos.filter(a => !a.pasto_id && a.id !== parcOrigId).map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>

@@ -372,10 +372,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   function updatePasture(id: string, patch: Partial<Pasture>) {
-    setPastures(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    // Para área: só sobrescreve o estado local se o valor é válido (> 0)
+    // Evita que um NaN/0 acidental apague a área exibida antes do próximo refresh
+    const statePatch: Partial<Pasture> = { ...patch };
+    if ('area' in statePatch) {
+      const a = statePatch.area;
+      if (a == null || typeof a !== 'number' || isNaN(a) || a <= 0) {
+        delete statePatch.area;
+      }
+    }
+    setPastures(prev => prev.map(p => p.id === id ? { ...p, ...statePatch } : p));
     supabaseAdmin.from('pastures').update({
       ...(patch.nome               !== undefined && { nome:               patch.nome }),
-      ...(patch.area               !== undefined && { area:               patch.area ?? null }),
+      ...('area' in patch && { area: (typeof patch.area === 'number' && !isNaN(patch.area) && patch.area > 0) ? patch.area : null }),
       ...(patch.observacoes        !== undefined && { observacoes:        patch.observacoes ?? null }),
       ...(patch.retiro_id          !== undefined && { retiro_id:          patch.retiro_id ?? null }),
       // só inclui as colunas novas se tiverem valor — evita erro se SQL ainda não foi rodado
