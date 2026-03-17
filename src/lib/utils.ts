@@ -27,10 +27,13 @@ export function sortedTypes(groups: Record<string, DataEntry[]>): string[] {
   return [...inOrder, ...others];
 }
 
+/** Média ponderada pelo número de cabeças (quantidade) */
 export function averageConsumo(entries: DataEntry[]): number {
   if (!entries.length) return 0;
-  const total = entries.reduce((acc, e) => acc + Number(e.consumo || 0), 0);
-  return total / entries.length;
+  const totalCab    = entries.reduce((acc, e) => acc + Number(e.quantidade || 0), 0);
+  if (totalCab === 0) return 0;
+  const totalPesado = entries.reduce((acc, e) => acc + Number(e.consumo || 0) * Number(e.quantidade || 0), 0);
+  return totalPesado / totalCab;
 }
 
 export function sumQuantidade(entries: DataEntry[]): number {
