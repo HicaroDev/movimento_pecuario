@@ -787,17 +787,20 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
     const bezQtd    = data.bezerros_quantidade > 0 ? data.bezerros_quantidade : null;
     const bezPeso   = data.bezerros_peso_medio > 0 ? data.bezerros_peso_medio : null;
     const payload = {
-      nome: data.nome, quantidade: data.quantidade,
-      raca: data.raca || null, categoria_id: data.categoria_id || null,
-      observacoes: data.observacoes || null,
-      ...(data.sexo && { sexo: data.sexo }),
-      ...(pesoMedio && { peso_medio: pesoMedio }),
-      ...(bezQtd    && { bezerros_quantidade: bezQtd }),
-      ...(bezPeso   && { bezerros_peso_medio: bezPeso }),
+      nome:                data.nome,
+      quantidade:          data.quantidade,
+      raca:                data.raca || null,
+      categoria_id:        data.categoria_id || null,
+      observacoes:         data.observacoes || null,
+      sexo:                data.sexo || null,
+      peso_medio:          pesoMedio,
+      bezerros_quantidade: bezQtd,
+      bezerros_peso_medio: bezPeso,
     };
     const { error } = await supabaseAdmin.from('animals').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, nome: data.nome, quantidade: data.quantidade, raca: data.raca || undefined, categoria_id: data.categoria_id || undefined, peso_medio: pesoMedio ?? undefined, sexo: data.sexo || undefined, bezerros_quantidade: bezQtd ?? undefined, bezerros_peso_medio: bezPeso ?? undefined, observacoes: data.observacoes || undefined } : a); setItems(_animaisCache);
+    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, ...payload } : a);
+    setItems(_animaisCache);
     toast.success('Lote atualizado!'); setEditingId(null);
   }
 
