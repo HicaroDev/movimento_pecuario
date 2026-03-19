@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
-  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, GitMerge, SplitSquareVertical,
+  X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, GitMerge,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -522,42 +522,86 @@ function TransferirTab({
 }: {
   animals: Animal[]; pastures: Pasture[]; farmId: string; onReload: () => void; categories: AnimalCategory[];
 }) {
-  const [loteId, setLoteId]       = useState('');
-  const [destId, setDestId]       = useState('');
-  const [obs, setObs]             = useState('');
-  const [data, setData]           = useState(() => new Date().toISOString().split('T')[0]);
-  const [saving, setSaving]       = useState(false);
-  const [events, setEvents]       = useState<ManejoEvent[]>([]);
-  const [loadingH, setLoadingH]   = useState(true);
+  const [loteId, setLoteId]         = useState('');
+  const [destPastoId, setDestPastoId] = useState('');
+  const [obs, setObs]               = useState('');
+  const [data, setData]             = useState(() => new Date().toISOString().split('T')[0]);
+  const [saving, setSaving]         = useState(false);
+  const [events, setEvents]         = useState<ManejoEvent[]>([]);
+  const [loadingH, setLoadingH]     = useState(true);
+
+  // Controle de transferência parcial
+  const [isParcial, setIsParcial]   = useState(false);
+  const [parcQtd, setParcQtd]       = useState('');
+  // Se o pasto destino já tem lotes, o usuário pode agregar em um deles ou criar novo
+  const [parcModo, setParcModo]     = useState<'novo' | 'agregar'>('novo');
+  const [parcMergeId, setParcMergeId] = useState('');
+  const [parcNovoNome, setParcNovoNome] = useState('');
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const pastoMap = useMemo(() => Object.fromEntries(pastures.map(p => [p.id, p.nome])), [pastures]);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
   const lote = ativos.find(a => a.id === loteId);
 
+  // Lotes já existentes no pasto de destino
+  const lotesDestino = useMemo(
+    () => ativos.filter(a => a.pasto_id === destPastoId && a.id !== loteId),
+    [ativos, destPastoId, loteId]
+  );
+
   useEffect(() => {
     setLoadingH(true);
-    manejoService.listarHistorico(farmId, 'transferencia', 20)
+    manejoService.listarHistorico(farmId, ['transferencia', 'transf_parcial'], 30)
       .then(setEvents).catch(() => {}).finally(() => setLoadingH(false));
   }, [farmId]);
 
+  function resetForm() {
+    setLoteId(''); setDestPastoId(''); setObs(''); setData(new Date().toISOString().split('T')[0]);
+    setIsParcial(false); setParcQtd(''); setParcModo('novo'); setParcMergeId(''); setParcNovoNome('');
+  }
+
   async function confirmar() {
-    if (!lote || !destId) { toast.error('Selecione o lote e o pasto de destino.'); return; }
-    if (lote.pasto_id === destId) { toast.error('O lote já está neste pasto.'); return; }
-    setSaving(true);
-    try {
-      const origemNome = lote.pasto_id ? (pastoMap[lote.pasto_id] ?? 'sem pasto') : 'sem pasto';
-      const destNome   = pastoMap[destId] ?? destId;
-      await manejoService.transferir(lote, destId, origemNome, destNome, data, obs || undefined);
-      toast.success(`"${lote.nome}" transferido para ${destNome}!`);
-      setLoteId(''); setDestId(''); setObs(''); setData(new Date().toISOString().split('T')[0]);
-      onReload();
-      const updated = await manejoService.listarHistorico(farmId, 'transferencia', 20);
-      setEvents(updated);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao transferir.');
-    } finally {
-      setSaving(false);
+    if (!lote || !destPastoId) { toast.error('Selecione o lote e o pasto de destino.'); return; }
+    if (lote.pasto_id === destPastoId && !isParcial) { toast.error('O lote já está neste pasto.'); return; }
+    const destNome = pastoMap[destPastoId] ?? destPastoId;
+
+    if (!isParcial) {
+      // Transferência completa do lote para outro pasto
+      if (lote.pasto_id === destPastoId) { toast.error('O lote já está neste pasto.'); return; }
+      setSaving(true);
+      try {
+        const origemNome = lote.pasto_id ? (pastoMap[lote.pasto_id] ?? 'sem pasto') : 'sem pasto';
+        await manejoService.transferir(lote, destPastoId, origemNome, destNome, data, obs || undefined);
+        toast.success(`"${lote.nome}" transferido para ${destNome}!`);
+        resetForm(); onReload();
+        const updated = await manejoService.listarHistorico(farmId, ['transferencia', 'transf_parcial'], 30);
+        setEvents(updated);
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : 'Erro ao transferir.');
+      } finally { setSaving(false); }
+    } else {
+      // Transferência parcial para pasto de destino
+      const qtd = Number(parcQtd);
+      if (!qtd || qtd <= 0) { toast.error('Informe a quantidade a transferir.'); return; }
+      if (parcModo === 'novo' && !parcNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
+      if (parcModo === 'agregar' && !parcMergeId) { toast.error('Selecione o lote de destino.'); return; }
+      const mergeLote = parcModo === 'agregar' ? ativos.find(a => a.id === parcMergeId) : undefined;
+      setSaving(true);
+      try {
+        await manejoService.transferirParcialParaPasto({
+          origem: lote, qtd, destPastoId, destPastoNome: destNome, farmId, data,
+          mergeLoteId:  mergeLote?.id,
+          mergeLoteNome: mergeLote?.nome,
+          mergeLoteQtd: mergeLote?.quantidade,
+          novoLoteNome: parcModo === 'novo' ? parcNovoNome.trim() : undefined,
+        });
+        toast.success(`${qtd} cab. de "${lote.nome}" → ${destNome}!`);
+        resetForm(); onReload();
+        const updated = await manejoService.listarHistorico(farmId, ['transferencia', 'transf_parcial'], 30);
+        setEvents(updated);
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : 'Erro ao transferir.');
+      } finally { setSaving(false); }
     }
   }
 
@@ -570,10 +614,22 @@ function TransferirTab({
           <h3 className="font-semibold text-gray-900">Transferir lote</h3>
         </div>
 
+        {/* Toggle completo/parcial */}
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+          <button type="button" onClick={() => setIsParcial(false)}
+            className={`flex-1 px-3 py-2 transition-colors ${!isParcial ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+            Lote completo
+          </button>
+          <button type="button" onClick={() => setIsParcial(true)}
+            className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${isParcial ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+            Transferência parcial
+          </button>
+        </div>
+
         <div>
           <label className={labelClass}>Lote de Origem</label>
           <div className="relative">
-            <select value={loteId} onChange={e => { setLoteId(e.target.value); setDestId(''); }} className={selectClass}>
+            <select value={loteId} onChange={e => { setLoteId(e.target.value); setDestPastoId(''); setParcMergeId(''); }} className={selectClass}>
               <option value="">Selecione um lote…</option>
               {ativos.filter(a => !!a.pasto_id).map(a => {
                 const catNome = a.categoria_id ? (catMap[a.categoria_id] ?? '') : '';
@@ -593,21 +649,76 @@ function TransferirTab({
           <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
             <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             <span>Pasto atual: <strong>{lote.pasto_id ? (pastoMap[lote.pasto_id] ?? '—') : 'Não alocado'}</strong></span>
+            <span className="ml-auto text-xs text-gray-400">{lote.quantidade} cab. disponíveis</span>
+          </div>
+        )}
+
+        {/* Quantidade (apenas parcial) */}
+        {isParcial && (
+          <div>
+            <label className={labelClass}>
+              Qtd. a transferir{lote ? <span className="ml-1 text-gray-400 font-normal">(máx. {lote.quantidade})</span> : ''}
+            </label>
+            <input
+              type="number" min="1" max={lote?.quantidade}
+              value={parcQtd} onChange={e => setParcQtd(e.target.value)}
+              placeholder="Ex: 20" className={inputClass} disabled={!loteId}
+            />
           </div>
         )}
 
         <div>
           <label className={labelClass}>Pasto de destino</label>
           <div className="relative">
-            <select value={destId} onChange={e => setDestId(e.target.value)} className={selectClass} disabled={!loteId}>
-              <option value="">Selecione o destino…</option>
-              {pastures.filter(p => p.id !== lote?.pasto_id).map(p => (
-                <option key={p.id} value={p.id}>{p.nome}{p.area ? ` (${p.area} ha)` : ''}</option>
-              ))}
+            <select value={destPastoId} onChange={e => { setDestPastoId(e.target.value); setParcMergeId(''); setParcModo('novo'); }} className={selectClass} disabled={!loteId}>
+              <option value="">Selecione o pasto…</option>
+              {pastures.filter(p => !isParcial ? p.id !== lote?.pasto_id : true).map(p => {
+                const nLotes = ativos.filter(a => a.pasto_id === p.id && a.id !== loteId).length;
+                return (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}{p.area ? ` (${p.area} ha)` : ''}{nLotes > 0 ? ` · ${nLotes} lote${nLotes !== 1 ? 's' : ''}` : ' · vazio'}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
         </div>
+
+        {/* Opções de destino parcial quando pasto tem lotes */}
+        {isParcial && destPastoId && (
+          <div className="space-y-2">
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+              <button type="button" onClick={() => setParcModo('novo')}
+                className={`flex-1 px-3 py-2 transition-colors ${parcModo === 'novo' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                Criar novo lote
+              </button>
+              {lotesDestino.length > 0 && (
+                <button type="button" onClick={() => setParcModo('agregar')}
+                  className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${parcModo === 'agregar' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                  Agregar em lote existente
+                </button>
+              )}
+            </div>
+            {parcModo === 'novo' ? (
+              <input
+                type="text" value={parcNovoNome} onChange={e => setParcNovoNome(e.target.value)}
+                placeholder="Nome do novo lote (ex: Garrotes Mar/26)"
+                className={inputClass}
+              />
+            ) : (
+              <div className="relative">
+                <select value={parcMergeId} onChange={e => setParcMergeId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o lote…</option>
+                  {lotesDestino.map(a => (
+                    <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label className={labelClass}>Data da transferência</label>
@@ -615,17 +726,19 @@ function TransferirTab({
             max={new Date().toISOString().split('T')[0]} className={inputClass} />
         </div>
 
-        <div>
-          <label className={labelClass}>Observação (opcional)</label>
-          <input type="text" value={obs} onChange={e => setObs(e.target.value)}
-            placeholder="Ex: transferência por superlotação"
-            className={inputClass} />
-        </div>
+        {!isParcial && (
+          <div>
+            <label className={labelClass}>Observação (opcional)</label>
+            <input type="text" value={obs} onChange={e => setObs(e.target.value)}
+              placeholder="Ex: transferência por superlotação"
+              className={inputClass} />
+          </div>
+        )}
 
-        <button onClick={confirmar} disabled={saving || !loteId || !destId}
+        <button onClick={confirmar} disabled={saving || !loteId || !destPastoId}
           className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <ArrowRight className="w-4 h-4" />
-          {saving ? 'Transferindo...' : 'Confirmar Transferência'}
+          {saving ? 'Transferindo...' : isParcial ? 'Confirmar Transferência Parcial' : 'Confirmar Transferência'}
         </button>
       </div>
 
@@ -645,7 +758,7 @@ function TransferirTab({
    TAB 3 — Evolução (Categoria · Parição · Bezerros)
 ══════════════════════════════════════════════════════════════ */
 
-type SubOp = 'categoria' | 'paricao' | 'bezerros' | 'parcial';
+type SubOp = 'categoria' | 'paricao' | 'bezerros';
 type DestinoTipo = 'existente' | 'novo';
 
 function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId, animals, catMap, categories }: {
@@ -704,7 +817,6 @@ function EvolucaoTab({
 }: {
   animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
 }) {
-  const { pastures } = useData();
   const [subOp, setSubOp]         = useState<SubOp>('categoria');
   const [saving, setSaving]       = useState(false);
   const [events, setEvents]       = useState<ManejoEvent[]>([]);
@@ -741,11 +853,6 @@ function EvolucaoTab({
   const [fundirNome, setFundirNome]     = useState('');
   const [fundirData, setFundirData]     = useState(() => new Date().toISOString().split('T')[0]);
 
-  /* ── Transferir Parcial ── */
-  const [parcOrigId, setParcOrigId]     = useState('');
-  const [parcDestId, setParcDestId]     = useState('');
-  const [parcQtd,    setParcQtd]        = useState('');
-  const [parcData,   setParcData]       = useState(() => new Date().toISOString().split('T')[0]);
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
@@ -867,30 +974,10 @@ function EvolucaoTab({
     finally { setSaving(false); }
   }
 
-  /* ── Confirmar: Transferir Parcial ── */
-  async function confirmarParcial() {
-    const orig = ativos.find(a => a.id === parcOrigId);
-    const dest = ativos.find(a => a.id === parcDestId);
-    if (!orig) { toast.error('Selecione o lote de origem.'); return; }
-    if (!dest) { toast.error('Selecione o lote de destino.'); return; }
-    if (orig.id === dest.id) { toast.error('Origem e destino devem ser lotes diferentes.'); return; }
-    const qtd = Number(parcQtd);
-    if (!qtd || qtd <= 0) { toast.error('Informe a quantidade a transferir.'); return; }
-    setSaving(true);
-    try {
-      await manejoService.transferirParcial(orig, dest, qtd, farmId, parcData);
-      toast.success(`${qtd} cab. transferidas de "${orig.nome}" → "${dest.nome}"!`);
-      setParcOrigId(''); setParcDestId(''); setParcQtd(''); setParcData(new Date().toISOString().split('T')[0]);
-      onReload(); await reloadHistorico();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
-    finally { setSaving(false); }
-  }
-
   const SUB_OPS = [
     { id: 'categoria' as SubOp, label: 'Categoria',  icon: TrendingUp },
     { id: 'paricao'   as SubOp, label: 'Parição',    icon: Baby },
     { id: 'bezerros'  as SubOp, label: 'Desmama',    icon: Milk },
-    { id: 'parcial'   as SubOp, label: 'Transf. Parcial', icon: SplitSquareVertical },
   ];
 
   return (
@@ -1056,11 +1143,11 @@ function EvolucaoTab({
               <h3 className="font-semibold text-gray-900">Registrar parição</h3>
             </div>
             <div>
-              <label className={labelClass}>Lote mãe</label>
+              <label className={labelClass}>Lote mãe <span className="text-pink-400 font-normal">(apenas fêmeas)</span></label>
               <div className="relative">
                 <select value={parLoteMaeId} onChange={e => setParLoteMaeId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
+                  {ativos.filter(a => a.sexo === 'femea').map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
@@ -1103,11 +1190,11 @@ function EvolucaoTab({
               <h3 className="font-semibold text-gray-900">Desmama</h3>
             </div>
             <div>
-              <label className={labelClass}>Lote de origem</label>
+              <label className={labelClass}>Lote de origem <span className="text-orange-400 font-normal">(fêmeas com bezerros ao pé)</span></label>
               <div className="relative">
                 <select value={bezLoteId} onChange={e => setBezLoteId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
+                  {ativos.filter(a => a.sexo === 'femea' && (a.bezerros_quantidade ?? 0) > 0).map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab. · {a.bezerros_quantidade} bez.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
@@ -1150,113 +1237,6 @@ function EvolucaoTab({
           </div>
         )}
 
-        {/* ── Sub-op: Transferir Parcial ── */}
-        {subOp === 'parcial' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <SplitSquareVertical className="w-4 h-4" style={{ color: '#1a6040' }} />
-              <h3 className="font-semibold text-gray-900">Transferir parte do lote</h3>
-            </div>
-            <p className="text-xs text-gray-400">
-              Move uma quantidade de cabeças de um lote para outro sem alterar o pasto.
-            </p>
-
-            <div>
-              <label className={labelClass}>Lote de origem</label>
-              <div className="relative">
-                <select value={parcOrigId} onChange={e => setParcOrigId(e.target.value)} className={selectClass}>
-                  <option value="">Selecione o lote…</option>
-                  {ativos.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>
-                  Qtd. a transferir
-                  {parcOrigId && (() => { const o = ativos.find(a => a.id === parcOrigId); return o ? <span className="ml-1 text-gray-400">(máx. {o.quantidade})</span> : null; })()}
-                </label>
-                <input
-                  type="number" min="1"
-                  value={parcQtd}
-                  onChange={e => setParcQtd(e.target.value)}
-                  placeholder="Ex: 15"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Data</label>
-                <input type="date" value={parcData} onChange={e => setParcData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Lote de destino</label>
-              <div className="relative">
-                <select value={parcDestId} onChange={e => setParcDestId(e.target.value)} className={selectClass}>
-                  <option value="">Selecione o lote…</option>
-                  {/* Agrupa lotes por pasto */}
-                  {pastures.map(p => {
-                    const lotesNoPasto = ativos.filter(a => a.pasto_id === p.id && a.id !== parcOrigId);
-                    return (
-                      <optgroup key={p.id} label={`${p.nome}${p.area ? ` (${p.area} ha)` : ''}`}>
-                        {lotesNoPasto.length === 0
-                          ? <option disabled value="">— sem lotes —</option>
-                          : lotesNoPasto.map(a => (
-                            <option key={a.id} value={a.id}>
-                              {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
-                            </option>
-                          ))
-                        }
-                      </optgroup>
-                    );
-                  })}
-                  {/* Lotes sem pasto */}
-                  {ativos.filter(a => !a.pasto_id && a.id !== parcOrigId).length > 0 && (
-                    <optgroup label="Sem pasto alocado">
-                      {ativos.filter(a => !a.pasto_id && a.id !== parcOrigId).map(a => (
-                        <option key={a.id} value={a.id}>
-                          {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              </div>
-              {/* Preview do resultado */}
-              {parcOrigId && parcDestId && Number(parcQtd) > 0 && (() => {
-                const orig = ativos.find(a => a.id === parcOrigId);
-                const dest = ativos.find(a => a.id === parcDestId);
-                const qtd  = Number(parcQtd);
-                if (!orig || !dest) return null;
-                return (
-                  <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                    <span><strong>{orig.nome}</strong>: {orig.quantidade} → <strong style={{ color: '#1a6040' }}>{orig.quantidade - qtd}</strong> cab.</span>
-                    <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                    <span><strong>{dest.nome}</strong>: {dest.quantidade} → <strong style={{ color: '#1a6040' }}>{dest.quantidade + qtd}</strong> cab.</span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <button
-              onClick={confirmarParcial}
-              disabled={saving || !parcOrigId || !parcDestId || !parcQtd}
-              className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#1a6040' }}
-            >
-              <SplitSquareVertical className="w-4 h-4" />
-              {saving ? 'Transferindo...' : 'Confirmar Transferência Parcial'}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Histórico */}

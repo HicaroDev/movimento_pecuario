@@ -133,8 +133,8 @@ export function Historico() {
     let entries = allEntries;
     // Filter by type
     if (filterType === 'manejo') entries = entries.filter(e => e.source === 'manejo');
-    else if (filterType === 'lancamento') entries = entries.filter(e => e.source === 'lancamento');
-    else if (filterType === 'activity') entries = entries.filter(e => e.source === 'activity');
+    else if (filterType === 'lancamento') entries = entries.filter(e => e.source === 'lancamento' || (e.source === 'activity' && e.module === 'formulario'));
+    else if (filterType === 'activity') entries = entries.filter(e => e.source === 'activity' && e.module !== 'formulario');
     // Filter by date range
     if (dateFrom) entries = entries.filter(e => e.created_at >= dateFrom);
     if (dateTo)   entries = entries.filter(e => e.created_at.slice(0, 10) <= dateTo);
@@ -159,9 +159,9 @@ export function Historico() {
 
   const FILTER_TABS: { key: FilterType; label: string; count: number }[] = [
     { key: 'all', label: 'Todos', count: allEntries.length },
-    { key: 'lancamento', label: 'Lançamentos', count: allEntries.filter(e => e.source === 'lancamento').length },
+    { key: 'lancamento', label: 'Lançamentos', count: allEntries.filter(e => e.source === 'lancamento' || (e.source === 'activity' && e.module === 'formulario')).length },
     { key: 'manejo', label: 'Manejos', count: allEntries.filter(e => e.source === 'manejo').length },
-    { key: 'activity', label: 'Atividades', count: allEntries.filter(e => e.source === 'activity').length },
+    { key: 'activity', label: 'Atividades', count: allEntries.filter(e => e.source === 'activity' && e.module !== 'formulario').length },
   ];
 
   return (

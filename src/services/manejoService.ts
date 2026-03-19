@@ -478,6 +478,63 @@ export const manejoService = {
     });
   },
 
+  /** Transfere parcialmente para um PASTO de destino (cria novo lote ou agrega em lote existente). */
+  async transferirParcialParaPasto(params: {
+    origem: Animal;
+    qtd: number;
+    destPastoId: string;
+    destPastoNome: string;
+    farmId: string;
+    data?: string;
+    mergeLoteId?: string;
+    mergeLoteNome?: string;
+    mergeLoteQtd?: number;
+    novoLoteNome?: string;
+  }): Promise<void> {
+    const { origem, qtd, destPastoId, destPastoNome, farmId, data, mergeLoteId, mergeLoteNome, mergeLoteQtd, novoLoteNome } = params;
+    if (qtd <= 0) throw new Error('Quantidade inválida.');
+    if (qtd > origem.quantidade) throw new Error(`Quantidade maior que o disponível no lote (${origem.quantidade} cab.).`);
+
+    // Deduz do lote de origem
+    const { error: e1 } = await supabaseAdmin.from('animals')
+      .update({ quantidade: origem.quantidade - qtd }).eq('id', origem.id);
+    if (e1) throw new Error(e1.message);
+
+    const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+    let descrDest: string;
+
+    if (mergeLoteId) {
+      // Agrega em lote existente no pasto destino
+      const { error: e2 } = await supabaseAdmin.from('animals')
+        .update({ quantidade: (mergeLoteQtd ?? 0) + qtd }).eq('id', mergeLoteId);
+      if (e2) throw new Error(e2.message);
+      descrDest = `agregados ao lote "${mergeLoteNome ?? mergeLoteId}" no pasto ${destPastoNome}`;
+    } else {
+      // Cria novo lote no pasto destino
+      const { error: e2 } = await supabaseAdmin.from('animals').insert({
+        farm_id:     farmId,
+        nome:        novoLoteNome ?? `${origem.nome} (parcial)`,
+        quantidade:  qtd,
+        categoria_id: origem.categoria_id ?? null,
+        peso_medio:  origem.peso_medio ?? null,
+        raca:        origem.raca ?? null,
+        sexo:        origem.sexo ?? null,
+        pasto_id:    destPastoId,
+        status:      'ativo',
+      });
+      if (e2) throw new Error(e2.message);
+      descrDest = `novo lote "${novoLoteNome ?? origem.nome}" criado no pasto ${destPastoNome}`;
+    }
+
+    await insertHistorico({
+      farm_id:    farmId,
+      animal_id:  origem.id,
+      tipo:       'transf_parcial',
+      descricao:  `${qtd} cab. de "${origem.nome}" → ${descrDest}${dataStr}`,
+      quantidade: qtd,
+    });
+  },
+
   async listarHistorico(farmId: string, tipo?: string | string[], limit = 30): Promise<ManejoEvent[]> {
     let q = supabaseAdmin
       .from('manejo_historico')

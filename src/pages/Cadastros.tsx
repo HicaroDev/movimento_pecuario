@@ -1616,8 +1616,8 @@ export function Cadastros() {
         {/* Tab content */}
         {activeTab === 'pastos'       && <PastosTab onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
         {activeTab === 'animais'      && <AnimaisTab onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
-        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
-        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'forragens'    && <SimpleTab table="forage_types" label="Forragem" icon={Sprout} emptyText="Nenhuma forragem cadastrada" newLabel="Nova Forragem" predefinedOptions={FORRAGENS} onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
+        {activeTab === 'suplementos'  && <SuplementosTab onRequestDelete={setDeleteTarget} onRequestEdit={setEditTarget} />}
         {activeTab === 'funcionarios' && <FuncionariosTab onRequestDelete={setSimpleDeleteTarget} onRequestEdit={setEditTarget} />}
 
       </motion.div>

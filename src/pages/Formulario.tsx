@@ -131,6 +131,7 @@ export function Formulario() {
   const { user } = useAuth();
   const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingEditId, setPendingEditId] = useState<string | null>(null);
   const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [animalCategories, setAnimalCategories] = useState<{ id: string; nome: string }[]>([]);
@@ -804,7 +805,7 @@ export function Formulario() {
                           ) : (
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => setEditingId(entry.id ?? null)}
+                                onClick={() => setPendingEditId(entry.id ?? null)}
                                 className="text-gray-400 hover:text-teal-600 hover:bg-teal-50 p-1.5 rounded transition-colors"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -846,6 +847,21 @@ export function Formulario() {
       </motion.div>
 
       {showImport && <ImportExcelModal onClose={() => setShowImport(false)} />}
+
+      {/* ── Modal de confirmação de edição (senha do login) ── */}
+      {pendingEditId && (
+        <PasswordConfirmModal
+          title="Editar registro?"
+          description="Para editar um registro salvo é necessário confirmar sua senha."
+          onConfirm={async (password) => {
+            const ok = await verifyPassword(user!.email, password);
+            if (!ok) throw new Error('Senha incorreta');
+            setEditingId(pendingEditId);
+            setPendingEditId(null);
+          }}
+          onCancel={() => setPendingEditId(null)}
+        />
+      )}
 
       {/* ── Modal de confirmação de exclusão (senha do login) ── */}
       {confirmDelete && (

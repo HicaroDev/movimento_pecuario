@@ -7,6 +7,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from 'recharts';
 import { motion } from 'motion/react';
 import { fmt } from '../lib/utils';
@@ -78,6 +79,12 @@ export function SummaryChart({ data, title, subtitle }: SummaryChartProps) {
                 {data.map((item, idx) => (
                   <Cell key={idx} fill={item.color} />
                 ))}
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  formatter={(v: number) => fmt(v)}
+                  style={{ fontSize: 11, fill: '#444', fontWeight: 600 }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
