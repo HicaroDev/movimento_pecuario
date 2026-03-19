@@ -127,7 +127,7 @@ export function DashboardLayout() {
     >
       {/* Sidebar — glassmorphism claro */}
       <aside
-        className="w-64 flex flex-col flex-shrink-0 relative no-print"
+        className="w-64 h-screen flex flex-col flex-shrink-0 relative no-print"
         style={{
           background: 'rgba(255, 255, 255, 0.80)',
           backdropFilter: 'blur(24px)',
