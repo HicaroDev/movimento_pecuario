@@ -201,6 +201,42 @@ export function DashboardLayout() {
             );
           })}
 
+            {/* ── Planejamento (DevPlan) ── */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.05 }}
+          >
+            <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              {(() => {
+                const isActive = location.pathname.startsWith('/devplan');
+                return (
+                  <Link
+                    to="/devplan"
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
+                    style={isActive ? {
+                      background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 16px rgba(26,96,64,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+                      border: '1px solid rgba(26,96,64,0.3)',
+                    } : {
+                      color: '#6b7280',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }}
+                  >
+                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm font-medium">Planejamento</span>
+                  </Link>
+                );
+              })()}
+            </div>
+          </motion.div>
+
           {/* ── Módulos em breve ── */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}

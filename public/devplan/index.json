@@ -1,0 +1,10 @@
+[
+  { "file": "00-visao-geral.md",      "title": "Visão Geral",        "icon": "🏠" },
+  { "file": "01-modulos.md",          "title": "Módulos do Sistema", "icon": "📦" },
+  { "file": "02-ajustes-mp16.md",     "title": "Ajustes MP16",       "icon": "✅" },
+  { "file": "03-ajustes-mp17.md",     "title": "Ajustes MP17",       "icon": "🔄" },
+  { "file": "04-relatorios.md",       "title": "Relatórios",         "icon": "📊" },
+  { "file": "05-manejos.md",          "title": "Manejos",            "icon": "🐄" },
+  { "file": "06-proximas-versoes.md", "title": "Próximas Versões",   "icon": "🚀" },
+  { "file": "changelog.md",           "title": "Changelog",          "icon": "📝" }
+]

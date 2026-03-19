@@ -12,6 +12,7 @@ import { Usuarios } from './pages/Usuarios';
 import { Cadastros } from './pages/Cadastros';
 import { Manejos } from './pages/Manejos';
 import { Historico } from './pages/Historico';
+import { DevPlan } from './pages/DevPlan';
 
 const router = createBrowserRouter([
   { path: '/login', Component: Login },
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
           children: [{ path: 'usuarios', Component: Usuarios }],
         },
         { path: 'historico', Component: Historico },
+        { path: 'devplan',   Component: DevPlan   },
       ],
     }],
   },
