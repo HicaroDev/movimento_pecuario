@@ -1105,7 +1105,7 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2">
-        <input list="sugg-supl-edit" {...register('nome', { required: true })} className={inputClass} placeholder="Digite ou selecione..." />
+        <input list="sugg-supl-edit" {...upperReg(register('nome', { required: true }))} className={inputClass} placeholder="Digite ou selecione..." />
         <datalist id="sugg-supl-edit">
           {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n} />)}
         </datalist>
@@ -1166,7 +1166,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
     const dup = _suplementosCache.find(s => s.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
     if (dup) { toast.error('Já existe um suplemento com este nome.'); return; }
     const payload: Record<string, unknown> = {
-      nome: data.nome,
+      nome: data.nome.toUpperCase(),
       unidade: data.unidade,
       observacoes: data.observacoes || null,
       farm_id: activeFarmId,
@@ -1184,7 +1184,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
   }
   async function onEditSave(id: string, data: SupplementForm) {
     const payload: Record<string, unknown> = {
-      nome: data.nome,
+      nome: data.nome.toUpperCase(),
       unidade: data.unidade,
       observacoes: data.observacoes || null,
       ...(data.peso     > 0 && { peso:     data.peso }),
@@ -1241,7 +1241,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
             <div>
               <label className={labelClass}>Nome *</label>
               <input list="sugg-supl-add" placeholder="Digite ou selecione..."
-                {...register('nome', { required: true })}
+                {...upperReg(register('nome', { required: true }))}
                 className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
               <datalist id="sugg-supl-add">
                 {SUPLEMENTOS_NOMES.map(n => <option key={n} value={n} />)}

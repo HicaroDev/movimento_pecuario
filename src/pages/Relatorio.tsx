@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { FileDown, ChevronDown, Filter, CalendarDays } from 'lucide-react';
+import { FileDown, ChevronDown, Filter, CalendarDays, TrendingUp, Printer } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -163,7 +164,7 @@ export function Relatorio() {
         const v = parseFloat(String(s.consumo).replace('%', '').replace(',', '.'));
         if (!isNaN(v)) consumoPct = v;
       }
-      map[s.nome] = { consumoPct, valorKg: typeof s.valor_kg === 'number' ? s.valor_kg : null };
+      map[s.nome.toUpperCase()] = { consumoPct, valorKg: typeof s.valor_kg === 'number' ? s.valor_kg : null };
     }
     return map;
   }, [suppTypes]);
@@ -236,7 +237,7 @@ export function Relatorio() {
   const aggregatedGroupsWithMeta = useMemo(() => {
     const result: Record<string, ReturnType<typeof aggregateEntriesByPasto>> = {};
     for (const [tipo, typeEntries] of Object.entries(aggregatedGroups)) {
-      const suppInfo   = suppTypeMap[tipo];
+      const suppInfo   = suppTypeMap[tipo.toUpperCase()];
       const consumoPct = suppInfo?.consumoPct ?? null;
       const valorKg    = suppInfo?.valorKg    ?? null;
 
@@ -276,7 +277,7 @@ export function Relatorio() {
 
   /* ── Summary chart data (only supplements with data) ── */
   const summaryData = useMemo(() => activeTypes.map((name, i) => ({
-    name,
+    name: name.toUpperCase(),
     value: averageConsumo(aggregatedGroupsWithMeta[name] ?? []),
     color: getSupplementColor(name, i),
   })), [activeTypes, aggregatedGroupsWithMeta]);
@@ -289,6 +290,89 @@ export function Relatorio() {
     ? [dateFrom, dateTo].filter(Boolean).join(' a ')
     : '';
   const subtitle   = [farmName, periodoStr].filter(Boolean).join(' — ');
+
+  /* ── Dados do gráfico de linha por lote ── */
+  const loteLineData = useMemo(() => {
+    if (!filterLote || filtered.length === 0) return null;
+    const animal  = animals.find(a => a.nome === filterLote);
+    const pesoVivo = animal?.peso_medio ?? null;
+
+    const sorted  = [...filtered].sort((a, b) => (a.data ?? '').localeCompare(b.data ?? ''));
+    const tiposUnicos = Array.from(new Set(sorted.map(e => e.tipo.toUpperCase())));
+
+    const byDate: Record<string, Record<string, number | string>> = {};
+    for (const e of sorted) {
+      if (!e.data) continue;
+      const label = e.data.split('-').reverse().join('/');
+      if (!byDate[e.data]) byDate[e.data] = { data: label };
+      const tipoUp = e.tipo.toUpperCase();
+      byDate[e.data][tipoUp] = Number(e.consumo.toFixed(3));
+      if (pesoVivo && pesoVivo > 0) {
+        byDate[e.data][`${tipoUp}_PV`] = Number(((e.consumo / pesoVivo) * 100).toFixed(3));
+      }
+    }
+    const points = Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, vals]) => vals);
+
+    return { points, tiposUnicos, pesoVivo };
+  }, [filterLote, filtered, animals]);
+
+  /* ── Ficha de consumo PDF pré-preenchida ── */
+  const handleFichaPDF = () => {
+    if (!filterLote) return;
+    const animal    = animals.find(a => a.nome === filterLote);
+    const pasto     = animal ? (pastoIdToNome[animal.pasto_id ?? ''] ?? '—') : '—';
+    const qtd       = animal?.quantidade ?? 0;
+    const peso      = animal?.peso_medio ?? null;
+    const sorted    = [...filtered].sort((a, b) => (b.data ?? '').localeCompare(a.data ?? ''));
+    const suplemento = sorted[0]?.tipo?.toUpperCase() ?? '—';
+    const dataHoje  = new Date().toLocaleDateString('pt-BR');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Ficha de Consumo — ${filterLote}</title>
+<style>
+  @page { size: A4 portrait; margin: 20mm; }
+  body { font-family: Arial, sans-serif; color: #111; }
+  h1 { font-size: 18px; color: #1a6040; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #666; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #1a6040; color: #fff; padding: 8px 12px; text-align: left; font-size: 12px; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+  .linha { height: 32px; border-bottom: 1px solid #d1d5db; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 24px; }
+  .field { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; }
+  .label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .footer { margin-top: 40px; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+</style></head><body>
+<h1>Ficha de Consumo de Suplemento</h1>
+<p class="sub">Fazenda ${farmName} · Gerado em ${dataHoje}</p>
+<table>
+  <tr><th>Campo</th><th>Dado</th></tr>
+  <tr><td>Fazenda</td><td>${farmName}</td></tr>
+  <tr><td>Pasto</td><td>${pasto}</td></tr>
+  <tr><td>Lote</td><td>${filterLote}</td></tr>
+  <tr><td>Quantidade de animais</td><td>${qtd} cabeças</td></tr>
+  ${peso ? `<tr><td>Peso médio</td><td>${peso} kg</td></tr>` : ''}
+  <tr><td>Suplemento atual</td><td>${suplemento}</td></tr>
+</table>
+<p style="font-size:13px;font-weight:600;margin-bottom:8px;">Registros de campo:</p>
+<table>
+  <tr>
+    <th>Data</th><th>Produto</th><th>Sacos (25kg)</th><th>KG total</th><th>Vaqueiro</th>
+  </tr>
+  ${Array.from({ length: 8 }).map(() => `<tr class="linha"><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+</table>
+<p class="footer">Suplemento Control · HicaroDev · ${dataHoje}</p>
+</body></html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 400);
+  };
 
   /* ── Actions ── */
   const handleExportPDF = () => {
@@ -509,6 +593,86 @@ export function Relatorio() {
           </div>
         )}
 
+        {/* ── Gráfico de linha — curva de consumo por lote ── */}
+        {!loading && filterLote && loteLineData && loteLineData.points.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-4 h-4" style={{ color: '#1a6040' }} />
+                  <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">
+                    Curva de Consumo — {filterLote}
+                  </h3>
+                </div>
+                {loteLineData.pesoVivo && (
+                  <p className="text-xs text-gray-500">
+                    Peso vivo: <strong>{loteLineData.pesoVivo.toFixed(0)} kg</strong>
+                    {' '}— % PV calculado sobre este peso
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleFichaPDF}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-all no-print"
+              >
+                <Printer className="w-4 h-4" />
+                Ficha PDF
+              </button>
+            </div>
+
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={loteLineData.points} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                <XAxis dataKey="data" tick={{ fontSize: 10 }} />
+                <YAxis
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={v => `${Number(v).toFixed(3).replace('.', ',')}`}
+                  label={{ value: 'KG/cab/dia', angle: -90, position: 'insideLeft', style: { fontSize: 10 }, offset: 10 }}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => {
+                    if (name.endsWith('_PV')) return [`${Number(value).toFixed(3).replace('.', ',')}%`, `% PV — ${name.replace('_PV', '')}`];
+                    return [`${Number(value).toFixed(3).replace('.', ',')} kg/cab/dia`, name];
+                  }}
+                  labelFormatter={l => `Data: ${l}`}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                {loteLineData.tiposUnicos.map((tipo, i) => (
+                  <Line
+                    key={tipo}
+                    type="monotone"
+                    dataKey={tipo}
+                    name={tipo}
+                    stroke={getSupplementColor(tipo, i)}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: getSupplementColor(tipo, i) }}
+                    activeDot={{ r: 6 }}
+                    connectNulls
+                  />
+                ))}
+                {loteLineData.pesoVivo && loteLineData.tiposUnicos.map((tipo, i) => (
+                  <Line
+                    key={`${tipo}_PV`}
+                    type="monotone"
+                    dataKey={`${tipo}_PV`}
+                    name={`% PV — ${tipo}`}
+                    stroke={getSupplementColor(tipo, i)}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </motion.div>
+        )}
+
         {/* ── Per-supplement sections ── */}
         {loading ? (
           <SkeletonChart />
@@ -521,7 +685,7 @@ export function Relatorio() {
                 return (
                   <SupplementSection
                     key={tipo}
-                    tipo={tipo}
+                    tipo={tipo.toUpperCase()}
                     color={color}
                     entries={sectionEntries}
                     periodo={periodoStr.toUpperCase() || 'TODOS OS PERÍODOS'}
