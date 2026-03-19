@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
-import { FileDown, FileSpreadsheet, ChevronDown, Filter, CalendarDays } from 'lucide-react';
+import { FileDown, ChevronDown, Filter, CalendarDays } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { supabaseAdmin } from '../lib/supabase';
@@ -306,25 +305,6 @@ export function Relatorio() {
     }, 200);
   };
 
-  const handleExportExcel = () => {
-    const rows = filtered.map((e) => ({
-      DATA:                   e.data ?? '',
-      PASTO:                  e.pasto,
-      QUANTIDADE:             e.quantidade,
-      'TIPO DE SUPLEMENTO':   e.tipo,
-      'PERÍODO (dias)':       e.periodo,
-      'SACOS (25 kg)':        e.sacos,
-      'KG CONSUMIDOS':        e.kg,
-      'CONSUMO (kg/cab dia)': Number(e.consumo.toFixed(3)),
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, 'Relatorio');
-    const tag = farmName.replace(/\s+/g, '_') || 'relatorio';
-    XLSX.writeFile(wb, `relatorio_${tag}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast.success('Excel exportado!');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8 no-print-padding">
       <div>
@@ -476,14 +456,6 @@ export function Relatorio() {
 
             {/* Export buttons (4th column) */}
             <div className="flex items-end gap-2">
-              <button
-                onClick={handleExportExcel}
-                disabled={filtered.length === 0}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                Excel
-              </button>
               <button
                 onClick={handleExportPDF}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg font-medium text-sm"

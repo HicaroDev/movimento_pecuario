@@ -14,8 +14,7 @@
 ## Equipe
 
 - **Cliente:** Stela Melo / Phyllypi Melo
-- **Desenvolvimento:** HicaroDev + Claude Code (Anthropic)
-- **GitHub:** [github.com/HicaroDev/movimento_pecuario](https://github.com/HicaroDev/movimento_pecuario)
+- **Desenvolvimento:** HicaroDev
 
 ## Objetivos do Sistema
 
@@ -44,4 +43,4 @@ O **Suplemento Control** é um sistema de gestão de suplementação mineral e p
 
 ---
 
-*Suplemento Control — desenvolvido por HicaroDev com Claude Code*
+*Suplemento Control — desenvolvido por HicaroDev*

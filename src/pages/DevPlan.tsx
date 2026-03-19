@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { motion } from 'motion/react';
-import { ClipboardList, RefreshCw } from 'lucide-react';
+import { ClipboardList, RefreshCw, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface NavEntry {
   file: string;
@@ -12,12 +13,32 @@ interface NavEntry {
 
 marked.setOptions({ breaks: true });
 
+/* Chave localStorage: devplan_checks_{file} → Record<number, boolean> */
+function checksKey(file: string) {
+  return `devplan_checks_${file}`;
+}
+
+function loadChecks(file: string): Record<number, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(checksKey(file)) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveChecks(file: string, checks: Record<number, boolean>) {
+  localStorage.setItem(checksKey(file), JSON.stringify(checks));
+}
+
 export function DevPlan() {
-  const [nav, setNav]           = useState<NavEntry[]>([]);
-  const [active, setActive]     = useState<string>('');
-  const [html, setHtml]         = useState<string>('');
-  const [loading, setLoading]   = useState(true);
-  const [lastMod, setLastMod]   = useState<string>('');
+  const { isAdmin } = useAuth();
+  const [nav, setNav]         = useState<NavEntry[]>([]);
+  const [active, setActive]   = useState<string>('');
+  const [rawMd, setRawMd]     = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [lastMod, setLastMod] = useState<string>('');
+  const [checks, setChecks]   = useState<Record<number, boolean>>({});
+  const contentRef            = useRef<HTMLDivElement>(null);
 
   /* carrega index.json */
   useEffect(() => {
@@ -30,24 +51,81 @@ export function DevPlan() {
       .catch(() => setNav([]));
   }, []);
 
-  /* carrega o MD ativo */
+  /* carrega MD ao trocar aba */
   useEffect(() => {
     if (!active) return;
     setLoading(true);
+    setChecks(loadChecks(active));
     fetch(`/devplan/${active}?t=${Date.now()}`)
       .then(r => {
         const lm = r.headers.get('Last-Modified');
         if (lm) setLastMod(new Date(lm).toLocaleDateString('pt-BR'));
         return r.text();
       })
-      .then(md => {
-        const dirty = marked.parse(md) as string;
-        setHtml(DOMPurify.sanitize(dirty));
-      })
-      .catch(() => setHtml('<p>Erro ao carregar arquivo.</p>'))
+      .then(md => setRawMd(md))
+      .catch(() => setRawMd('> Erro ao carregar arquivo.'))
       .finally(() => setLoading(false));
   }, [active]);
 
+  /* injeta checkboxes interativos após renderizar */
+  useEffect(() => {
+    if (!contentRef.current || loading) return;
+
+    const items = contentRef.current.querySelectorAll<HTMLLIElement>('li');
+    let idx = 0;
+
+    items.forEach(li => {
+      const text = li.childNodes[0]?.textContent ?? '';
+      const isUnchecked = text.trimStart().startsWith('[ ]') || text.trimStart().startsWith('[ ]');
+      const isChecked   = text.trimStart().startsWith('[x]') || text.trimStart().startsWith('[X]');
+      if (!isUnchecked && !isChecked) return;
+
+      const currentIdx = idx++;
+      const checked = checks[currentIdx] ?? isChecked;
+
+      /* remove o marcador de texto */
+      if (li.childNodes[0]?.nodeType === Node.TEXT_NODE) {
+        li.childNodes[0].textContent = li.childNodes[0].textContent!
+          .replace(/^\s*\[[ xX]\]\s*/, ' ');
+      }
+
+      /* cria checkbox */
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checked;
+      cb.disabled = !isAdmin;
+      cb.className = 'devplan-checkbox';
+      cb.addEventListener('change', () => {
+        const next = { ...loadChecks(active), [currentIdx]: cb.checked };
+        saveChecks(active, next);
+        setChecks(next);
+      });
+
+      li.prepend(cb);
+
+      /* estilo visual da linha */
+      li.style.display = 'flex';
+      li.style.alignItems = 'flex-start';
+      li.style.gap = '8px';
+      if (checked) li.style.opacity = '0.55';
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawMd, loading, active]);
+
+  /* re-aplica checked state sem re-renderizar o MD */
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const cbs = contentRef.current.querySelectorAll<HTMLInputElement>('input.devplan-checkbox');
+    let idx = 0;
+    cbs.forEach(cb => {
+      cb.checked = checks[idx] ?? cb.checked;
+      const li = cb.closest('li') as HTMLLIElement | null;
+      if (li) li.style.opacity = cb.checked ? '0.55' : '1';
+      idx++;
+    });
+  }, [checks]);
+
+  const html = DOMPurify.sanitize(marked.parse(rawMd) as string);
   const activeEntry = nav.find(n => n.file === active);
 
   return (
@@ -69,7 +147,7 @@ export function DevPlan() {
             <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Planejamento</span>
           </div>
           <p className="text-[11px] text-gray-400 leading-snug">
-            Atualizado pela equipe HicaroDev — somente leitura
+            {isAdmin ? 'Admin — checkboxes clicáveis' : 'Somente leitura'}
           </p>
         </div>
 
@@ -107,8 +185,9 @@ export function DevPlan() {
         </nav>
 
         {/* Footer nav */}
-        <div className="p-4 text-[10px] text-gray-400" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-          HicaroDev + Claude Code · 2026
+        <div className="p-4 flex items-center gap-2 text-[10px] text-gray-400" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          {!isAdmin && <Lock className="w-3 h-3" />}
+          HicaroDev · 2026
         </div>
       </aside>
 
@@ -119,9 +198,7 @@ export function DevPlan() {
           {/* Badge de última atualização */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              {activeEntry && (
-                <span className="text-2xl">{activeEntry.icon}</span>
-              )}
+              {activeEntry && <span className="text-2xl">{activeEntry.icon}</span>}
               <h1 className="text-xl font-bold text-gray-800">
                 {activeEntry?.title ?? 'Planejamento'}
               </h1>
@@ -154,6 +231,7 @@ export function DevPlan() {
           ) : (
             <motion.div
               key={active}
+              ref={contentRef}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}

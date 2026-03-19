@@ -45,4 +45,4 @@
 
 ---
 
-*Roadmap atualizado em 19/03/2026 — HicaroDev + Phyllypi Melo*
+*Roadmap atualizado em 19/03/2026 — HicaroDev*

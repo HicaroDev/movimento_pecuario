@@ -11,7 +11,6 @@ import { supplementOrder } from '../lib/data';
 import { supabaseAdmin } from '../lib/supabase';
 import { manejoService, type Animal } from '../services/manejoService';
 import { fmtInt } from '../lib/utils';
-import { ImportExcelModal } from '../components/ImportExcelModal';
 import { logActivity } from '../services/activityLogService';
 import { PasswordConfirmModal } from '../components/PasswordConfirmModal';
 import { verifyPassword } from '../lib/verifyPassword';
@@ -129,7 +128,6 @@ function nextYM(ym: string) {
 export function Formulario() {
   const { entries, addEntry, updateEntry, removeEntry, pastures, loading, activeFarmId } = useData();
   const { user } = useAuth();
-  const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingEditId, setPendingEditId] = useState<string | null>(null);
   const [supplementTypes, setSupplementTypes] = useState<SupplementType[]>([]);
@@ -413,14 +411,6 @@ export function Formulario() {
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h2 className="text-base font-bold text-gray-900">Novo Registro</h2>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowImport(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                Importar Excel
-              </button>
               <button
                 type="button"
                 onClick={handleSubmit(onAddRow)}
@@ -845,8 +835,6 @@ export function Formulario() {
           )}
         </motion.div>
       </motion.div>
-
-      {showImport && <ImportExcelModal onClose={() => setShowImport(false)} />}
 
       {/* ── Modal de confirmação de edição (senha do login) ── */}
       {pendingEditId && (

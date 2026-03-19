@@ -71,4 +71,4 @@
 
 ---
 
-*Changelog mantido por HicaroDev + Claude Code — github.com/HicaroDev*
+*Changelog mantido por HicaroDev*
