@@ -1,50 +1,81 @@
 # Ajustes MP17 — 17 Março 2026
 
-> Conjunto de ajustes entregues na versão v1.18 com base na reunião de 17/03/2026 + áudio de 18/03/2026.
+> Versão **v1.18 / v1.19** — ajustes entregues com base na reunião de 17/03/2026 e áudio de 18/03/2026.
+
+---
 
 ## Segurança
 
-- ✅ Lançamentos > Editar registro agora exige senha (PasswordConfirmModal)
-- ✅ Cadastros > Excluir Forragem agora exige senha
-- ✅ Cadastros > Excluir Suplemento agora exige senha
+- ✅ **Lançamentos > Editar registro** agora exige confirmação de senha
+- ✅ **Cadastros > Excluir Forragem** agora exige confirmação de senha
+- ✅ **Cadastros > Excluir Suplemento** agora exige confirmação de senha
+
+---
 
 ## Manejos — Regras de Sexo
 
-- ✅ Parição — lista apenas lotes do sexo **FÊMEA**
-- ✅ Desmama — lista apenas lotes **FÊMEA com bezerros ao pé**
+- ✅ **Parição** — lista apenas lotes do sexo **FÊMEA**
+- ✅ **Desmama** — lista apenas lotes **FÊMEA com bezerros ao pé**
 - ✅ Parição bloqueada para machos (filtro impede seleção)
 - ✅ Desmama bloqueada para machos e para fêmeas sem bezerros
 
+---
+
 ## Manejos — Transferir Unificado
 
-- ✅ "Transferir" e "Transferir Parcial" unificados em uma tela
+- ✅ **"Transferir" e "Transferir Parcial" unificados em uma única tela**
   - Toggle **Lote completo / Transferência parcial**
   - Destino sempre por **PASTO** (vazio ou com lotes)
   - Parcial: opção de criar novo lote ou agregar em lote existente
-- ✅ Select "Pasto de destino" mostra todos os pastos com indicação de quantidade de lotes
+  - Pasto destino mostra quantos lotes já possui
+
+---
 
 ## Histórico
 
-- ✅ Filtro "Lançamentos" agora inclui atividades do módulo formulário
-- ✅ Filtro "Atividades" exclui itens do módulo formulário
-- ✅ Contagens dos chips corrigidas
+- ✅ Filtro **"Lançamentos"** corrigido — inclui atividades do módulo formulário
+- ✅ Filtro **"Atividades"** corrigido — exclui itens de lançamento
+- ✅ Contagens dos chips atualizadas corretamente
 
-## Relatórios
+---
 
-- ✅ SummaryChart — rótulo de dados acima de cada barra do gráfico
+## Relatórios — Gráficos e Labels
 
-## Pendente de Verificação
+- ✅ **SummaryChart** — rótulo de dados (valor) acima de cada barra
+- ✅ **Suplementos em CAIXA ALTA** em toda a exibição do relatório
+- ✅ **Curva de consumo diário por lote** — ao selecionar um Lote no filtro, exibe gráfico de **LINHA** com:
+  - Eixo X = datas dos lançamentos
+  - Eixo Y = KG/cab/dia
+  - Uma linha por tipo de suplemento (cor distinta por produto)
+  - Linha tracejada = % PV (consumo em % do peso vivo)
+- ✅ **% PV** — exibido no gráfico de linha com linha tracejada e no tooltip
+- ✅ **Intervalos irregulares tratados corretamente** — cada lançamento usa seu próprio período real (3, 5, 7+ dias)
 
-- ⬜ Suplementos em CAIXA ALTA — verificar se precisa de migração SQL no banco
-- ⬜ Categoria Animal nos pré-lançamentos — confirmar se seed está correto
-- ⬜ Testar fluxo completo de Transferir unificado (especialmente parcial para pasto vazio)
+---
 
-## Em Implementação (Áudio 18/03)
+## Ficha de Consumo em PDF
 
-- ⬜ Gráfico de linha — curva de consumo diário por lote (ao filtrar por lote)
-- ⬜ % PV nos relatórios por lote
-- ⬜ Ficha de consumo em PDF pré-preenchida para download em campo
-- ⬜ Tratar intervalos irregulares entre lançamentos no cálculo de dias reais
+- ✅ **Botão "Ficha PDF"** aparece quando um Lote está selecionado no relatório
+- ✅ PDF gerado com: Fazenda, Pasto, Lote, Quantidade de animais, Suplemento atual
+- ✅ Tabela em branco para o vaqueiro registrar em campo
+
+---
+
+## Ajustes da v1.19
+
+- ✅ **Botão Excel removido** do Relatório (mantido apenas PDF)
+- ✅ **Botão Importar Excel removido** do Formulário
+- ✅ **Aba Planejamento** visível somente para administradores
+- ✅ **Versão atualizada** para v1.19
+
+---
+
+## Pendente de Validação com o Cliente
+
+- ⬜ **Categoria Animal nos pré-lançamentos** — confirmar com Phyllypi se os dados cadastrados estão corretos
+- ⬜ **Testar Transferir Parcial para pasto vazio** — validar fluxo completo em tela
+
+---
 
 ## Status Resumido
 
@@ -55,15 +86,22 @@
 | Segurança | Excluir Suplemento com senha | ✅ |
 | Manejos | Parição: apenas lotes fêmea | ✅ |
 | Manejos | Desmama: apenas fêmeas com bezerros | ✅ |
+| Manejos | Bloquear Parição/Desmama de machos | ✅ |
 | Manejos | Transferir + Parcial na mesma tela | ✅ |
 | Manejos | Destino por PASTO (vazio ou com lotes) | ✅ |
 | Histórico | Filtro Lançamentos corrigido | ✅ |
+| Histórico | Chips de filtro corrigidos | ✅ |
 | Relatórios | Rótulo acima das barras | ✅ |
-| Relatórios | Curva de consumo diário (linha) | ⬜ |
-| Relatórios | % PV por lote | ⬜ |
-| Relatórios | Ficha PDF pré-preenchida | ⬜ |
+| Relatórios | Suplementos em CAIXA ALTA | ✅ |
+| Relatórios | Curva de consumo diário (linha) | ✅ |
+| Relatórios | % PV ao lado do consumo | ✅ |
+| Relatórios | Intervalos irregulares tratados | ✅ |
+| Relatórios | Ficha PDF pré-preenchida | ✅ |
+| Geral | Remover Excel (Relatório + Formulário) | ✅ |
+| Geral | Versão v1.19 | ✅ |
+| Seed/Dados | Categoria Animal nos pré-lançamentos | ⬜ Validar |
+| Manejos | Testar Transferir Parcial pasto vazio | ⬜ Validar |
 
 ---
 
-*MP17 entregue em 19/03/2026 — Suplemento Control v1.18*
-*Brainstorm Phyllypi Melo adicionado em 19/03/2026 (áudio 18/03/2026)*
+*MP17 iniciado em 19/03/2026 · v1.18 → v1.19 · Suplemento Control*

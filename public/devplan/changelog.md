@@ -1,5 +1,25 @@
 # Changelog — Suplemento Control
 
+## v1.19 — 19/03/2026
+
+### Relatórios
+- Curva de consumo diário por lote — gráfico de LINHA ao selecionar Lote
+- % PV (consumo em % do peso vivo) exibido no gráfico de linha
+- Suplementos em CAIXA ALTA em todo o relatório
+- Intervalos irregulares entre lançamentos tratados corretamente
+- Botão "Ficha PDF" — ficha pré-preenchida para vaqueiro usar em campo
+- Botão Excel removido (mantido apenas PDF)
+
+### Formulário (Lançamento)
+- Botão Importar Excel removido
+
+### Geral
+- Versão atualizada para v1.19
+- Aba Planejamento visível somente para administradores
+- Cadastros > Suplementos: nome salvo automaticamente em CAIXA ALTA
+
+---
+
 ## v1.18 — 19/03/2026
 
 ### Segurança
