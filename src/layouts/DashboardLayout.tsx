@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { farmService } from '../services/farmService';
+import { supabaseAdmin } from '../lib/supabase';
 import type { Module } from '../types/user';
 import type { Farm } from '../types/farm';
 
@@ -83,6 +84,22 @@ export function DashboardLayout() {
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
   const [showEmDev, setShowEmDev] = useState(false);
+  const [unreadComments, setUnreadComments] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function fetchUnread() {
+      const { count } = await supabaseAdmin
+        .from('devplan_comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('lido', false)
+        .neq('author_role', 'admin');
+      setUnreadComments(count ?? 0);
+    }
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [isAdmin, location.pathname]);
 
   const visibleNavItems = navItems.filter(item =>
     item.module === 'historico' ? (isAdmin || hasModule(item.module)) : hasModule(item.module)
@@ -232,6 +249,12 @@ export function DashboardLayout() {
                     >
                       <ClipboardList className="w-4 h-4 flex-shrink-0" />
                       <span className="text-sm font-medium">Planejamento</span>
+                      {unreadComments > 0 && (
+                        <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: '#ef4444', color: '#fff', minWidth: '18px', textAlign: 'center' }}>
+                          {unreadComments}
+                        </span>
+                      )}
                     </Link>
                   );
                 })()}
