@@ -37,6 +37,13 @@
 - ⬜ Sem login — acesso direto pelo QR
 - ⬜ Lançamento aprovado/revisado pelo gestor antes de entrar no sistema
 
+## v2.2 — Ordem de Serviço
+
+- ⬜ Fazendeiro ou gerente gera uma **Ordem de Serviço** para o vaqueiro
+- ⬜ OS indica: qual pasto, qual suplemento, quantidade a colocar
+- ⬜ Vaqueiro recebe a OS no celular e executa
+- ⬜ Após execução, OS vira lançamento automaticamente no sistema
+
 ## v3.0 — SaaS Escala
 
 - ⬜ Multi-tenant com planos pagos

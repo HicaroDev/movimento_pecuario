@@ -187,7 +187,7 @@ export function DevPlan() {
         {/* Footer nav */}
         <div className="p-4 flex items-center gap-2 text-[10px] text-gray-400" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
           {!isAdmin && <Lock className="w-3 h-3" />}
-          HicaroDev · 2026
+          {!isAdmin ? 'Somente leitura' : 'Admin'}
         </div>
       </aside>
 

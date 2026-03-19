@@ -25,6 +25,7 @@
 |--------|-----------|--------|
 | **Estoque de Produtos e Fábrica** | Controle de estoque de suplementos e matéria-prima | ⬜ Futuro |
 | **Lançamento pelo Vaqueiro** | App simplificado com QRCode nos cochos para vaqueiros | ⬜ Futuro |
+| **Ordem de Serviço** | Fazendeiro/gerente gera OS para o vaqueiro colocar suplemento no pasto conforme solicitado | ⬜ Futuro |
 
 ---
 

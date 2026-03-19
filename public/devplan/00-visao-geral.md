@@ -13,7 +13,7 @@
 
 ## Equipe
 
-- **Cliente:** Stela Melo / Phyllypi Melo
+- **Cliente:** Phyllypi Melo
 - **Desenvolvimento:** HicaroDev
 
 ## Objetivos do Sistema
