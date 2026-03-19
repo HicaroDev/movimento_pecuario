@@ -166,6 +166,15 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolso, 2)}</strong>/cab/dia
               </span>
             )}
+            {avgMeta === null && (
+              <span
+                className="px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ background: 'rgba(234,179,8,0.12)', color: '#854d0e', border: '1px solid rgba(234,179,8,0.3)' }}
+                title="Configure o % PV em Cadastros > Suplementos para exibir a meta de consumo"
+              >
+                ⚠ Solicite ao cliente o memorial de cálculo (% PV) para ativar a meta
+              </span>
+            )}
           </div>
         </div>
 
@@ -199,20 +208,22 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 formatter={(value) => [`${fmt(Number(value))} kg/cab dia`, 'Consumo']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
-              {/* Linha de referência vermelha tracejada */}
-              <ReferenceLine
-                y={avg}
-                stroke="#e53e3e"
-                strokeWidth={2}
-                strokeDasharray="6 3"
-                label={{
-                  value: `média ${fmt(avg)}`,
-                  position: 'right',
-                  fill: '#e53e3e',
-                  fontSize: 11,
-                  fontWeight: 'bold',
-                }}
-              />
+              {/* Linha de referência vermelha tracejada — só exibe quando avg > 0 */}
+              {avg > 0 && (
+                <ReferenceLine
+                  y={avg}
+                  stroke="#e53e3e"
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  label={{
+                    value: `média ${fmt(avg)}`,
+                    position: 'insideTopRight',
+                    fill: '#e53e3e',
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                  }}
+                />
+              )}
               {avgMeta != null && (
                 <ReferenceLine
                   y={avgMeta}
@@ -221,7 +232,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                   strokeDasharray="4 3"
                   label={{
                     value: `meta ${fmt(avgMeta)}`,
-                    position: 'right',
+                    position: 'insideTopRight',
                     fill: '#1a4a7a',
                     fontSize: 10,
                     fontWeight: 'bold',
