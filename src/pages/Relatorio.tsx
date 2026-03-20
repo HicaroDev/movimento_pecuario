@@ -390,7 +390,7 @@ export function Relatorio() {
   };
 
   return (
-    <div className="min-h-screen bg-red-100 p-8 no-print-padding">
+    <div className="p-8 no-print-padding">
       <div>
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-8">
