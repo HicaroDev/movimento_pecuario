@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { motion } from 'motion/react';
-import { ClipboardList, RefreshCw, Lock, Send, MessageSquare } from 'lucide-react';
+import { ClipboardList, RefreshCw, Lock, Send, MessageSquare, Reply } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabaseAdmin } from '../lib/supabase';
 
@@ -50,6 +50,8 @@ export function DevPlan() {
   const [comments, setComments]     = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
+  const [showModal, setShowModal]   = useState(false);
+  const [modalText, setModalText]   = useState('');
 
   /* carrega index.json */
   useEffect(() => {
@@ -103,6 +105,23 @@ export function DevPlan() {
       lido:        false,
     });
     setNewComment('');
+    await loadComments(active);
+    setSending(false);
+  }
+
+  async function handleModalSend() {
+    if (!modalText.trim()) return;
+    setSending(true);
+    await supabaseAdmin.from('devplan_comments').insert({
+      farm_id:     farmId || '10000000-0000-4000-8000-000000000001',
+      file:        active,
+      comment:     modalText.trim(),
+      author_name: user?.name ?? 'Usuário',
+      author_role: isAdmin ? 'admin' : 'client',
+      lido:        false,
+    });
+    setModalText('');
+    setShowModal(false);
     await loadComments(active);
     setSending(false);
   }
@@ -302,6 +321,63 @@ export function DevPlan() {
 
         </div>
       </main>
+
+      {/* Botão flutuante Responder */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        onClick={() => setShowModal(true)}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg text-sm font-semibold text-white"
+        style={{ background: 'linear-gradient(135deg, #1a6040, #0f4a30)' }}
+      >
+        <Reply className="w-4 h-4" />
+        Responder
+      </motion.button>
+
+      {/* Modal de resposta */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowModal(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.93, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.18 }}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-4 h-4" style={{ color: '#1a6040' }} />
+              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
+                Responder — {activeEntry?.title}
+              </h3>
+            </div>
+            <textarea
+              value={modalText}
+              onChange={e => setModalText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && e.ctrlKey && handleModalSend()}
+              placeholder="Digite sua mensagem ou observação…"
+              rows={4}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              autoFocus
+            />
+            <p className="text-[10px] text-gray-400 mt-1 mb-4">Ctrl+Enter para enviar</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowModal(false)}
+                className="px-4 py-2 rounded-xl text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleModalSend}
+                disabled={sending || !modalText.trim()}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white flex items-center gap-2 transition-all disabled:opacity-40"
+                style={{ background: '#1a6040' }}>
+                <Send className="w-3.5 h-3.5" />
+                {sending ? 'Enviando…' : 'Enviar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
