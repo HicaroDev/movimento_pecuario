@@ -394,7 +394,7 @@ export function DashboardLayout() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-16 left-52 z-50 w-9 h-9 rounded-full flex items-center justify-center shadow-lg no-print"
+          className="fixed bottom-33 left-52 z-50 w-9 h-9 rounded-full flex items-center justify-center shadow-lg no-print"
           style={{ background: 'linear-gradient(135deg, #1a6040, #0f4a30)', color: '#fff' }}
           title="Voltar ao topo"
         >
