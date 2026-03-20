@@ -1460,7 +1460,7 @@ export function Manejos() {
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-red-100 p-8">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="max-w-6xl mx-auto">
 
