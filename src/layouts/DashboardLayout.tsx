@@ -179,7 +179,7 @@ export function DashboardLayout() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
+        <nav className="sidebar-nav flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
           {visibleNavItems.map((item, index) => {
             const isActive =
               item.path === '/'
@@ -368,6 +368,8 @@ export function DashboardLayout() {
             <span>Sair</span>
           </button>
         </div>
+        {/* Footer verde — fechamento visual do sidebar */}
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, #1a6040, #0f4a30)', flexShrink: 0 }} />
       </aside>
 
       {/* Main */}
