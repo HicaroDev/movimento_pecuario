@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -84,6 +84,13 @@ export function DashboardLayout() {
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
   const [showEmDev, setShowEmDev] = useState(false);
+  const [showBackTop, setShowBackTop] = useState(false);
+
+  useEffect(() => {
+    function onScroll() { setShowBackTop(window.scrollY > 300); }
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const [unreadComments, setUnreadComments] = useState(0);
 
   useEffect(() => {
@@ -379,6 +386,21 @@ export function DashboardLayout() {
       >
         <Outlet />
       </main>
+
+      {/* Botão voltar ao topo */}
+      {showBackTop && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 left-[72px] z-50 w-9 h-9 rounded-full flex items-center justify-center shadow-lg no-print"
+          style={{ background: 'linear-gradient(135deg, #1a6040, #0f4a30)', color: '#fff' }}
+          title="Voltar ao topo"
+        >
+          <ArrowUp className="w-4 h-4" />
+        </motion.button>
+      )}
     </div>
   );
 }
