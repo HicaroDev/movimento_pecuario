@@ -44,6 +44,13 @@
 - ⬜ Vaqueiro recebe a OS no celular e executa
 - ⬜ Após execução, OS vira lançamento automaticamente no sistema
 
+## v1.20 — Melhorias de Layout e UX
+
+- ⬜ **Sidebar sticky/fixed** — menu lateral sempre visível durante a rolagem da página
+  - Usuário navega entre módulos sem precisar rolar de volta ao topo
+  - Padrão de sistemas SaaS modernos (Notion, Linear, Vercel)
+  - Requer atenção em telas menores para não sobrepor itens
+
 ## v3.0 — SaaS Escala
 
 - ⬜ Multi-tenant com planos pagos
