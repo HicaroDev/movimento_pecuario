@@ -8,6 +8,7 @@
   --color-teal-600: #1a6040;
   --color-teal-700: #155033;
   --color-teal-800: #0f3d26;
+  --height-screen: 100dvh;
 }
 
 :root {

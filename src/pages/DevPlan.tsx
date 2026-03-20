@@ -156,10 +156,10 @@ export function DevPlan() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex bg-gray-50">
 
       {/* ── Sidebar ── */}
-      <aside className="w-60 h-full flex-shrink-0 flex flex-col"
+      <aside className="w-60 flex-shrink-0 flex flex-col"
         style={{ background: 'rgba(255,255,255,0.90)', borderRight: '1px solid rgba(0,0,0,0.08)', boxShadow: '2px 0 12px rgba(0,0,0,0.04)' }}>
         <div className="p-5" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
           <div className="flex items-center gap-2 mb-1">
@@ -195,7 +195,7 @@ export function DevPlan() {
       </aside>
 
       {/* ── Conteúdo principal ── */}
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 p-8">
         <div className="max-w-3xl mx-auto">
 
           {/* Badge última atualização */}
