@@ -116,7 +116,7 @@ export function DashboardLayout() {
 
   return (
     <div
-      className="flex h-screen"
+      className="flex min-h-screen"
       style={{
         background: `
           radial-gradient(ellipse at 20% 60%, rgba(26,96,64,0.08) 0%, transparent 50%),
@@ -127,7 +127,7 @@ export function DashboardLayout() {
     >
       {/* Sidebar — glassmorphism claro */}
       <aside
-        className="w-64 h-full flex flex-col flex-shrink-0 relative no-print"
+        className="w-64 flex flex-col flex-shrink-0 relative no-print"
         style={{
           background: 'rgba(255, 255, 255, 0.80)',
           backdropFilter: 'blur(24px)',
@@ -179,7 +179,7 @@ export function DashboardLayout() {
         )}
 
         {/* Nav */}
-        <nav className="sidebar-nav flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1">
           {visibleNavItems.map((item, index) => {
             const isActive =
               item.path === '/'
@@ -374,7 +374,7 @@ export function DashboardLayout() {
 
       {/* Main */}
       <main
-        className="flex-1 overflow-auto"
+        className="flex-1"
         style={{ background: '#f8fafc', isolation: 'isolate' }}
       >
         <Outlet />
