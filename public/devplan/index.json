@@ -6,5 +6,6 @@
   { "file": "04-relatorios.md",       "title": "Relatórios",         "icon": "📊" },
   { "file": "05-manejos.md",          "title": "Manejos",            "icon": "🐄" },
   { "file": "06-proximas-versoes.md", "title": "Próximas Versões",   "icon": "🚀" },
+  { "file": "08-ajustes-mp20.md",     "title": "Ajustes MP_20",      "icon": "🔍" },
   { "file": "changelog.md",           "title": "Changelog",          "icon": "📝" }
 ]
