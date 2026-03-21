@@ -1,5 +1,31 @@
 # Changelog — Suplemento Control
 
+## v1.21 — 21/03/2026
+
+### Manejos
+- Parição: exibe apenas lotes FÊMEA marcados como **prenha = SIM**
+- Filtro sexo corrigido para aceitar variações de caixa (FÊMEA / femea / Femea)
+
+### Cadastros
+- Campo **Prenha** (SIM / NÃO) exibido ao selecionar sexo FÊMEA no cadastro de animais
+- Salvo corretamente como boolean no banco (era string "true" — corrigido)
+- Destaque visual: botão SIM fica rosa quando selecionado
+
+### Layout / UX
+- Sidebar: footer com gradiente verde na base
+- Botão "Voltar ao topo" (canto inferior esquerdo)
+- Sem barra de rolagem própria no menu lateral
+
+### DevPlan (Planejamento)
+- Botão flutuante **Responder** para o cliente enviar feedback diretamente na aba
+- Contador de respostas não lidas no menu lateral (polling 30s)
+
+### Banco de Dados
+- Nova coluna `animals.prenha boolean DEFAULT false` (ajustes_v121.sql)
+- Tabela `devplan_comments` para respostas do cliente (ajustes_v119.sql)
+
+---
+
 ## v1.19 — 19/03/2026
 
 ### Relatórios

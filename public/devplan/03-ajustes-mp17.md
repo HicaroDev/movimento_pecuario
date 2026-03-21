@@ -70,6 +70,18 @@
 
 ---
 
+## Ajustes da v1.21 — 21/03/2026
+
+- ✅ **Campo Prenha** no cadastro de animais: SIM / NÃO ao selecionar sexo FÊMEA
+- ✅ **Parição** agora filtra apenas fêmeas com `prenha = SIM`
+- ✅ **Fix:** prenha salvo como boolean real (era string "true")
+- ✅ **Fix:** campo `prenha` mapeado corretamente no `manejoService` (era `undefined`)
+- ✅ **Sidebar:** footer verde na base + botão voltar ao topo
+- ✅ **DevPlan:** botão Responder para o cliente + contador de não lidos no menu
+- ✅ **Banco:** coluna `animals.prenha boolean DEFAULT false` adicionada
+
+---
+
 ## Pendente de Validação com o Cliente
 
 - ⬜ **Categoria Animal nos pré-lançamentos** — confirmar com Phyllypi se os dados cadastrados estão corretos
@@ -101,7 +113,11 @@
 | Geral | Versão v1.19 | ✅ |
 | Seed/Dados | Categoria Animal nos pré-lançamentos | ⬜ Validar |
 | Manejos | Testar Transferir Parcial pasto vazio | ⬜ Validar |
+| Cadastros | Campo Prenha (SIM/NÃO) para FÊMEA | ✅ |
+| Manejos | Parição filtra prenha = SIM | ✅ |
+| Layout | Sidebar footer + botão voltar ao topo | ✅ |
+| DevPlan | Botão Responder + contador não lidos | ✅ |
 
 ---
 
-*MP17 iniciado em 19/03/2026 · v1.18 → v1.19 · Suplemento Control*
+*MP17 iniciado em 19/03/2026 · v1.18 → v1.21 · Suplemento Control*
