@@ -25,7 +25,12 @@ export function RecuperarSenha() {
     );
     setLoading(false);
     if (err) {
-      setError('Envio de e-mail não disponível no momento. Entre em contato com o administrador para redefinir sua senha.');
+      const msg = err.message ?? '';
+      if (msg.toLowerCase().includes('smtp') || msg.toLowerCase().includes('email') || msg.toLowerCase().includes('mail')) {
+        setError('Envio de e-mail não disponível. Entre em contato com o administrador para redefinir sua senha.');
+      } else {
+        setError(msg || 'Erro ao enviar e-mail. Tente novamente.');
+      }
     } else {
       setSent(true);
     }
