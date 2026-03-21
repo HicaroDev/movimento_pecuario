@@ -3,14 +3,14 @@ import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   UserCog, Plus, Pencil, Trash2, Save, X, Eye, EyeOff,
-  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2, ClipboardList,
+  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2, ClipboardList, KeyRound,
 } from 'lucide-react';
 import type { ModulePermission } from '../types/user';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { farmService } from '../services/farmService';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { SkeletonTable } from '../components/Skeleton';
 import { logger } from '../lib/logger';
 import type { FarmUser, Module, Role } from '../types/user';
@@ -328,6 +328,93 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
   );
 }
 
+/* ─────────────── Modal trocar senha ─────────────── */
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [showNew, setShowNew]       = useState(false);
+  const [showConf, setShowConf]     = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<{ newPwd: string; confPwd: string }>();
+
+  async function onSubmit(data: { newPwd: string; confPwd: string }) {
+    if (data.newPwd !== data.confPwd) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: data.newPwd });
+      if (error) throw new Error(error.message);
+      toast.success('Senha alterada com sucesso!');
+      onClose();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao alterar senha.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
+      <motion.div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm z-10 overflow-hidden"
+        initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 12 }} transition={{ duration: 0.2 }}>
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900">Trocar Senha</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <label className={labelClass}>Nova senha *</label>
+              <div className="relative">
+                <input type={showNew ? 'text' : 'password'} placeholder="••••••••"
+                  className={`${inputClass} pr-10 no-uppercase ${errors.newPwd ? 'border-red-400 ring-2 ring-red-400' : ''}`}
+                  {...register('newPwd', { required: 'Informe a nova senha', minLength: { value: 6, message: 'Mínimo 6 caracteres' } })} />
+                <button type="button" onClick={() => setShowNew(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.newPwd && <p className="text-xs text-red-500 mt-1">{errors.newPwd.message}</p>}
+            </div>
+
+            <div>
+              <label className={labelClass}>Confirmar nova senha *</label>
+              <div className="relative">
+                <input type={showConf ? 'text' : 'password'} placeholder="••••••••"
+                  className={`${inputClass} pr-10 no-uppercase ${errors.confPwd ? 'border-red-400 ring-2 ring-red-400' : ''}`}
+                  {...register('confPwd', {
+                    required: 'Confirme a nova senha',
+                    validate: v => v === watch('newPwd') || 'As senhas não coincidem',
+                  })} />
+                <button type="button" onClick={() => setShowConf(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showConf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.confPwd && <p className="text-xs text-red-500 mt-1">{errors.confPwd.message}</p>}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-600 hover:bg-white transition-colors">
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
+              <KeyRound className="w-4 h-4" />
+              {saving ? 'Salvando...' : 'Alterar senha'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 /* ─────────────── Linha de usuário na tabela ─────────────── */
 
 function UserRow({ u, currentUserId, onEdit, onRefresh }: {
@@ -455,6 +542,7 @@ export function Usuarios() {
   );
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [clientEditing, setClientEditing]     = useState<FarmUser | null>(null);
+  const [changePwdOpen, setChangePwdOpen]     = useState(false);
 
   function openClientCreate() { setClientEditing(null); setClientModalOpen(true); }
   function openClientEdit(u: FarmUser) { setClientEditing(u); setClientModalOpen(true); }
@@ -743,15 +831,26 @@ export function Usuarios() {
                         })}
                       </div>
                     </div>
-                    {hasModule('usuarios') && u.id !== user!.id && (
-                      <button
-                        onClick={() => openClientEdit(u)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
-                        title="Editar usuário"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {u.id === user!.id && (
+                        <button
+                          onClick={() => setChangePwdOpen(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-teal-700 border border-teal-200 hover:bg-teal-50 transition-colors"
+                          title="Trocar senha"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" /> Trocar Senha
+                        </button>
+                      )}
+                      {hasModule('usuarios') && u.id !== user!.id && (
+                        <button
+                          onClick={() => openClientEdit(u)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                          title="Editar usuário"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -773,6 +872,10 @@ export function Usuarios() {
             clientMode
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {changePwdOpen && <ChangePasswordModal onClose={() => setChangePwdOpen(false)} />}
       </AnimatePresence>
     </div>
   );
