@@ -39,7 +39,7 @@ function formatPhone(raw: string): string {
 
 /* ── Local types ── */
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
-interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
+interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; prenha?: boolean; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
 interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; consumo?: string; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
 
@@ -665,15 +665,16 @@ function PastosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (targ
 let _animaisCache: Animal[] = [];
 let _acatCache: AnimalCategory[] = [];
 
-interface AnimalForm { nome: string; quantidade: number; raca: string; categoria_id: string; peso_medio: number; sexo: string; bezerros_quantidade: number; bezerros_peso_medio: number; observacoes: string; }
+interface AnimalForm { nome: string; quantidade: number; raca: string; categoria_id: string; peso_medio: number; sexo: string; prenha: boolean; bezerros_quantidade: number; bezerros_peso_medio: number; observacoes: string; }
 
 function AnimalEditRow({ item, categories, onSave, onCancel }: {
   item: Animal; categories: AnimalCategory[];
   onSave: (d: AnimalForm) => void; onCancel: () => void;
 }) {
   const [temBezerros, setTemBezerros] = useState(() => !!(item.bezerros_quantidade || item.bezerros_peso_medio));
-  const { register, handleSubmit } = useForm<AnimalForm>({
-    defaultValues: { nome: item.nome, quantidade: item.quantidade, raca: item.raca || '', categoria_id: item.categoria_id || '', peso_medio: item.peso_medio ?? 0, sexo: item.sexo || '', bezerros_quantidade: item.bezerros_quantidade ?? 0, bezerros_peso_medio: item.bezerros_peso_medio ?? 0, observacoes: item.observacoes || '' },
+  const [editSexo, setEditSexo] = useState(item.sexo || '');
+  const { register, handleSubmit, setValue } = useForm<AnimalForm>({
+    defaultValues: { nome: item.nome, quantidade: item.quantidade, raca: item.raca || '', categoria_id: item.categoria_id || '', peso_medio: item.peso_medio ?? 0, sexo: item.sexo || '', prenha: item.prenha ?? false, bezerros_quantidade: item.bezerros_quantidade ?? 0, bezerros_peso_medio: item.bezerros_peso_medio ?? 0, observacoes: item.observacoes || '' },
   });
   function handleSave(data: AnimalForm) {
     onSave(!temBezerros ? { ...data, bezerros_quantidade: 0, bezerros_peso_medio: 0 } : data);
@@ -696,12 +697,23 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
         </select>
       </td>
       <td className="px-4 py-2">
-        <select {...register('sexo')} className={inputClass}>
+        <select {...register('sexo')} className={inputClass} onChange={e => { setEditSexo(e.target.value); setValue('sexo', e.target.value); if (e.target.value !== 'FÊMEA') setValue('prenha', false); }}>
           <option value="">—</option>
           <option value="MACHO">MACHO</option>
           <option value="FÊMEA">FÊMEA</option>
           <option value="MISTURADO">MISTURADO</option>
         </select>
+        {editSexo === 'FÊMEA' && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-[10px] text-pink-600 font-semibold">PRENHA?</span>
+            <label className="flex items-center gap-0.5 cursor-pointer">
+              <input type="radio" {...register('prenha')} value="true" className="accent-pink-500" /> <span className="text-[10px]">SIM</span>
+            </label>
+            <label className="flex items-center gap-0.5 cursor-pointer">
+              <input type="radio" {...register('prenha')} value="false" className="accent-gray-400" /> <span className="text-[10px]">NÃO</span>
+            </label>
+          </div>
+        )}
       </td>
       <td className="px-4 py-2">
         <div className="space-y-1">
@@ -737,8 +749,9 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
   const [showCatSection, setShowCatSection] = useState(false);
   const [search, setSearch] = useState('');
   const [temBezerros, setTemBezerros] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AnimalForm>({
-    defaultValues: { quantidade: 0, peso_medio: 0, bezerros_quantidade: 0, bezerros_peso_medio: 0 },
+  const [addSexo, setAddSexo] = useState('');
+  const { register, handleSubmit, reset, setValue: setAddValue, formState: { errors } } = useForm<AnimalForm>({
+    defaultValues: { quantidade: 0, peso_medio: 0, prenha: false, bezerros_quantidade: 0, bezerros_peso_medio: 0 },
   });
 
   useEffect(() => {
@@ -775,6 +788,7 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
       raca: data.raca || null, categoria_id: data.categoria_id || null,
       observacoes: data.observacoes || null, farm_id: activeFarmId,
       ...(data.sexo      && { sexo: data.sexo }),
+      prenha: data.sexo === 'FÊMEA' ? (data.prenha ?? false) : false,
       ...(pesoMedio      && { peso_medio: pesoMedio }),
       ...(bezQtd         && { bezerros_quantidade: bezQtd }),
       ...(bezPeso        && { bezerros_peso_medio: bezPeso }),
@@ -797,6 +811,7 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
       categoria_id:        data.categoria_id || null,
       observacoes:         data.observacoes || null,
       sexo:                data.sexo || null,
+      prenha:              data.sexo === 'FÊMEA' ? (data.prenha ?? false) : false,
       peso_medio:          pesoMedio,
       bezerros_quantidade: bezQtd,
       bezerros_peso_medio: bezPeso,
@@ -917,12 +932,23 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
               </div>
               <div>
                 <label className={labelClass}>Sexo</label>
-                <select {...register('sexo')} className={inputClass}>
+                <select {...register('sexo')} className={inputClass} onChange={e => { setAddSexo(e.target.value); setAddValue('sexo', e.target.value); if (e.target.value !== 'FÊMEA') setAddValue('prenha', false); }}>
                   <option value="">—</option>
                   <option value="MACHO">MACHO</option>
                   <option value="FÊMEA">FÊMEA</option>
                   <option value="MISTURADO">MISTURADO</option>
                 </select>
+                {addSexo === 'FÊMEA' && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-pink-600 font-semibold">PRENHA?</span>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                      <button type="button" onClick={() => setAddValue('prenha', true)}
+                        className="px-3 py-1.5 transition-colors bg-white text-gray-500 hover:bg-pink-50 hover:text-pink-600">SIM</button>
+                      <button type="button" onClick={() => setAddValue('prenha', false)}
+                        className="px-3 py-1.5 transition-colors bg-white text-gray-500 hover:bg-gray-50 border-l border-gray-200">NÃO</button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
                 <div className="flex items-center justify-between mb-3">

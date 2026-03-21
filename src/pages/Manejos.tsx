@@ -1147,7 +1147,7 @@ function EvolucaoTab({
               <div className="relative">
                 <select value={parLoteMaeId} onChange={e => setParLoteMaeId(e.target.value)} className={selectClass}>
                   <option value="">Selecione o lote…</option>
-                  {ativos.filter(a => a.sexo?.toLowerCase().replace('ê','e') === 'femea').map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
+                  {ativos.filter(a => a.sexo?.toLowerCase().replace('ê','e') === 'femea' && a.prenha === true).map(a => <option key={a.id} value={a.id}>{a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
