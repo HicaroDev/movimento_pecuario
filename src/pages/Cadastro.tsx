@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
+import { adminCreateAuthUser } from '../services/userService';
 
 interface RegisterForm {
   name: string;
@@ -26,20 +27,18 @@ export function Cadastro() {
     setError('');
     setLoading(true);
     try {
-      // 1. Criar auth user (email_confirm bypassado via signUp — active=false bloqueia o login)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email.toLowerCase().trim(),
-        password: data.password,
-        options: { data: { name: data.name } },
-      });
-      if (authError) throw new Error(authError.message);
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('Erro ao criar usuário. Tente novamente.');
+      // 1. Criar auth user via admin API (email_confirm: true — sem envio de e-mail)
+      const userId = await adminCreateAuthUser(
+        data.email.toLowerCase().trim(),
+        data.password,
+        data.name.trim(),
+        'client',
+      );
 
       // 2. Criar fazenda pré-cadastro (inactive — ativada pelo admin)
       const { data: farm, error: farmError } = await supabaseAdmin
         .from('farms')
-        .insert({ nomeFazenda: data.fazendaNome.trim().toUpperCase(), active: false })
+        .insert({ nome_fazenda: data.fazendaNome.trim().toUpperCase(), active: false })
         .select()
         .single();
       if (farmError) throw new Error(farmError.message);
@@ -60,7 +59,15 @@ export function Cadastro() {
 
       setSuccess(true);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao cadastrar. Tente novamente.');
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.toLowerCase().includes('already been registered') || msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('email already'))
+        setError('Este e-mail já está cadastrado. Tente fazer login ou recupere sua senha.');
+      else if (msg.toLowerCase().includes('password'))
+        setError('A senha deve ter no mínimo 6 caracteres.');
+      else if (msg.toLowerCase().includes('invalid email'))
+        setError('E-mail inválido. Verifique e tente novamente.');
+      else
+        setError(msg || 'Erro ao cadastrar. Tente novamente.');
     } finally {
       setLoading(false);
     }

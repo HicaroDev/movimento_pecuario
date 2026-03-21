@@ -205,6 +205,8 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
               <div className="relative">
                 <input type={showPwd ? 'text' : 'password'} placeholder="••••••••"
                   className={`${inputClass} pr-10 ${errors.password ? 'border-red-400 ring-2 ring-red-400' : ''}`}
+                  style={{ textTransform: 'none' }}
+                  data-no-uppercase
                   {...register('password', { minLength: { value: 6, message: 'Mínimo 6 caracteres' } })} />
                 <button type="button" onClick={() => setShowPwd(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">

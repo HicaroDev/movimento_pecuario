@@ -38,7 +38,7 @@ function adminFetch(url: string, init: RequestInit, timeoutMs = 15_000): Promise
 }
 
 // Chama a Admin REST API diretamente — sem criar segundo GoTrueClient no browser
-async function adminCreateAuthUser(email: string, password: string, name: string, role: string): Promise<string> {
+export async function adminCreateAuthUser(email: string, password: string, name: string, role: string): Promise<string> {
   const res = await adminFetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
@@ -79,7 +79,7 @@ function toFarmUser(row: Record<string, unknown>): FarmUser {
 export const userService = {
   async list(): Promise<FarmUser[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('profiles').select('*').order('name');
       if (error) throw new Error(error.message);
       const users = (data ?? []).map(toFarmUser);
