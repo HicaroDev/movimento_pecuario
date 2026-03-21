@@ -129,9 +129,7 @@ export function Login() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className={`${inputClass} pr-11`}
-                  style={{ textTransform: 'none' }}
-                  data-no-uppercase
+                  className={`${inputClass} pr-11 no-uppercase`}
                   {...register('password', { required: 'Informe a senha' })}
                 />
                 <button

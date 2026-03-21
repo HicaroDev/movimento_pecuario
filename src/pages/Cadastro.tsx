@@ -178,9 +178,7 @@ export function Cadastro() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className={`${inputClass} pr-11`}
-                  style={{ textTransform: 'none' }}
-                  data-no-uppercase
+                  className={`${inputClass} pr-11 no-uppercase`}
                   {...register('password', {
                     required: 'Informe a senha',
                     minLength: { value: 6, message: 'Mínimo 6 caracteres' },

@@ -51,6 +51,11 @@
   }
 }
 
+/* Campo sem uppercase — usado em senhas com toggle show/hide */
+.no-uppercase {
+  text-transform: none !important;
+}
+
 /* ── Sidebar nav — scroll sem barra visível ── */
 .sidebar-nav {
   scrollbar-width: none;

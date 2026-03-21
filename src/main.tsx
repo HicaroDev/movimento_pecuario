@@ -10,7 +10,7 @@ document.addEventListener('input', (e) => {
   const t = e.target as HTMLInputElement;
   if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') return;
   if (['number', 'date', 'password', 'email', 'checkbox', 'radio'].includes(t.type)) return;
-  if (t.dataset.noUppercase !== undefined) return;
+  if (t.classList.contains('no-uppercase')) return;
   const start = t.selectionStart;
   const end   = t.selectionEnd;
   t.value = t.value.toUpperCase();
