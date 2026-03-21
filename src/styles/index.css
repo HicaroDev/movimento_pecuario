@@ -39,6 +39,11 @@
   input, textarea {
     text-transform: uppercase;
   }
+
+  /* Senha preserva caixa original (maiúsculo/minúsculo importa) */
+  input[type="password"] {
+    text-transform: none;
+  }
 }
 
 /* ── Sidebar nav — scroll sem barra visível ── */
