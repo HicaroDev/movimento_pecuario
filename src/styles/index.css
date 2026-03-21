@@ -35,6 +35,11 @@
     text-transform: uppercase;
   }
 
+  /* Garante uppercase em todos os elementos (Tailwind reseta button/a) */
+  button, a, select, option {
+    text-transform: uppercase;
+  }
+
   /* Inputs são tratados via JS (main.tsx) para preservar cursor */
   input, textarea {
     text-transform: uppercase;
