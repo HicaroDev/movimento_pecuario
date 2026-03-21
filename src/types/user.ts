@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'client';
+export type Role = 'admin' | 'client' | 'representante';
 export type Module = 'relatorio' | 'formulario' | 'cadastros' | 'manejos' | 'fazendas' | 'usuarios' | 'historico';
 export type ModulePermission = 'view' | 'edit';
 

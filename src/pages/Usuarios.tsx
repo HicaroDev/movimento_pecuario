@@ -218,7 +218,8 @@ function UserModal({ editing, currentUserId, onClose, onSaved, restrictFarmIds, 
               <div>
                 <label className={labelClass}>Perfil</label>
                 <select className={inputClass} {...register('role')}>
-                  <option value="client">Cliente / Funcionário</option>
+                  <option value="client">Usuário</option>
+                  <option value="representante">Representante</option>
                   <option value="admin">Administrador</option>
                 </select>
               </div>
@@ -463,7 +464,7 @@ function UserRow({ u, currentUserId, onEdit, onRefresh }: {
       </td>
       <td className="px-4 py-3">
         <span className="text-xs font-medium text-gray-600">
-          {u.role === 'admin' ? 'Admin' : 'Cliente'}
+          {u.role === 'admin' ? 'Admin' : u.role === 'representante' ? 'Representante' : 'Usuário'}
         </span>
       </td>
       <td className="px-4 py-3 max-w-[180px]">
@@ -799,8 +800,8 @@ export function Usuarios() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-sm font-semibold text-gray-900">{u.name}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${u.role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {u.role === 'admin' ? 'Admin' : 'Cliente'}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${u.role === 'admin' ? 'bg-teal-100 text-teal-700' : u.role === 'representante' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {u.role === 'admin' ? 'Admin' : u.role === 'representante' ? 'Representante' : 'Usuário'}
                         </span>
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {u.active ? '● Ativo' : '○ Inativo'}
