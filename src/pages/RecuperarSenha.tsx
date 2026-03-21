@@ -25,7 +25,7 @@ export function RecuperarSenha() {
     );
     setLoading(false);
     if (err) {
-      setError('Não foi possível enviar o e-mail. Verifique o endereço digitado.');
+      setError('Envio de e-mail não disponível no momento. Entre em contato com o administrador para redefinir sua senha.');
     } else {
       setSent(true);
     }
