@@ -45,8 +45,9 @@
     text-transform: uppercase;
   }
 
-  /* Senha preserva caixa original (maiúsculo/minúsculo importa) */
-  input[type="password"] {
+  /* Senha e e-mail preservam caixa original */
+  input[type="password"],
+  input[type="email"] {
     text-transform: none;
   }
 }

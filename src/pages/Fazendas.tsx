@@ -285,6 +285,24 @@ function FarmCard({ farm, onEdit, onRefresh }: {
 /* ─────────────── View do cliente (read-only) ─────────────── */
 
 function MyFarmView({ farm }: { farm: Farm | null }) {
+  const { updateClientInfo } = useData();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const { register, handleSubmit, reset } = useForm<Farm>({ defaultValues: farm || {} });
+
+  function startEdit() { reset(farm || {}); setEditing(true); }
+
+  async function onSave(data: Farm) {
+    if (!farm) return;
+    setSaving(true);
+    try {
+      updateClientInfo({ ...farm, ...data });
+      toast.success('Dados da fazenda atualizados!');
+      setEditing(false);
+    } catch { toast.error('Erro ao salvar.'); }
+    finally { setSaving(false); }
+  }
+
   if (!farm) return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
       <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -293,20 +311,73 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
     </div>
   );
 
+  if (editing) return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="font-semibold text-gray-800">Editar Dados da Fazenda</h3>
+        <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+      </div>
+      <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className={labelClass}>Nome da Fazenda</label>
+            <input {...register('nomeFazenda', { required: true })} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Responsável</label>
+            <input {...register('nomeResponsavel')} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Qtd. Cabeças</label>
+            <input type="number" {...register('quantidadeCabecas', { valueAsNumber: true })} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Telefone</label>
+            <input {...register('telefone')} className={inputClass} />
+          </div>
+          <div>
+            <label className={`${labelClass} no-uppercase`}>E-mail</label>
+            <input type="email" {...register('email')} className={`${inputClass} no-uppercase`} />
+          </div>
+          <div className="col-span-2">
+            <label className={labelClass}>Endereço</label>
+            <input {...register('endereco')} className={inputClass} />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button type="submit" disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60">
+            <Save className="w-3.5 h-3.5" /> {saving ? 'Salvando...' : 'Salvar'}
+          </button>
+          <button type="button" onClick={() => setEditing(false)}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-      <div className="flex items-center gap-4 mb-6">
-        {farm.logoUrl ? (
-          <img src={farm.logoUrl} alt="Logo" className="w-16 h-16 object-contain border border-gray-200 rounded-xl bg-gray-50" />
-        ) : (
-          <div className="w-16 h-16 rounded-xl bg-teal-100 flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-teal-600" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          {farm.logoUrl ? (
+            <img src={farm.logoUrl} alt="Logo" className="w-16 h-16 object-contain border border-gray-200 rounded-xl bg-gray-50" />
+          ) : (
+            <div className="w-16 h-16 rounded-xl bg-teal-100 flex items-center justify-center">
+              <Building2 className="w-8 h-8 text-teal-600" />
+            </div>
+          )}
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{farm.nomeFazenda}</h2>
+            {farm.nomeResponsavel && <p className="text-sm text-gray-500">{farm.nomeResponsavel}</p>}
           </div>
-        )}
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{farm.nomeFazenda}</h2>
-          {farm.nomeResponsavel && <p className="text-sm text-gray-500">{farm.nomeResponsavel}</p>}
         </div>
+        <button onClick={startEdit}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-teal-700 border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors">
+          <Pencil className="w-3.5 h-3.5" /> Editar
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-4 text-sm">
         {farm.quantidadeCabecas ? (
@@ -318,6 +389,9 @@ function MyFarmView({ farm }: { farm: Farm | null }) {
         {farm.endereco && <div className="flex items-center gap-2 text-gray-700"><MapPin className="w-4 h-4 text-gray-400" /><span>{farm.endereco}</span></div>}
         {farm.telefone && <div className="flex items-center gap-2 text-gray-700"><Phone className="w-4 h-4 text-gray-400" /><span>{farm.telefone}</span></div>}
         {farm.email    && <div className="flex items-center gap-2 text-gray-700"><Mail  className="w-4 h-4 text-gray-400" /><span>{farm.email}</span></div>}
+        {!farm.quantidadeCabecas && !farm.endereco && !farm.telefone && !farm.email && (
+          <p className="col-span-2 text-xs text-amber-600 font-medium">⚠ Dados incompletos — clique em Editar para preencher.</p>
+        )}
       </div>
     </div>
   );
