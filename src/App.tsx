@@ -5,6 +5,8 @@ import { DataProvider } from './context/DataContext';
 import { ProtectedRoute, ModuleRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Login } from './pages/Login';
+import { Cadastro } from './pages/Cadastro';
+import { RecuperarSenha } from './pages/RecuperarSenha';
 import { Relatorio } from './pages/Relatorio';
 import { Formulario } from './pages/Formulario';
 import { Fazendas } from './pages/Fazendas';
@@ -15,7 +17,9 @@ import { Historico } from './pages/Historico';
 import { DevPlan } from './pages/DevPlan';
 
 const router = createBrowserRouter([
-  { path: '/login', Component: Login },
+  { path: '/login',           Component: Login },
+  { path: '/cadastro',        Component: Cadastro },
+  { path: '/recuperar-senha', Component: RecuperarSenha },
   {
     Component: ProtectedRoute,
     children: [{

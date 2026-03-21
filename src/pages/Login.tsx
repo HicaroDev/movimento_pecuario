@@ -130,6 +130,8 @@ export function Login() {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   className={`${inputClass} pr-11`}
+                  style={{ textTransform: 'none' }}
+                  data-no-uppercase
                   {...register('password', { required: 'Informe a senha' })}
                 />
                 <button
@@ -160,7 +162,26 @@ export function Login() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-8">v2.0 © 2025 Suplemento Control</p>
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px bg-gray-100" />
+            <span className="text-xs text-gray-400">ou</span>
+            <div className="flex-1 h-px bg-gray-100" />
+          </div>
+
+          <a
+            href="/cadastro"
+            className="block w-full py-3 rounded-xl text-teal-700 font-semibold text-sm text-center border-2 border-teal-600 hover:bg-teal-50 transition-all"
+          >
+            Criar Conta
+          </a>
+
+          <p className="text-center mt-4">
+            <a href="/recuperar-senha" className="text-xs text-gray-400 hover:text-teal-600 transition-colors">
+              Esqueci minha senha
+            </a>
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-6">v1.191A © 2025 Suplemento Control</p>
         </div>
       </div>
     </div>

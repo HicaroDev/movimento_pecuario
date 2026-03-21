@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { farmService } from '../services/farmService';
+import { supabaseAdmin } from '../lib/supabase';
 import { SkeletonTable } from '../components/Skeleton';
 import { logger } from '../lib/logger';
 import type { FarmUser, Module, Role } from '../types/user';
@@ -530,6 +531,30 @@ export function Usuarios() {
   function openEdit(u: FarmUser) { setEditing(u); setModalOpen(true); }
   function closeModal() { setModalOpen(false); setEditing(null); }
 
+  const pendentes = users.filter(u => !u.active && u.role !== 'admin');
+  const ativos    = users.filter(u => u.active || u.role === 'admin');
+
+  async function aprovarUsuario(u: FarmUser) {
+    try {
+      await userService.update(u.id, { active: true });
+      if (u.farmId) {
+        await supabaseAdmin.from('farms').update({ active: true }).eq('id', u.farmId);
+      }
+      toast.success(`${u.name} aprovado com sucesso!`);
+      refresh();
+    } catch { toast.error('Erro ao aprovar usuário.'); }
+  }
+
+  async function recusarUsuario(u: FarmUser) {
+    if (!window.confirm(`Recusar e remover o cadastro de "${u.name}"?`)) return;
+    try {
+      await userService.remove(u.id);
+      if (u.farmId) await supabaseAdmin.from('farms').delete().eq('id', u.farmId);
+      toast.success('Cadastro recusado e removido.');
+      refresh();
+    } catch { toast.error('Erro ao recusar.'); }
+  }
+
   /* ── Admin ── */
   if (isAdmin) return (
     <div className="p-8">
@@ -541,8 +566,8 @@ export function Usuarios() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">Usuários</h1>
             <p className="text-sm text-gray-500">
-              {users.filter(u => u.active).length} ativo{users.filter(u => u.active).length !== 1 ? 's' : ''}
-              {' '}· {users.length} total
+              {ativos.length} ativo{ativos.length !== 1 ? 's' : ''}
+              {pendentes.length > 0 && <span className="ml-2 text-amber-600 font-semibold">· {pendentes.length} aguardando aprovação</span>}
             </p>
           </div>
           <button onClick={openCreate}
@@ -550,6 +575,42 @@ export function Usuarios() {
             <Plus className="w-4 h-4" /> Novo Usuário
           </button>
         </div>
+
+        {/* ── Seção Pendentes ── */}
+        {!loading && pendentes.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-6 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <p className="text-sm font-semibold text-amber-800">Aguardando Aprovação ({pendentes.length})</p>
+            </div>
+            <div className="divide-y divide-amber-100">
+              {pendentes.map(u => (
+                <div key={u.id} className="flex items-center justify-between px-5 py-3 hover:bg-amber-100/50 transition-colors">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{u.name}</p>
+                    <p className="text-xs text-gray-500">{u.email}</p>
+                    {u.farmId && (
+                      <p className="text-xs text-amber-700 font-medium mt-0.5">
+                        Fazenda: {farmNameMap[u.farmId] ?? u.farmId}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => recusarUsuario(u)}
+                      className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                      Recusar
+                    </button>
+                    <button onClick={() => aprovarUsuario(u)}
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors">
+                      Aprovar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {loading ? (
           <SkeletonTable rows={4} cols={6} />
@@ -566,10 +627,10 @@ export function Usuarios() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {users.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Nenhum usuário cadastrado.</td></tr>
+                  {ativos.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Nenhum usuário ativo.</td></tr>
                   ) : (
-                    users.map(u => <UserRow key={u.id} u={u} currentUserId={user!.id} onEdit={openEdit} onRefresh={refresh} />)
+                    ativos.map(u => <UserRow key={u.id} u={u} currentUserId={user!.id} onEdit={openEdit} onRefresh={refresh} />)
                   )}
                 </tbody>
               </table>
