@@ -11,6 +11,7 @@ export interface Animal {
   categoria_id?: string;
   peso_medio?: number;
   sexo?: string;
+  prenha?: boolean;
   bezerros_quantidade?: number;
   bezerros_peso_medio?: number;
   observacoes?: string;
@@ -50,6 +51,7 @@ function toAnimal(row: Record<string, unknown>): Animal {
     categoria_id: (row.categoria_id as string) ?? undefined,
     peso_medio:          (row.peso_medio as number) ?? undefined,
     sexo:                (row.sexo as string) ?? undefined,
+    prenha:              (row.prenha as boolean) ?? false,
     bezerros_quantidade: (row.bezerros_quantidade as number) ?? undefined,
     bezerros_peso_medio: (row.bezerros_peso_medio as number) ?? undefined,
     observacoes:         (row.observacoes as string) ?? undefined,
