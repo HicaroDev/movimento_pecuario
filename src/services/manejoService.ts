@@ -319,43 +319,27 @@ export const manejoService = {
     qtdPartos: number;
     pesoMedio?: number;
     data?: string;
-    destino: { tipo: 'existente'; loteId: string } | { tipo: 'novo'; nome: string; categoriaId?: string };
     farmId: string;
-    loteDestinoNome?: string;
   }): Promise<void> {
-    const { loteMae, qtdPartos, pesoMedio, data, destino, farmId, loteDestinoNome } = params;
+    const { loteMae, qtdPartos, pesoMedio, data, farmId } = params;
+    const novosBez = (loteMae.bezerros_quantidade ?? 0) + qtdPartos;
+    const updatePayload: Record<string, unknown> = {
+      bezerros_quantidade: novosBez,
+      prenha: false,
+    };
+    if (pesoMedio) updatePayload.bezerros_peso_medio = pesoMedio;
+    const { error } = await supabaseAdmin
+      .from('animals')
+      .update(updatePayload)
+      .eq('id', loteMae.id);
+    if (error) throw new Error(error.message);
+
     const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
-    let descrDestino = '';
-
-    if (destino.tipo === 'existente') {
-      const { data: loteAtual, error: errLer } = await supabaseAdmin
-        .from('animals').select('quantidade').eq('id', destino.loteId).single();
-      if (errLer) throw new Error(errLer.message);
-      const { error } = await supabaseAdmin
-        .from('animals')
-        .update({ quantidade: (loteAtual.quantidade as number) + qtdPartos })
-        .eq('id', destino.loteId);
-      if (error) throw new Error(error.message);
-      descrDestino = `agregados ao lote "${loteDestinoNome ?? destino.loteId}"`;
-    } else {
-      const { error } = await supabaseAdmin.from('animals').insert({
-        farm_id:      farmId,
-        nome:         destino.nome,
-        quantidade:   qtdPartos,
-        categoria_id: destino.categoriaId ?? null,
-        peso_medio:   pesoMedio ?? null,
-        pasto_id:     loteMae.pasto_id ?? null,
-        status:       'ativo',
-      });
-      if (error) throw new Error(error.message);
-      descrDestino = `novo lote "${destino.nome}" criado`;
-    }
-
     await insertHistorico({
       farm_id:    farmId,
       animal_id:  loteMae.id,
       tipo:       'paricao',
-      descricao:  `Parição: ${qtdPartos} bezerro(s) do lote "${loteMae.nome}"${pesoMedio ? ` · ${pesoMedio} kg` : ''}${dataStr} — ${descrDestino}`,
+      descricao:  `Parição: ${qtdPartos} bezerro(s) nascido(s) no lote "${loteMae.nome}"${pesoMedio ? ` · ${pesoMedio} kg/cab` : ''}${dataStr} — bezerros ao pé`,
       quantidade: qtdPartos,
       peso_medio: pesoMedio ?? null,
     });

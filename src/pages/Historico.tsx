@@ -78,7 +78,7 @@ export function Historico() {
   const { user } = useAuth();
   const farmId = activeFarmId || user?.farmId || '';
   const [manejos, setManejos] = useState<{ id: string; tipo: string; descricao: string; created_at: string; user_name?: string }[]>([]);
-  const [lancamentos, setLancamentos] = useState<{ id: string; pasto_nome: string; tipo: string; data: string | null; quantidade: number; sacos: number; kg: number; funcionario?: string; created_at?: string }[]>([]);
+  const [lancamentos, setLancamentos] = useState<{ id: string; pasto_nome: string; suplemento: string; data: string | null; quantidade: number; sacos: number; kg: number }[]>([]);
   const [activityLogs, setActivityLogs] = useState<{ id: string; module: string; action: string; description: string; user_name?: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -91,7 +91,7 @@ export function Historico() {
     setLoading(true);
     Promise.all([
       supabaseAdmin.from('manejo_historico').select('id, tipo, descricao, created_at, user_name').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
-      supabaseAdmin.from('data_entries').select('id, pasto_nome, tipo, data, quantidade, sacos, kg, funcionario, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
+      supabaseAdmin.from('data_entries').select('id, pasto_nome, suplemento, data, quantidade, sacos, kg').eq('farm_id', farmId).order('data', { ascending: false }).limit(300),
       supabaseAdmin.from('activity_log').select('id, module, action, description, user_name, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
     ]).then(([manRes, lanRes, actRes]) => {
       setManejos(manRes.data ?? []);
@@ -113,8 +113,8 @@ export function Historico() {
       id: `l_${l.id}`,
       source: 'lancamento',
       tipo: 'lancamento',
-      descricao: `${l.pasto_nome} · ${l.tipo} · ${l.quantidade} cab. · ${l.sacos} sac. · ${l.kg} kg${l.funcionario ? ` · ${l.funcionario}` : ''}`,
-      created_at: l.created_at || l.data || '',
+      descricao: `${l.pasto_nome} · ${l.suplemento} · ${l.quantidade} cab. · ${l.sacos} sac. · ${l.kg} kg`,
+      created_at: l.data || '',
     }));
     const actItems: HistoricoEntry[] = activityLogs.map(a => ({
       id: `a_${a.id}`,

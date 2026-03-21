@@ -776,7 +776,7 @@ function TransferirTab({
    TAB 3 — Evolução (Categoria · Parição · Bezerros)
 ══════════════════════════════════════════════════════════════ */
 
-type SubOp = 'categoria' | 'paricao' | 'bezerros';
+type SubOp = 'categoria' | 'paricao' | 'bezerros' | 'transf_parcial';
 type DestinoTipo = 'existente' | 'novo';
 
 function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoNome, setNovoNome, novoCatId, setNovoCatId, excludeId, animals, catMap, categories }: {
@@ -831,9 +831,9 @@ function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoN
 }
 
 function EvolucaoTab({
-  animals, categories, farmId, onReload,
+  animals, categories, pastures, farmId, onReload,
 }: {
-  animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
+  animals: Animal[]; categories: AnimalCategory[]; pastures: Pasture[]; farmId: string; onReload: () => void;
 }) {
   const [subOp, setSubOp]         = useState<SubOp>('categoria');
   const [saving, setSaving]       = useState(false);
@@ -852,10 +852,15 @@ function EvolucaoTab({
   const [parQtd, setParQtd]               = useState('');
   const [parPeso, setParPeso]             = useState('');
   const [parData, setParData]             = useState(() => new Date().toISOString().split('T')[0]);
-  const [parDestino, setParDestino]       = useState<DestinoTipo>('novo');
-  const [parLoteDestId, setParLoteDestId] = useState('');
-  const [parNovoNome, setParNovoNome]     = useState('');
-  const [parNovoCatId, setParNovoCatId]   = useState('');
+
+  /* ── Transf. Parcial (EvolucaoTab) ── */
+  const [tfpLoteId, setTfpLoteId]         = useState('');
+  const [tfpQtd, setTfpQtd]              = useState('');
+  const [tfpData, setTfpData]             = useState(() => new Date().toISOString().split('T')[0]);
+  const [tfpDestPastoId, setTfpDestPastoId] = useState('');
+  const [tfpModo, setTfpModo]             = useState<'novo' | 'agregar'>('novo');
+  const [tfpMergeId, setTfpMergeId]       = useState('');
+  const [tfpNovoNome, setTfpNovoNome]     = useState('');
 
   /* ── Bezerros ── */
   const [bezLoteId, setBezLoteId]         = useState('');
@@ -874,6 +879,7 @@ function EvolucaoTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
+  const pastureMap = useMemo(() => Object.fromEntries(pastures.map(p => [p.id, p.nome])), [pastures]);
 
   const [evolSearch, setEvolSearch] = useState('');
   const ativosFiltradosEvol = useMemo(() => {
@@ -885,7 +891,7 @@ function EvolucaoTab({
     );
   }, [ativos, evolSearch, catMap]);
 
-  const EVOLUCAO_TIPOS = ['evolucao_categoria', 'paricao', 'manejo_bezerros'];
+  const EVOLUCAO_TIPOS = ['evolucao_categoria', 'paricao', 'manejo_bezerros', 'transf_parcial'];
 
   useEffect(() => {
     setLoadingH(true);
@@ -930,23 +936,50 @@ function EvolucaoTab({
   async function confirmarParicao() {
     if (!parLoteMaeId) { toast.error('Selecione o lote mãe.'); return; }
     if (!parQtd || Number(parQtd) <= 0) { toast.error('Informe a quantidade de partos.'); return; }
-    if (parDestino === 'existente' && !parLoteDestId) { toast.error('Selecione o lote de destino.'); return; }
-    if (parDestino === 'novo' && !parNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
     const loteMae = ativos.find(a => a.id === parLoteMaeId)!;
     setSaving(true);
     try {
       await manejoService.registrarParicao({
         loteMae, qtdPartos: Number(parQtd),
         pesoMedio: parPeso ? Number(parPeso) : undefined,
-        data: parData,
-        destino: parDestino === 'existente'
-          ? { tipo: 'existente', loteId: parLoteDestId }
-          : { tipo: 'novo', nome: parNovoNome.trim(), categoriaId: parNovoCatId || undefined },
-        farmId,
-        loteDestinoNome: parDestino === 'existente' ? (ativos.find(a => a.id === parLoteDestId)?.nome ?? '') : undefined,
+        data: parData, farmId,
       });
-      toast.success(`Parição registrada: ${parQtd} bezerro(s)!`);
-      setParLoteMaeId(''); setParQtd(''); setParPeso(''); setParLoteDestId(''); setParNovoNome(''); setParNovoCatId(''); setParDestino('novo');
+      toast.success(`Parição registrada: ${parQtd} bezerro(s) adicionados ao lote!`);
+      setParLoteMaeId(''); setParQtd(''); setParPeso('');
+      setParData(new Date().toISOString().split('T')[0]);
+      onReload(); await reloadHistorico();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setSaving(false); }
+  }
+
+  /* ── Confirmar: Transf. Parcial (Evolução) ── */
+  async function confirmarTfp() {
+    const lote = ativos.find(a => a.id === tfpLoteId);
+    if (!lote) { toast.error('Selecione o lote de origem.'); return; }
+    const qtd = Number(tfpQtd);
+    if (!qtd || qtd <= 0) { toast.error('Informe a quantidade a transferir.'); return; }
+    if (qtd > lote.quantidade) { toast.error(`Máximo: ${lote.quantidade} cab.`); return; }
+    if (!tfpDestPastoId) { toast.error('Selecione o pasto de destino.'); return; }
+    if (tfpModo === 'novo' && !tfpNovoNome.trim()) { toast.error('Informe o nome do novo lote.'); return; }
+    if (tfpModo === 'agregar' && !tfpMergeId) { toast.error('Selecione o lote de destino.'); return; }
+    const mergeLote = tfpModo === 'agregar' ? ativos.find(a => a.id === tfpMergeId) : undefined;
+    setSaving(true);
+    try {
+      await manejoService.transferirParcialParaPasto({
+        origem: lote, qtd,
+        destPastoId: tfpDestPastoId,
+        destPastoNome: pastureMap[tfpDestPastoId] ?? tfpDestPastoId,
+        farmId, data: tfpData,
+        mergeLoteId: mergeLote?.id,
+        mergeLoteNome: mergeLote?.nome,
+        mergeLoteQtd: mergeLote?.quantidade,
+        mergeLoteBezQtd: mergeLote?.bezerros_quantidade,
+        novoLoteNome: tfpModo === 'novo' ? tfpNovoNome.trim() : undefined,
+      });
+      toast.success(`${qtd} cab. transferidas com sucesso!`);
+      setTfpLoteId(''); setTfpQtd(''); setTfpDestPastoId('');
+      setTfpModo('novo'); setTfpMergeId(''); setTfpNovoNome('');
+      setTfpData(new Date().toISOString().split('T')[0]);
       onReload(); await reloadHistorico();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setSaving(false); }
@@ -993,9 +1026,10 @@ function EvolucaoTab({
   }
 
   const SUB_OPS = [
-    { id: 'categoria' as SubOp, label: 'Categoria',  icon: TrendingUp },
-    { id: 'paricao'   as SubOp, label: 'Parição',    icon: Baby },
-    { id: 'bezerros'  as SubOp, label: 'Desmama',    icon: Milk },
+    { id: 'categoria'    as SubOp, label: 'Categoria',      icon: TrendingUp },
+    { id: 'paricao'      as SubOp, label: 'Parição',        icon: Baby },
+    { id: 'bezerros'     as SubOp, label: 'Desmama',        icon: Milk },
+    { id: 'transf_parcial' as SubOp, label: 'Transf. Parcial', icon: GitMerge },
   ];
 
   return (
@@ -1184,14 +1218,9 @@ function EvolucaoTab({
               <label className={labelClass}>Data</label>
               <input type="date" value={parData} onChange={e => setParData(e.target.value)} max={new Date().toISOString().split('T')[0]} className={inputClass} />
             </div>
-            <DestinoSelector
-              destino={parDestino} setDestino={setParDestino}
-              loteDestId={parLoteDestId} setLoteDestId={setParLoteDestId}
-              novoNome={parNovoNome} setNovoNome={setParNovoNome}
-              novoCatId={parNovoCatId} setNovoCatId={setParNovoCatId}
-              excludeId={parLoteMaeId}
-              animals={ativos} catMap={catMap} categories={categories}
-            />
+            <div className="text-xs text-pink-600 bg-pink-50 border border-pink-200 rounded-lg px-3 py-2">
+              Os bezerros nascidos serão adicionados ao próprio lote da mãe.
+            </div>
             <button onClick={confirmarParicao} disabled={saving || !parLoteMaeId || !parQtd}
               className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               <Baby className="w-4 h-4" />
@@ -1199,6 +1228,112 @@ function EvolucaoTab({
             </button>
           </div>
         )}
+
+        {/* ── Sub-op: Transf. Parcial ── */}
+        {subOp === 'transf_parcial' && (() => {
+          const tfpLote = ativos.find(a => a.id === tfpLoteId);
+          const lotesDestino = tfpDestPastoId
+            ? ativos.filter(a => a.pasto_id === tfpDestPastoId && a.id !== tfpLoteId)
+            : [];
+          return (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <GitMerge className="w-4 h-4 text-violet-500" />
+                <h3 className="font-semibold text-gray-900">Transferir parte do lote</h3>
+                <span className="text-xs text-gray-400 font-normal">move cab. sem alterar o pasto de origem</span>
+              </div>
+              {/* Lote de Origem */}
+              <div>
+                <label className={labelClass}>Lote de origem</label>
+                <div className="relative">
+                  <select value={tfpLoteId} onChange={e => { setTfpLoteId(e.target.value); setTfpDestPastoId(''); setTfpMergeId(''); }} className={selectClass}>
+                    <option value="">Selecione o lote…</option>
+                    {ativos.filter(a => !!a.pasto_id).map(a => {
+                      const pasto = a.pasto_id ? (pastureMap[a.pasto_id] ?? '') : '';
+                      const catNome = a.categoria_id ? (catMap[a.categoria_id] ?? '') : '';
+                      return (
+                        <option key={a.id} value={a.id}>
+                          {a.nome} · {a.quantidade} cab.{catNome ? ` · ${catNome}` : ''} — {pasto}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              {/* Qtd + Data */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Qtd. a transferir{tfpLote ? <span className="ml-1 text-gray-400 font-normal">(máx. {tfpLote.quantidade})</span> : ''}</label>
+                  <input type="number" min="1" max={tfpLote?.quantidade} value={tfpQtd}
+                    onChange={e => setTfpQtd(e.target.value)} placeholder="Ex: 20" className={inputClass} disabled={!tfpLoteId} />
+                </div>
+                <div>
+                  <label className={labelClass}>Data</label>
+                  <input type="date" value={tfpData} onChange={e => setTfpData(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]} className={inputClass} />
+                </div>
+              </div>
+              {/* Pasto de Destino */}
+              <div>
+                <label className={labelClass}>Pasto de destino</label>
+                <div className="relative">
+                  <select value={tfpDestPastoId} onChange={e => { setTfpDestPastoId(e.target.value); setTfpMergeId(''); setTfpModo('novo'); }}
+                    className={selectClass} disabled={!tfpLoteId}>
+                    <option value="">Selecione o pasto…</option>
+                    {pastures.map(p => {
+                      const nLotes = ativos.filter(a => a.pasto_id === p.id && a.id !== tfpLoteId).length;
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.nome}{p.area ? ` (${p.area} ha)` : ''}{nLotes > 0 ? ` · ${nLotes} lote${nLotes !== 1 ? 's' : ''}` : ' · vazio'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              {/* Opções de destino */}
+              {tfpDestPastoId && (
+                <div className="space-y-2">
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                    <button type="button" onClick={() => setTfpModo('novo')}
+                      className={`flex-1 px-3 py-2 transition-colors ${tfpModo === 'novo' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                      Criar novo lote
+                    </button>
+                    {lotesDestino.length > 0 && (
+                      <button type="button" onClick={() => setTfpModo('agregar')}
+                        className={`flex-1 px-3 py-2 border-l border-gray-200 transition-colors ${tfpModo === 'agregar' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                        Agregar em lote existente
+                      </button>
+                    )}
+                  </div>
+                  {tfpModo === 'novo' ? (
+                    <input type="text" value={tfpNovoNome} onChange={e => setTfpNovoNome(e.target.value)}
+                      placeholder="Nome do novo lote (ex: Garrotes Mar/26)" className={inputClass} />
+                  ) : (
+                    <div className="relative">
+                      <select value={tfpMergeId} onChange={e => setTfpMergeId(e.target.value)} className={selectClass}>
+                        <option value="">Selecione o lote…</option>
+                        {lotesDestino.map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.nome} · {a.quantidade} cab.{a.categoria_id ? ` · ${catMap[a.categoria_id] ?? ''}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                    </div>
+                  )}
+                </div>
+              )}
+              <button onClick={confirmarTfp} disabled={saving || !tfpLoteId || !tfpQtd || !tfpDestPastoId}
+                className="flex items-center gap-2 w-full justify-center px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <GitMerge className="w-4 h-4" />
+                {saving ? 'Transferindo...' : 'Confirmar Transferência Parcial'}
+              </button>
+            </div>
+          );
+        })()}
 
         {/* ── Sub-op: Bezerros ── */}
         {subOp === 'bezerros' && (
@@ -1540,7 +1675,7 @@ export function Manejos() {
                   farmId={activeFarmId} onReload={reload} categories={categories} />
               )}
               {tab === 'evolucao' && (
-                <EvolucaoTab animals={animals} categories={categories}
+                <EvolucaoTab animals={animals} categories={categories} pastures={pastures}
                   farmId={activeFarmId} onReload={reload} />
               )}
               {tab === 'abate' && (
