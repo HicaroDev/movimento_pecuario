@@ -673,9 +673,10 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
 }) {
   const [temBezerros, setTemBezerros] = useState(() => !!(item.bezerros_quantidade || item.bezerros_peso_medio));
   const [editSexo, setEditSexo] = useState(item.sexo || '');
-  const { register, handleSubmit, setValue } = useForm<AnimalForm>({
+  const { register, handleSubmit, setValue, watch } = useForm<AnimalForm>({
     defaultValues: { nome: item.nome, quantidade: item.quantidade, raca: item.raca || '', categoria_id: item.categoria_id || '', peso_medio: item.peso_medio ?? 0, sexo: item.sexo || '', prenha: item.prenha ?? false, bezerros_quantidade: item.bezerros_quantidade ?? 0, bezerros_peso_medio: item.bezerros_peso_medio ?? 0, observacoes: item.observacoes || '' },
   });
+  const editPrenha = watch('prenha');
   function handleSave(data: AnimalForm) {
     onSave(!temBezerros ? { ...data, bezerros_quantidade: 0, bezerros_peso_medio: 0 } : data);
   }
@@ -706,12 +707,12 @@ function AnimalEditRow({ item, categories, onSave, onCancel }: {
         {editSexo === 'FÊMEA' && (
           <div className="flex items-center gap-1 mt-1">
             <span className="text-[10px] text-pink-600 font-semibold">PRENHA?</span>
-            <label className="flex items-center gap-0.5 cursor-pointer">
-              <input type="radio" {...register('prenha')} value="true" className="accent-pink-500" /> <span className="text-[10px]">SIM</span>
-            </label>
-            <label className="flex items-center gap-0.5 cursor-pointer">
-              <input type="radio" {...register('prenha')} value="false" className="accent-gray-400" /> <span className="text-[10px]">NÃO</span>
-            </label>
+            <div className="flex rounded border border-gray-200 overflow-hidden text-[10px] font-medium">
+              <button type="button" onClick={() => setValue('prenha', true)}
+                className={`px-2 py-0.5 transition-colors ${editPrenha === true ? 'bg-pink-500 text-white' : 'bg-white text-gray-500'}`}>SIM</button>
+              <button type="button" onClick={() => setValue('prenha', false)}
+                className={`px-2 py-0.5 border-l border-gray-200 transition-colors ${editPrenha !== true ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-500'}`}>NÃO</button>
+            </div>
           </div>
         )}
       </td>
@@ -750,9 +751,10 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
   const [search, setSearch] = useState('');
   const [temBezerros, setTemBezerros] = useState(false);
   const [addSexo, setAddSexo] = useState('');
-  const { register, handleSubmit, reset, setValue: setAddValue, formState: { errors } } = useForm<AnimalForm>({
+  const { register, handleSubmit, reset, setValue: setAddValue, watch: addWatch, formState: { errors } } = useForm<AnimalForm>({
     defaultValues: { quantidade: 0, peso_medio: 0, prenha: false, bezerros_quantidade: 0, bezerros_peso_medio: 0 },
   });
+  const addPrenha = addWatch('prenha');
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -943,9 +945,9 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
                     <span className="text-xs text-pink-600 font-semibold">PRENHA?</span>
                     <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
                       <button type="button" onClick={() => setAddValue('prenha', true)}
-                        className="px-3 py-1.5 transition-colors bg-white text-gray-500 hover:bg-pink-50 hover:text-pink-600">SIM</button>
+                        className={`px-3 py-1.5 transition-colors ${addPrenha === true ? 'bg-pink-500 text-white' : 'bg-white text-gray-500 hover:bg-pink-50 hover:text-pink-600'}`}>SIM</button>
                       <button type="button" onClick={() => setAddValue('prenha', false)}
-                        className="px-3 py-1.5 transition-colors bg-white text-gray-500 hover:bg-gray-50 border-l border-gray-200">NÃO</button>
+                        className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addPrenha !== true ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>NÃO</button>
                     </div>
                   </div>
                 )}
