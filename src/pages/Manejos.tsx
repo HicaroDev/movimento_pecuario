@@ -533,6 +533,7 @@ function TransferirTab({
   // Controle de transferência parcial
   const [isParcial, setIsParcial]   = useState(false);
   const [parcQtd, setParcQtd]       = useState('');
+  const [parcBezQtd, setParcBezQtd] = useState('');
   // Se o pasto destino já tem lotes, o usuário pode agregar em um deles ou criar novo
   const [parcModo, setParcModo]     = useState<'novo' | 'agregar'>('novo');
   const [parcMergeId, setParcMergeId] = useState('');
@@ -557,7 +558,7 @@ function TransferirTab({
 
   function resetForm() {
     setLoteId(''); setDestPastoId(''); setObs(''); setData(new Date().toISOString().split('T')[0]);
-    setIsParcial(false); setParcQtd(''); setParcModo('novo'); setParcMergeId(''); setParcNovoNome('');
+    setIsParcial(false); setParcQtd(''); setParcBezQtd(''); setParcModo('novo'); setParcMergeId(''); setParcNovoNome('');
   }
 
   async function confirmar() {
@@ -589,10 +590,12 @@ function TransferirTab({
       setSaving(true);
       try {
         await manejoService.transferirParcialParaPasto({
-          origem: lote, qtd, destPastoId, destPastoNome: destNome, farmId, data,
-          mergeLoteId:  mergeLote?.id,
-          mergeLoteNome: mergeLote?.nome,
-          mergeLoteQtd: mergeLote?.quantidade,
+          origem: lote, qtd, bezQtd: parcBezQtd ? Number(parcBezQtd) : undefined,
+          destPastoId, destPastoNome: destNome, farmId, data,
+          mergeLoteId:      mergeLote?.id,
+          mergeLoteNome:    mergeLote?.nome,
+          mergeLoteQtd:     mergeLote?.quantidade,
+          mergeLoteBezQtd:  mergeLote?.bezerros_quantidade,
           novoLoteNome: parcModo === 'novo' ? parcNovoNome.trim() : undefined,
         });
         toast.success(`${qtd} cab. de "${lote.nome}" → ${destNome}!`);
@@ -663,6 +666,21 @@ function TransferirTab({
               type="number" min="1" max={lote?.quantidade}
               value={parcQtd} onChange={e => setParcQtd(e.target.value)}
               placeholder="Ex: 20" className={inputClass} disabled={!loteId}
+            />
+          </div>
+        )}
+
+        {/* Bezerros a transferir (apenas parcial e se o lote tem bezerros) */}
+        {isParcial && lote && (lote.bezerros_quantidade ?? 0) > 0 && (
+          <div>
+            <label className={labelClass}>
+              <span className="text-orange-600 font-semibold">Bezerros a transferir</span>
+              <span className="ml-1 text-gray-400 font-normal">(máx. {lote.bezerros_quantidade} · opcional)</span>
+            </label>
+            <input
+              type="number" min="0" max={lote.bezerros_quantidade}
+              value={parcBezQtd} onChange={e => setParcBezQtd(e.target.value)}
+              placeholder="Ex: 5" className={inputClass}
             />
           </div>
         )}

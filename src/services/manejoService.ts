@@ -484,6 +484,7 @@ export const manejoService = {
   async transferirParcialParaPasto(params: {
     origem: Animal;
     qtd: number;
+    bezQtd?: number;
     destPastoId: string;
     destPastoNome: string;
     farmId: string;
@@ -491,15 +492,19 @@ export const manejoService = {
     mergeLoteId?: string;
     mergeLoteNome?: string;
     mergeLoteQtd?: number;
+    mergeLoteBezQtd?: number;
     novoLoteNome?: string;
   }): Promise<void> {
-    const { origem, qtd, destPastoId, destPastoNome, farmId, data, mergeLoteId, mergeLoteNome, mergeLoteQtd, novoLoteNome } = params;
+    const { origem, qtd, bezQtd, destPastoId, destPastoNome, farmId, data, mergeLoteId, mergeLoteNome, mergeLoteQtd, mergeLoteBezQtd, novoLoteNome } = params;
     if (qtd <= 0) throw new Error('Quantidade inválida.');
     if (qtd > origem.quantidade) throw new Error(`Quantidade maior que o disponível no lote (${origem.quantidade} cab.).`);
+    if (bezQtd && bezQtd > (origem.bezerros_quantidade ?? 0)) throw new Error(`Quantidade de bezerros maior que o disponível (${origem.bezerros_quantidade ?? 0}).`);
 
     // Deduz do lote de origem
+    const origemUpdate: Record<string, unknown> = { quantidade: origem.quantidade - qtd };
+    if (bezQtd) origemUpdate.bezerros_quantidade = Math.max(0, (origem.bezerros_quantidade ?? 0) - bezQtd);
     const { error: e1 } = await supabaseAdmin.from('animals')
-      .update({ quantidade: origem.quantidade - qtd }).eq('id', origem.id);
+      .update(origemUpdate).eq('id', origem.id);
     if (e1) throw new Error(e1.message);
 
     const dataStr = data ? ` · ${new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
@@ -507,8 +512,10 @@ export const manejoService = {
 
     if (mergeLoteId) {
       // Agrega em lote existente no pasto destino
+      const mergeUpdate: Record<string, unknown> = { quantidade: (mergeLoteQtd ?? 0) + qtd };
+      if (bezQtd) mergeUpdate.bezerros_quantidade = (mergeLoteBezQtd ?? 0) + bezQtd;
       const { error: e2 } = await supabaseAdmin.from('animals')
-        .update({ quantidade: (mergeLoteQtd ?? 0) + qtd }).eq('id', mergeLoteId);
+        .update(mergeUpdate).eq('id', mergeLoteId);
       if (e2) throw new Error(e2.message);
       descrDest = `agregados ao lote "${mergeLoteNome ?? mergeLoteId}" no pasto ${destPastoNome}`;
     } else {
@@ -521,6 +528,8 @@ export const manejoService = {
         peso_medio:  origem.peso_medio ?? null,
         raca:        origem.raca ?? null,
         sexo:        origem.sexo ?? null,
+        prenha:      origem.prenha ?? false,
+        bezerros_quantidade: bezQtd ?? null,
         pasto_id:    destPastoId,
         status:      'ativo',
       });
