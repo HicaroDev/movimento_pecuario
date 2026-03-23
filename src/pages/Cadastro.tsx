@@ -146,6 +146,7 @@ export function Cadastro() {
               <input
                 type="text" placeholder="Seu nome completo"
                 className={inputClass}
+                style={{ textTransform: 'uppercase' }}
                 {...register('name', { required: 'Informe o nome' })}
               />
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
@@ -167,6 +168,7 @@ export function Cadastro() {
               <input
                 type="text" placeholder="Ex: Fazenda Malhada Grande"
                 className={inputClass}
+                style={{ textTransform: 'uppercase' }}
                 {...register('fazendaNome', { required: 'Informe o nome da fazenda' })}
               />
               {errors.fazendaNome && <p className="text-xs text-red-500 mt-1">{errors.fazendaNome.message}</p>}

@@ -32,15 +32,20 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
   const avg      = averageConsumo(entries);
   const totalQtd = sumQuantidade(entries);
 
-  const hasMeta = entries.some(e => e.meta != null);
-  const hasLote = entries.some(e => !!e.lote);
+  const hasMeta        = entries.some(e => e.meta != null);
+  const hasLote        = entries.some(e => !!e.lote);
+  const hasDesembolso  = entries.some(e => e.desembolso != null);
 
   const avgMeta = hasMeta
     ? entries.filter(e => e.meta != null).reduce((s, e) => s + e.meta!, 0) / entries.filter(e => e.meta != null).length
     : null;
 
-  const avgDesembolso = entries.some(e => e.desembolso != null)
+  const avgDesembolso = hasDesembolso
     ? entries.filter(e => e.desembolso != null).reduce((s, e) => s + e.desembolso!, 0) / entries.filter(e => e.desembolso != null).length
+    : null;
+
+  const avgDesembolsoMes = hasDesembolso
+    ? entries.filter(e => e.desembolso != null && e.periodo > 0).reduce((s, e) => s + e.desembolso! * e.periodo, 0) / entries.filter(e => e.desembolso != null && e.periodo > 0).length
     : null;
 
   const dataMax  = entries.reduce((m, e) => Math.max(m, e.consumo), 0);
@@ -82,7 +87,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
 
         {/* ── Tabela full-width ── */}
         <div className="overflow-x-auto mb-4">
-          <table className="w-full text-[12px] border-collapse">
+          <table className="w-full text-[12px] border-collapse supplement-table">
             <thead>
               <tr style={{ borderBottom: '2px solid #000' }}>
                 <th className="py-2 text-left font-bold">PASTO</th>
@@ -93,7 +98,9 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 <th className="py-2 text-right font-bold w-24">SACOS</th>
                 <th className="py-2 text-right font-bold w-36">TOTAL KG OFERTADO</th>
                 <th className="py-2 text-right font-bold w-32">CONSUMO (KG/CAB DIA)</th>
-                {hasMeta && <th className="py-2 text-right font-bold w-32">META (KG/CAB DIA)</th>}
+                {hasMeta        && <th className="py-2 text-right font-bold w-32">META (KG/CAB DIA)</th>}
+                {hasDesembolso  && <th className="py-2 text-right font-bold w-32">DESEMBOLSO (R$/CAB DIA)</th>}
+                {hasDesembolso  && <th className="py-2 text-right font-bold w-36">DESEMBOLSO (R$/CAB MÊS)</th>}
               </tr>
             </thead>
             <tbody>
@@ -132,6 +139,16 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                       </td>
                     );
                   })()}
+                  {hasDesembolso && (
+                    <td className="py-2 text-right tabular-nums font-semibold" style={{ color: '#b45309' }}>
+                      {row.desembolso != null ? `R$ ${fmt(row.desembolso, 2)}` : '—'}
+                    </td>
+                  )}
+                  {hasDesembolso && (
+                    <td className="py-2 text-right tabular-nums font-semibold" style={{ color: '#b45309' }}>
+                      {row.desembolso != null && row.periodo > 0 ? `R$ ${fmt(row.desembolso * row.periodo, 2)}` : '—'}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -164,6 +181,9 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
               <span className="text-gray-900">
                 Desembolso:{' '}
                 <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolso, 2)}</strong>/cab/dia
+                {avgDesembolsoMes != null && (
+                  <> · <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolsoMes, 2)}</strong>/cab/mês</>
+                )}
               </span>
             )}
             {avgMeta === null && (

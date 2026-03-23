@@ -114,6 +114,26 @@
     page: portrait;
   }
 
+  /* Tabela do Relatório (SupplementSection) — bordas e títulos centralizados */
+  .supplement-table {
+    border-collapse: collapse !important;
+  }
+  .supplement-table th {
+    text-align: center !important;
+    border: 1px solid #9ca3af !important;
+    padding: 4px 6px !important;
+    font-size: 9px !important;
+    background-color: #f3f4f6 !important;
+    color: #111 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .supplement-table td {
+    border: 1px solid #d1d5db !important;
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+
   /* PDF table styles */
   .pdf-table {
     width: 100%;

@@ -151,6 +151,22 @@
 - [ ] **T-230** Filtro de data com range (início/fim) no Relatório
 - [ ] **T-231** Responsividade tablet/mobile
 
+### 2J — Ajustes MP_21 MAR (PARCIALMENTE CONCLUÍDO)
+- [x] **T-290** Fazendas: edição inline para usuário cliente
+- [x] **T-291** Usuários: botão "Trocar Senha" na própria linha do usuário logado
+- [x] **T-292** Usuários: role "Representante" + renomear "Cliente/Funcionário" → "Usuário"
+- [x] **T-293** Manejos > Parição: simplificada — bezerros ficam no lote da mãe (bezerros_quantidade++)
+- [x] **T-294** Manejos > Evolução: nova sub-tab "Transf. Parcial" com seletor de pasto/lote destino
+- [x] **T-295** Histórico: fix query data_entries (coluna suplemento + order by data)
+- [ ] **T-296** EasyPanel SMTP: configurar envio de e-mail de recuperação de senha
+  - Usar Gmail SMTP (smtp.gmail.com:587) com App Password
+  - OU resolver DNS do container Docker para usar mail.movimentopecuario.com.br
+  - Variáveis: SMTP_HOST, SMTP_PORT=587, SMTP_USER, SMTP_PASS, SMTP_ADMIN_EMAIL, SMTP_SENDER_NAME
+  - ENABLE_EMAIL_AUTOCONFIRM=false deve ficar como PRIMEIRA linha do arquivo Ambiente
+- [ ] **T-297** Relatórios: coluna META (KG/CAB DIA = Peso × %PV) + DESEMBOLSO (R$/CAB DIA e MÊS)
+- [ ] **T-298** Relatórios: PDF formato A4 retrato com bordas + títulos de colunas centralizados
+- [ ] **T-299** Pré-cadastros: dados internos uppercase (caixa alta nos inputs)
+
 ---
 
 ## FASE 3 — Escala SaaS (FUTURO ⬜)
