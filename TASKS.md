@@ -169,13 +169,31 @@
 
 ---
 
+## FASE 3A — Estoque de Suplementos (EM ANDAMENTO 🔄)
+
+- [x] **T-310** `supabase/estoque_v100.sql` — tabela `estoque_movimentos` + ALTER supplement_types (estoque_minimo_sacos, alerta_reposicao) + RLS
+- [x] **T-311** `estoque_minimo_sacos` + `alerta_reposicao` em Cadastros > Suplementos (campo na tabela + save)
+- [x] **T-312** `src/services/estoqueService.ts` — CRUD movimentos + calcularSaldos + consumoMedio30d
+- [x] **T-313** `src/pages/Estoque.tsx` — cards de saldo + barra de progresso por suplemento
+- [x] **T-314** Modal Entrada (data, suplemento, sacos, kg, fornecedor, NF, valor/kg)
+- [x] **T-315** Tab Movimentações — tabela filtrada por tipo/suplemento/período + deletar
+- [x] **T-316** Tab Alertas — cards com consumo 30d + sugestão de compra
+- [x] **T-317** Tab Configurar — edição estoque mínimo + toggle alerta por suplemento
+- [x] **T-318** Badge sidebar Estoque (contagem de alertas ativos, admin only) + polling 5 min
+- [x] **T-319** Rota `/estoque` + visibilidade admin-only (sidebar + guard na página)
+- [ ] **T-320** Integração: saída automática ao confirmar OS (Fase 3B)
+
+---
+
 ## FASE 3 — Escala SaaS (FUTURO ⬜)
+- OBS : O CLIENTE VAI REPASSAR PARA OS CLIENTE ELE NAO VAI OMERCIALIZAR NAO !!! 
+
 
 - [ ] **T-300** Landing page pública
 - [ ] **T-301** Planos de assinatura (Mercado Pago / Stripe)
-- [ ] **T-302** Alertas de consumo fora da média
-- [ ] **T-303** Relatórios comparativos entre fazendas
-- [ ] **T-304** API pública para integração
+- [ ] **T-302** Alertas de consumo fora da média 
+- [ ] **T-303** Relatórios comparativos entre fazendas -ok
+- [ ] **T-304** API pública para integração -ok 
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp, Menu, X as XIcon } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp, Menu, X as XIcon, Package } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -8,6 +8,7 @@ import { farmService } from '../services/farmService';
 import { supabaseAdmin } from '../lib/supabase';
 import type { Module } from '../types/user';
 import type { Farm } from '../types/farm';
+import { estoqueService } from '../services/estoqueService';
 
 const navItems = [
   { path: '/manejos',    label: 'Manejo',     icon: ClipboardList, module: 'manejos'    as Module },
@@ -83,9 +84,10 @@ export function DashboardLayout() {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
-  const [showEmDev, setShowEmDev]   = useState(false);
-  const [showBackTop, setShowBackTop] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showEmDev, setShowEmDev]       = useState(false);
+  const [showBackTop, setShowBackTop]   = useState(false);
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
+  const [estoqueAlertas, setEstoqueAlertas] = useState(0);
 
   useEffect(() => {
     function onScroll() { setShowBackTop(window.scrollY > 300); }
@@ -112,6 +114,24 @@ export function DashboardLayout() {
   const visibleNavItems = navItems.filter(item =>
     item.module === 'historico' ? (isAdmin || hasModule(item.module)) : hasModule(item.module)
   );
+
+  /* Alertas de estoque — só admin, polling a cada 5 min */
+  const { activeFarmId } = useData();
+  useEffect(() => {
+    if (!isAdmin) return;
+    const farmId = activeFarmId;
+    if (!farmId) return;
+    async function fetchAlertas() {
+      try {
+        const supls = await estoqueService.listarSuplementos(farmId!);
+        const saldos = await estoqueService.calcularSaldos(farmId!, supls);
+        setEstoqueAlertas(saldos.filter(s => s.em_alerta).length);
+      } catch { /* silencioso */ }
+    }
+    fetchAlertas();
+    const interval = setInterval(fetchAlertas, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAdmin, activeFarmId]);
 
   async function handleLogout() {
     try {
@@ -298,6 +318,45 @@ export function DashboardLayout() {
                         <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                           style={{ background: '#ef4444', color: '#fff', minWidth: '18px', textAlign: 'center' }}>
                           {unreadComments}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })()}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── Módulos admin-only ── */}
+          {isAdmin && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.10 }}
+            >
+              <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                {(() => {
+                  const isActive = location.pathname.startsWith('/estoque');
+                  return (
+                    <Link
+                      to="/estoque"
+                      onClick={() => setSidebarOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
+                      style={isActive ? {
+                        background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
+                        color: '#ffffff',
+                        boxShadow: '0 4px 16px rgba(26,96,64,0.35)',
+                        border: '1px solid rgba(26,96,64,0.3)',
+                      } : { color: '#6b7280' }}
+                      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
+                      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <Package className="w-4 h-4 flex-shrink-0" />
+                      <span className="text-sm font-medium">Estoque</span>
+                      {estoqueAlertas > 0 && (
+                        <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: '#ef4444', color: '#fff', minWidth: '18px', textAlign: 'center' }}>
+                          {estoqueAlertas}
                         </span>
                       )}
                     </Link>
