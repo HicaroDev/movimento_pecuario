@@ -63,27 +63,48 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
   const chartHeight = Math.max(340, entries.length * 36 + 130);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden print-break">
+    <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden print-break"
+      style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
 
       {/* ── Header: cor do suplemento ── */}
       <div
-        className="flex items-center justify-between px-5 py-3"
-        style={{ backgroundColor: color }}
+        className="flex items-center justify-between px-6 py-4"
+        style={{ background: `linear-gradient(135deg, ${color}ee, ${color})` }}
       >
-        <span className="text-white text-sm font-bold tracking-wide">
-          CONTROLE DE CONSUMO SUPLEMENTOS — {farmName.toUpperCase()}
-        </span>
-        <span className="text-white text-xs font-bold border border-white/40 px-2 py-0.5 rounded">
-          MOVIMENTO PECUÁRIO
-        </span>
+        <div>
+          <span className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-80">
+            Controle de Consumo — {farmName.toUpperCase()}
+          </span>
+          <h2 className="text-white text-base font-extrabold mt-0.5 uppercase tracking-wide">
+            {tipo.toUpperCase()}
+            <span className="ml-2 text-white/70 text-xs font-medium normal-case">
+              {periodo.toUpperCase()}
+            </span>
+          </h2>
+        </div>
+        <div className="flex items-center gap-3">
+          {avgMeta != null && (() => {
+            const over = avg > avgMeta;
+            return (
+              <span
+                className="text-xs font-bold px-3 py-1.5 rounded-full"
+                style={{
+                  background: over ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.22)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              >
+                {over ? '▲ ACIMA DA META' : '✓ DENTRO DA META'}
+              </span>
+            );
+          })()}
+          <span className="text-white text-[10px] font-bold border border-white/30 px-2.5 py-1 rounded-lg opacity-80">
+            MOVIMENTO PECUÁRIO
+          </span>
+        </div>
       </div>
 
       <div className="p-6">
-
-        {/* ── Título: escuro e centralizado ── */}
-        <h2 className="text-center font-extrabold text-lg mb-6 uppercase tracking-wide text-gray-900">
-          CONSUMO KG/CAB DIA - {tipo.toUpperCase()} ({periodo.toUpperCase()})
-        </h2>
 
         {/* ── Tabela full-width ── */}
         <div className="overflow-x-auto mb-4">
@@ -156,46 +177,63 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
         </div>
 
         {/* ── Totals ── */}
-        <div className="flex flex-wrap justify-between items-center pt-3 pb-6 px-1 text-sm font-bold border-t-2 border-gray-300 gap-4">
-          <span className="text-gray-900">Total cabeças: {fmtInt(totalQtd)}</span>
-          <div className="flex flex-wrap gap-4 items-center">
-            <span className="text-gray-900">
-              Média consumo:{' '}
-              <strong style={{ color }}>{fmt(avg)}</strong> kg/cab dia
-            </span>
-            {avgMeta != null && (() => {
-              const over = avg > avgMeta;
-              return (
+        <div
+          className="rounded-xl px-5 py-4 mb-6 flex flex-wrap gap-4 items-center justify-between"
+          style={{ background: 'rgba(0,0,0,0.025)', border: '1px solid rgba(0,0,0,0.06)' }}
+        >
+          {/* Cabeças */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Cabeças</span>
+            <span className="text-lg font-extrabold text-gray-900 tabular-nums">{fmtInt(totalQtd)}</span>
+          </div>
+          {/* Consumo médio */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Consumo médio</span>
+            <span className="text-lg font-extrabold tabular-nums" style={{ color }}>{fmt(avg)}</span>
+            <span className="text-xs text-gray-400">kg/cab/dia</span>
+          </div>
+          {/* Meta */}
+          {avgMeta != null && (() => {
+            const over = avg > avgMeta;
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Meta</span>
                 <span
-                  className="px-3 py-1 rounded-full text-sm font-bold"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
                   style={{
                     backgroundColor: over ? '#fee2e2' : '#dcfce7',
                     color:           over ? '#991b1b' : '#14532d',
                   }}
                 >
-                  {over ? '▲ ACIMA' : '▼ DENTRO'} DA META — {fmt(avgMeta)} kg/cab dia
+                  {over ? '▲ ACIMA' : '▼ DENTRO'} — {fmt(avgMeta)} kg/cab dia
                 </span>
-              );
-            })()}
-            {avgDesembolso != null && (
-              <span className="text-gray-900">
-                Desembolso:{' '}
-                <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolso, 2)}</strong>/cab/dia
-                {avgDesembolsoMes != null && (
-                  <> · <strong style={{ color: '#b45309' }}>R$ {fmt(avgDesembolsoMes, 2)}</strong>/cab/mês</>
-                )}
+              </div>
+            );
+          })()}
+          {/* Desembolso */}
+          {avgDesembolso != null && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Desembolso</span>
+              <span className="text-base font-extrabold tabular-nums" style={{ color: '#b45309' }}>
+                R$ {fmt(avgDesembolso, 2)}/cab/dia
               </span>
-            )}
-            {avgMeta === null && (
-              <span
-                className="px-3 py-1 rounded-full text-xs font-semibold"
-                style={{ background: 'rgba(234,179,8,0.12)', color: '#854d0e', border: '1px solid rgba(234,179,8,0.3)' }}
-                title="Configure o % PV em Cadastros > Suplementos para exibir a meta de consumo"
-              >
-                ⚠ Solicite ao cliente o memorial de cálculo (% PV) para ativar a meta
-              </span>
-            )}
-          </div>
+              {avgDesembolsoMes != null && (
+                <span className="text-sm font-bold tabular-nums text-gray-400">
+                  · R$ {fmt(avgDesembolsoMes, 2)}/mês
+                </span>
+              )}
+            </div>
+          )}
+          {/* Aviso sem meta */}
+          {avgMeta === null && (
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold"
+              style={{ background: 'rgba(234,179,8,0.12)', color: '#854d0e', border: '1px solid rgba(234,179,8,0.3)' }}
+              title="Configure o % PV em Cadastros > Suplementos para exibir a meta de consumo"
+            >
+              ⚠ Configure o % PV em Cadastros para ativar a meta
+            </span>
+          )}
         </div>
 
         {/* ── Gráfico full-width abaixo ── */}
