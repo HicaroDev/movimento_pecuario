@@ -13,9 +13,9 @@ COMPRA
   │
   │  saída via OS
   ▼
-[OS — Ordem de Suplemento]  ──► impresso para o salgador
+[OS — Ordem de Suplemento]  ──► impresso para o salgador ( OU UM APLICATIVO QUE VAI SER NOTIFICADO ## estamos querendo criar )
   │
-  │  lançamento automático
+  │  lançamento automático ( pode ser por foto ou depois com um aplicativo reduzido so para salgador )
   ▼
 [DATA ENTRIES — Relatório]  ← já existe
 
@@ -307,9 +307,9 @@ Lançamento   ← já existe
 Relatórios   ← já existe
 Cadastros    ← já existe
 ─────────────── (divisor)
-Estoque      ← NOVO (T-3A)
-OS           ← NOVO (T-3B)
-Livro Caixa  ← NOVO (T-3C)  [era "EM BREVE"]
+Estoque      ← NOVO (T-3A) (SOMENTE ADMIM PODE VISUALIZAR )( APAREÇA PARA OS CLIENTES - " EM BREVE")
+OS           ← NOVO (T-3B) (SOMENTE ADIM PODE VISUALIZAR)( APAREÇA PARA OS CLIENTES - " EM BREVE")
+Livro Caixa  ← NOVO (T-3C)  (SOMENTE ADIM PODE VISUALIZAR)( APAREÇA PARA OS CLIENTES - " EM BREVE")
 ─────────────── (divisor)
 Usuários     ← já existe
 Fazenda      ← já existe
@@ -326,3 +326,5 @@ Fazenda      ← já existe
 ---
 
 > **Próximo passo:** Confirmar escopo com usuário → iniciar Fase 3A (Estoque)
+> ** NAO ESQUEÇA DE CRIAR UM PLANO DE IMPLATAÇÃO QUANDO HOUVER ALGUMA COISA QUE TENHO Q RODA NO SQL 
+

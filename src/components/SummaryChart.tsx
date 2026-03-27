@@ -59,7 +59,7 @@ export function SummaryChart({ data, title, subtitle }: SummaryChartProps) {
         <div className="flex flex-col md:flex-row items-start gap-6">
           {/* Left: legend */}
           <div className="flex flex-row flex-wrap md:flex-col gap-3 md:gap-4 md:min-w-[200px]">
-            {data.map((item, i) => (
+            {data.map((item) => (
               <div key={item.name} className="flex items-center gap-2.5">
                 <div
                   className="w-3 h-3 rounded-sm flex-shrink-0"

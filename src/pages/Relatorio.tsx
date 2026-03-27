@@ -54,15 +54,16 @@ export function Relatorio() {
   useEffect(() => {
     if (!farmId) return;
     manejoService.listarAnimais(farmId).then(setAnimals).catch(() => {});
-    supabaseAdmin.from('supplement_types').select('nome, consumo, valor_kg').eq('farm_id', farmId)
-      .then(({ data }) => setSuppTypes((data ?? []) as SuppType[])).catch(() => {});
-    supabaseAdmin.from('manejo_historico')
-      .select('animal_id, created_at, peso_medio')
-      .eq('farm_id', farmId)
-      .eq('tipo', 'evolucao_categoria')
-      .not('peso_medio', 'is', null)
-      .then(({ data }) => setEvolucaoHistorico((data ?? []) as Array<{animal_id: string; created_at: string; peso_medio: number}>))
-      .catch(() => {});
+    void Promise.resolve(
+      supabaseAdmin.from('supplement_types').select('nome, consumo, valor_kg').eq('farm_id', farmId)
+    ).then(({ data }) => setSuppTypes((data ?? []) as SuppType[])).catch(() => {});
+    void Promise.resolve(
+      supabaseAdmin.from('manejo_historico')
+        .select('animal_id, created_at, peso_medio')
+        .eq('farm_id', farmId)
+        .eq('tipo', 'evolucao_categoria')
+        .not('peso_medio', 'is', null)
+    ).then(({ data }) => setEvolucaoHistorico((data ?? []) as Array<{animal_id: string; created_at: string; peso_medio: number}>)).catch(() => {});
   }, [farmId]);
 
   const hasFilters = !!filterSupplement || !!filterPasto || !!filterLote || filterMonths.length > 0 || !!dateFrom || !!dateTo;

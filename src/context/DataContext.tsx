@@ -87,7 +87,7 @@ const fallbackContext: DataContextType = {
   pastures: [],
   addPasture: () => {},
   deletePasture: async () => {},
-  updatePasture: () => {},
+  updatePasture: async () => {},
 };
 
 /* ── Provider ── */

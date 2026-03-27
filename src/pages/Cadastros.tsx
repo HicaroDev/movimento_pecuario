@@ -821,7 +821,19 @@ function AnimaisTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: (tar
     const { data: updated, error } = await supabaseAdmin.from('animals').update(payload).eq('id', id).select();
     if (error) { toast.error(`Erro ao atualizar: ${error.message}`); return; }
     if (!updated || updated.length === 0) { toast.error('Não foi possível salvar. Verifique as permissões do banco.'); return; }
-    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, ...payload } : a);
+    const patchedPayload: Partial<Animal> = {
+      nome:                payload.nome,
+      quantidade:          payload.quantidade,
+      raca:                payload.raca ?? undefined,
+      categoria_id:        payload.categoria_id ?? undefined,
+      observacoes:         payload.observacoes ?? undefined,
+      sexo:                payload.sexo ?? undefined,
+      prenha:              payload.prenha,
+      peso_medio:          payload.peso_medio ?? undefined,
+      bezerros_quantidade: payload.bezerros_quantidade ?? undefined,
+      bezerros_peso_medio: payload.bezerros_peso_medio ?? undefined,
+    };
+    _animaisCache = _animaisCache.map(a => a.id === id ? { ...a, ...patchedPayload } : a);
     setItems(_animaisCache);
     toast.success('Lote atualizado!'); setEditingId(null);
   }

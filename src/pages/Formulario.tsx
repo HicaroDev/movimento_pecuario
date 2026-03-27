@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, Trash2, FileSpreadsheet, Info, Pencil, Save, X, Lock, LockOpen, KeyRound, Search } from 'lucide-react';
+import { Plus, BarChart3, Trash2, Info, Pencil, Save, X, Lock, LockOpen, KeyRound, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
