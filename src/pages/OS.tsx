@@ -250,50 +250,34 @@ export function OS() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: '#f8fafc' }}>
+    <div className="p-4 md:p-8">
 
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden no-print" style={{
-        background: 'linear-gradient(135deg, #0b1e3d, #1a3461, #1a6040)',
-        padding: '32px 32px 28px',
-      }}>
-        <div className="absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-        <div className="relative flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.12)' }}>
-                <ClipboardList className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Ordens de Suplemento</h1>
-                <p className="text-sm text-green-200 opacity-80">Gestão e controle de entregas ao campo</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mt-3">
-              {tabConfig.map(t => (
-                <div key={t.key} className="flex items-center gap-1.5 text-white/70 text-xs">
-                  <t.icon className="w-3.5 h-3.5" />
-                  <span>{t.count} {t.label.toLowerCase()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-            style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.22)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'}
-          >
-            <Plus className="w-4 h-4" />
-            Nova OS
-          </button>
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="flex items-center justify-between gap-4 mb-8 flex-wrap no-print"
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+            Gestão de Campo
+          </p>
+          <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
+            Ordens de Suplemento
+          </h1>
         </div>
-      </div>
+        <button
+          onClick={() => setShowNew(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
+          style={{ boxShadow: '0 2px 10px rgba(26,96,64,0.25)' }}
+        >
+          <Plus className="w-4 h-4" />
+          Nova OS
+        </button>
+      </motion.div>
 
-      <div className="p-6 md:p-8">
+      <div>
         {/* Tabs */}
         <div className="flex gap-1 mb-6 p-1 rounded-xl w-fit"
           style={{ background: 'rgba(0,0,0,0.05)' }}>

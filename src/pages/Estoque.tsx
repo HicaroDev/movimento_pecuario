@@ -544,70 +544,45 @@ export function Estoque() {
   return (
     <div className="p-4 md:p-8">
 
-      {/* ── Hero ── */}
+      {/* ── Header ── */}
       <motion.div
-        initial={{ opacity: 0, y: -12 }}
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl mb-8 overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, #1d3461 0%, #1d5c8a 60%, #1a6040 100%)',
-          boxShadow: '0 8px 32px rgba(29,84,138,0.22)',
-        }}
+        transition={{ duration: 0.35 }}
+        className="flex items-center justify-between gap-4 mb-8 flex-wrap"
       >
-        <div className="px-6 py-5 flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <p className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest mb-0.5">
-              Gestão de Insumos
-            </p>
-            <h1 className="text-white text-2xl md:text-3xl font-extrabold leading-tight">
-              Estoque de Suplementos
-            </h1>
-          </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+            Gestão de Insumos
+          </p>
+          <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
+            Estoque de Suplementos
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
           {totalAlertas > 0 && (
-            <span
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer"
-              style={{ background: 'rgba(239,68,68,0.22)', color: '#fff', border: '1px solid rgba(239,68,68,0.4)' }}
+            <button
               onClick={() => setTab('alertas')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
             >
               <AlertTriangle className="w-4 h-4" />
-              {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''} de reposição
-            </span>
+              {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''}
+            </button>
           )}
+          <button
+            onClick={() => setShowEntrada(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
+          >
+            <Plus className="w-4 h-4" /> Nova Entrada
+          </button>
+          <button
+            onClick={() => setShowSaida(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 shadow-sm transition-colors"
+          >
+            <TrendingDown className="w-4 h-4" /> Registrar Saída
+          </button>
         </div>
-
-        {/* Strip KPIs */}
-        {!loading && (
-          <div className="grid grid-cols-3 border-t border-white/10">
-            {[
-              { label: 'Suplementos',  value: String(saldos.length) },
-              { label: 'Em estoque',   value: String(saldos.filter(s => s.saldo_sacos > 0).length) },
-              { label: 'Movimentos',   value: String(movimentos.length) },
-            ].map((k, i) => (
-              <div key={i} className={`px-5 py-3 text-center ${i < 2 ? 'border-r border-white/10' : ''}`}>
-                <p className="text-white text-lg font-extrabold leading-none">{k.value}</p>
-                <p className="text-blue-200/60 text-[10px] uppercase tracking-wider mt-0.5">{k.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </motion.div>
-
-      {/* ── Botões de ação ── */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <button
-          onClick={() => setShowEntrada(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors"
-          style={{ background: '#1a6040' }}
-        >
-          <Plus className="w-4 h-4" /> Nova Entrada
-        </button>
-        <button
-          onClick={() => setShowSaida(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 shadow-sm transition-colors"
-        >
-          <TrendingDown className="w-4 h-4" /> Registrar Saída
-        </button>
-      </div>
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 mb-6 bg-gray-100/80 rounded-2xl p-1 w-fit">
