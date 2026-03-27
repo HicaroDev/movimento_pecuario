@@ -401,10 +401,10 @@ export function Relatorio() {
           className="flex items-center justify-between gap-4 mb-8 flex-wrap no-print"
         >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
               Relatório de Consumo
             </p>
-            <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
+            <h1 className="text-3xl font-bold text-gray-900">
               {farmName || 'Suplemento Control'}
             </h1>
             {periodoStr && (
@@ -430,7 +430,7 @@ export function Relatorio() {
 
         {/* ── Header para impressão ── */}
         <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-extrabold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900">
             Relatório de Consumo — {farmName}
           </h1>
           {periodoStr && <p className="text-sm text-gray-500 mt-1">{periodoStr}</p>}

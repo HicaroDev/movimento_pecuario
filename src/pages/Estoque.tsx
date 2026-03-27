@@ -552,10 +552,10 @@ export function Estoque() {
         className="flex items-center justify-between gap-4 mb-8 flex-wrap"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
             Gestão de Insumos
           </p>
-          <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
+          <h1 className="text-3xl font-bold text-gray-900">
             Estoque de Suplementos
           </h1>
         </div>
