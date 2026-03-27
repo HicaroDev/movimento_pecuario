@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp, Menu, X as XIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -83,8 +83,9 @@ export function DashboardLayout() {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, isAdmin, hasModule } = useAuth();
-  const [showEmDev, setShowEmDev] = useState(false);
+  const [showEmDev, setShowEmDev]   = useState(false);
   const [showBackTop, setShowBackTop] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     function onScroll() { setShowBackTop(window.scrollY > 300); }
@@ -132,11 +133,47 @@ export function DashboardLayout() {
         `,
       }}
     >
+      {/* ── Mobile top bar ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 no-print"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(0,0,0,0.07)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <img src="/images/logo.png" alt="Movimento Pecuário" className="h-6 w-auto" />
+          <span className="text-sm font-bold text-gray-800">Suplemento Control</span>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(v => !v)}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label="Menu"
+        >
+          {sidebarOpen ? <XIcon className="w-5 h-5 text-gray-600" /> : <Menu className="w-5 h-5 text-gray-600" />}
+        </button>
+      </div>
+
+      {/* ── Mobile overlay ── */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar — glassmorphism claro */}
       <aside
-        className="w-64 flex flex-col flex-shrink-0 relative no-print"
+        className={`
+          flex flex-col flex-shrink-0 relative no-print
+          fixed md:sticky top-0 h-screen z-40
+          w-64 transition-transform duration-300
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
         style={{
-          background: 'rgba(255, 255, 255, 0.80)',
+          background: 'rgba(255, 255, 255, 0.92)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderRight: '1px solid rgba(0, 0, 0, 0.07)',
@@ -186,7 +223,7 @@ export function DashboardLayout() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto sidebar-nav">
           {visibleNavItems.map((item, index) => {
             const isActive =
               item.path === '/'
@@ -202,6 +239,7 @@ export function DashboardLayout() {
               >
                 <Link
                   to={item.path}
+                  onClick={() => setSidebarOpen(false)}
                   className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
                   style={isActive ? {
                     background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
@@ -381,7 +419,7 @@ export function DashboardLayout() {
 
       {/* Main */}
       <main
-        className="flex-1"
+        className="flex-1 min-w-0 pt-14 md:pt-0"
         style={{ background: '#f8fafc', isolation: 'isolate' }}
       >
         <Outlet />

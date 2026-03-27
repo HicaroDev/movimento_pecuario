@@ -145,11 +145,11 @@
 - [x] **T-283** Formulário: suplementos carregados do banco (supplement_types) ao invés de lista estática
 - [x] **T-284** Formulário: ao selecionar pasto → auto-fill quantidade + badge N° lotes
 
-### 2I — Entregas Finais (PENDENTE)
-- [ ] **T-281** Relatório / Dashboard corporativo: redesign visual completo
-- [ ] **T-285** Formulário: validar/documentar formato Excel para importação
-- [ ] **T-230** Filtro de data com range (início/fim) no Relatório
-- [ ] **T-231** Responsividade tablet/mobile
+### 2I — Entregas Finais (CONCLUÍDA ✅)
+- [x] **T-281** Relatório / Dashboard corporativo: redesign visual completo (hero banner verde com KPIs + grid responsivo)
+- [x] **T-285** Formulário: validar/documentar formato Excel para importação (seção colapsável em ImportExcelModal)
+- [x] **T-230** Filtro de data com range (início/fim) no Relatório
+- [x] **T-231** Responsividade tablet/mobile (sidebar colapsável, top bar mobile, paddings responsivos)
 
 ### 2J — Ajustes MP_21 MAR (PARCIALMENTE CONCLUÍDO)
 - [x] **T-290** Fazendas: edição inline para usuário cliente
@@ -163,9 +163,9 @@
   - OU resolver DNS do container Docker para usar mail.movimentopecuario.com.br
   - Variáveis: SMTP_HOST, SMTP_PORT=587, SMTP_USER, SMTP_PASS, SMTP_ADMIN_EMAIL, SMTP_SENDER_NAME
   - ENABLE_EMAIL_AUTOCONFIRM=false deve ficar como PRIMEIRA linha do arquivo Ambiente
-- [ ] **T-297** Relatórios: coluna META (KG/CAB DIA = Peso × %PV) + DESEMBOLSO (R$/CAB DIA e MÊS)
-- [ ] **T-298** Relatórios: PDF formato A4 retrato com bordas + títulos de colunas centralizados
-- [ ] **T-299** Pré-cadastros: dados internos uppercase (caixa alta nos inputs)
+- [x] **T-297** Relatórios: coluna META (KG/CAB DIA = Peso × %PV) + DESEMBOLSO (R$/CAB DIA e MÊS)
+- [x] **T-298** Relatórios: PDF formato A4 retrato com bordas + títulos de colunas centralizados
+- [x] **T-299** Pré-cadastros: dados internos uppercase (caixa alta nos inputs)
 
 ---
 
@@ -191,9 +191,10 @@
 | 2F — Módulo Manejos | 10 | 10 | ✅ Concluída |
 | 2G — Ajustes MP_04 MAR + PDF | 19 | 19 | ✅ Concluída |
 | 2H — Ajustes MP_05 MAR | 4 | 4 | ✅ Concluída |
-| 2I — Entregas Finais | 4 | 0 | 🔄 Pendente |
+| 2I — Entregas Finais | 4 | 4 | ✅ Concluída |
+| 2J — Ajustes MP_21 MAR | 10 | 9 | 🔄 90% (falta SMTP) |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **126** | **117** | **93%** |
+| **TOTAL** | **136** | **130** | **96%** |
 
 ---
 

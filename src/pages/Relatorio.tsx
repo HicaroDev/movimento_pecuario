@@ -390,26 +390,71 @@ export function Relatorio() {
   };
 
   return (
-    <div className="p-8 no-print-padding">
+    <div className="p-4 md:p-8 no-print-padding">
       <div>
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">Relatório</h1>
-            <p className="text-gray-600">Visão geral do consumo de suplementos</p>
-          </motion.div>
-          <motion.span
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl text-sm font-semibold shadow-lg no-print"
-          >
-            {isAdmin ? 'Admin' : user?.name ?? 'Cliente'}
-          </motion.span>
+        {/* ── Hero banner corporativo ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="rounded-2xl mb-8 overflow-hidden no-print"
+          style={{
+            background: 'linear-gradient(135deg, #0f3d26 0%, #1a6040 50%, #1d7a4e 100%)',
+            boxShadow: '0 8px 32px rgba(26,96,64,0.25)',
+          }}
+        >
+          <div className="px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-green-200/70 text-xs font-semibold uppercase tracking-widest mb-0.5">
+                Relatório de Consumo
+              </p>
+              <h1 className="text-white text-2xl md:text-3xl font-extrabold leading-tight">
+                {farmName || 'Suplemento Control'}
+              </h1>
+              {periodoStr && (
+                <p className="text-green-200/80 text-sm mt-1">{periodoStr.toUpperCase()}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 no-print">
+              <span className="px-3 py-1.5 rounded-xl text-xs font-bold border border-white/20 text-white"
+                style={{ background: 'rgba(255,255,255,0.12)' }}>
+                {isAdmin ? 'Admin' : user?.name ?? 'Cliente'}
+              </span>
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.25)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'}
+              >
+                <FileDown className="w-4 h-4" />
+                PDF
+              </button>
+            </div>
+          </div>
+          {/* strip de KPIs rápidos */}
+          {!loading && filtered.length > 0 && (
+            <div className="grid grid-cols-3 md:grid-cols-3 border-t border-white/10">
+              {[
+                { label: 'Registros',   value: String(totalEntries) },
+                { label: 'Pastos',      value: String(totalPastos) },
+                { label: 'Cabeças',     value: totalAnimals > 0 ? String(totalAnimals) : '—' },
+              ].map((k, i) => (
+                <div key={i} className={`px-5 py-3 text-center ${i < 2 ? 'border-r border-white/10' : ''}`}>
+                  <p className="text-white text-lg font-extrabold leading-none">{k.value}</p>
+                  <p className="text-green-200/60 text-[10px] uppercase tracking-wider mt-0.5">{k.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── Header para impressão ── */}
+        <div className="hidden print:block mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">
+            Relatório de Consumo — {farmName}
+          </h1>
+          {periodoStr && <p className="text-sm text-gray-500 mt-1">{periodoStr}</p>}
         </div>
 
         {/* ── Filters card ── */}
@@ -489,7 +534,7 @@ export function Relatorio() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Suplemento */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">Suplemento</label>
@@ -536,17 +581,6 @@ export function Relatorio() {
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
-            </div>
-
-            {/* Export buttons (4th column) */}
-            <div className="flex items-end gap-2">
-              <button
-                onClick={handleExportPDF}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg font-medium text-sm"
-              >
-                <FileDown className="w-4 h-4" />
-                PDF
-              </button>
             </div>
           </div>
 

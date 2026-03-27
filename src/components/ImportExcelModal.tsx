@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import type { DataEntry } from '../lib/data';
@@ -48,6 +48,7 @@ export function ImportExcelModal({ onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep]           = useState<'upload' | 'map' | 'done'>('upload');
+  const [showFormat, setShowFormat] = useState(false);
   const [headers, setHeaders]     = useState<string[]>([]);
   const [preview, setPreview]     = useState<Record<string, unknown>[]>([]);
   const [allRows, setAllRows]     = useState<Record<string, unknown>[]>([]);
@@ -150,22 +151,78 @@ export function ImportExcelModal({ onClose }: Props) {
 
           {/* ── Step 1: Upload ── */}
           {step === 'upload' && (
-            <div
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => inputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all"
-            >
-              <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-700 mb-1">Arraste o arquivo ou clique para selecionar</p>
-              <p className="text-xs text-gray-400">.xlsx ou .xls</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
-              />
+            <div className="space-y-4">
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => e.preventDefault()}
+                onClick={() => inputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all"
+              >
+                <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-700 mb-1">Arraste o arquivo ou clique para selecionar</p>
+                <p className="text-xs text-gray-400">.xlsx ou .xls</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
+                />
+              </div>
+
+              {/* ── Formato esperado ── */}
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => setShowFormat(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-teal-500" />
+                    <span className="font-medium">Como formatar a planilha</span>
+                  </div>
+                  {showFormat ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </button>
+                {showFormat && (
+                  <div className="px-4 pb-4 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mt-3 mb-3">
+                      A planilha deve ter os dados na <strong>primeira aba</strong>, com cabeçalhos na primeira linha. As colunas obrigatórias estão marcadas com <span className="text-red-400">*</span>.
+                    </p>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="text-[11px] w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200">Campo</th>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200">Nomes aceitos</th>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200">Exemplo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { label: 'Pasto *',              nomes: 'pasto',                                        ex: 'Pasto 01' },
+                            { label: 'Quantidade *',         nomes: 'quantidade, qtd, cabecas',                     ex: '150' },
+                            { label: 'Tipo de Suplemento *', nomes: 'tipo, suplemento',                            ex: 'Mineral Proteico' },
+                            { label: 'Período (dias) *',     nomes: 'periodo, dias',                               ex: '30' },
+                            { label: 'Sacos (25 kg)',        nomes: 'sacos',                                        ex: '12' },
+                            { label: 'KG Consumidos',        nomes: 'kg',                                          ex: '300' },
+                            { label: 'Consumo kg/cab/dia',   nomes: 'consumo',                                     ex: '0,066' },
+                            { label: 'Data',                 nomes: 'data (formato YYYY-MM-DD)',                    ex: '2026-03-01' },
+                          ].map((r, i) => (
+                            <tr key={i} className={i % 2 === 1 ? 'bg-gray-50/60' : ''}>
+                              <td className="px-3 py-1.5 font-medium text-gray-700">{r.label}</td>
+                              <td className="px-3 py-1.5 text-gray-400 font-mono">{r.nomes}</td>
+                              <td className="px-3 py-1.5 text-teal-700 font-medium">{r.ex}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Se <strong>KG</strong> não for informado, será calculado automaticamente como <code className="bg-gray-100 px-1 rounded">sacos × 25</code>.
+                      Se <strong>Consumo</strong> não for informado, será calculado como <code className="bg-gray-100 px-1 rounded">KG ÷ (qtd × dias)</code>.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
