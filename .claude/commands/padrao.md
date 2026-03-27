@@ -1,4 +1,5 @@
 # /padrao — Guardião do Padrão Visual do Sistema Inteiro
+> Atualizado: v1.21 (2026-03-27)
 
 Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `suplemento-control` e garanta que o padrão aprovado pelo cliente está sendo respeitado em cada página e componente.
 
@@ -90,14 +91,25 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ## 3. COMPONENTES
 
-### SupplementSection
-- [ ] Header usa cor do suplemento (via `supplementColors[tipo]`)
-- [ ] SEM `LabelList` nas barras
+### SupplementSection (v1.21)
+- [ ] Header usa gradiente `linear-gradient(135deg, ${color}ee, ${color})`
+- [ ] Badge status META integrado no header (quando `avgMeta != null`)
+- [ ] Card de totais com fundo `rgba(0,0,0,0.025)` (substitui rodapé antigo)
+- [ ] **Com** `LabelList` acima das barras
 - [ ] `ReferenceLine` vermelha: `stroke="#e53e3e"` `strokeDasharray="6 3"`
+- [ ] `ReferenceLine` azul para meta: `stroke="#1a4a7a"` `strokeDasharray="4 3"`
 
-### SummaryChart
-- [ ] Legenda lateral esquerda + gráfico à direita
-- [ ] SEM `LabelList`
+### SummaryChart (v1.21)
+- [ ] Header com ícone `BarChart2` + badge "KG / CAB / DIA"
+- [ ] Legenda `flex-col md:flex-row` (responsiva)
+- [ ] **Com** `LabelList` acima das barras
+
+### Estoque (v1.22 — admin only)
+- [ ] Hero banner `linear-gradient(135deg, #1d3461, #1d5c8a, #1a6040)`
+- [ ] Botão "Nova Entrada": `background: '#1a6040'`
+- [ ] Botão "Registrar Saída": `bg-red-500`
+- [ ] Tabs ativas: `background: '#1a6040'`
+- [ ] Barra de progresso alerta: `#ef4444` | normal: `#1a6040`
 
 ### MetricCard
 - [ ] Trend verde: `bg-green-50 text-green-700`
