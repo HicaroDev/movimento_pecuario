@@ -183,10 +183,10 @@ export async function atualizarOS(
 
 /**
  * Confirma execução da OS:
- * 1. Marca cada item como executado
- * 2. Gera saída no estoque para cada item
- * 3. Gera lançamento em data_entries para cada item
- * 4. Muda status para 'executada'
+ * 1. Saída no estoque para cada item
+ * 2. Lançamento em data_entries para cada item
+ * 3. Auto-despesa no livro_caixa (por item com valor_kg cadastrado)
+ * 4. Marca itens como executados + status 'executada'
  */
 export async function confirmarExecucao(
   os: OrdemSuplemento,
@@ -194,59 +194,99 @@ export async function confirmarExecucao(
   userId: string
 ): Promise<void> {
   const dataExec = new Date().toISOString().slice(0, 10);
+  const itens = os.itens ?? [];
 
   // 1. Saídas no estoque
-  const saidasPayload = (os.itens ?? []).map(item => ({
-    farm_id:        farmId,
-    tipo:           'saida',
-    suplemento_id:  item.suplemento_id ?? null,
-    suplemento_nome: item.suplemento_nome,
-    data:           dataExec,
-    sacos:          item.sacos,
-    kg:             item.kg ?? item.sacos * 25,
-    os_id:          os.id,
-    observacoes:    `OS ${os.numero} — ${item.pasto_nome}`,
-    created_by:     userId,
-  }));
-
-  if (saidasPayload.length > 0) {
-    const { error: estErr } = await supabaseAdmin
+  if (itens.length > 0) {
+    const { error } = await supabaseAdmin
       .from('estoque_movimentos')
-      .insert(saidasPayload);
-    if (estErr) throw estErr;
+      .insert(itens.map(item => ({
+        farm_id:         farmId,
+        tipo:            'saida',
+        suplemento_id:   item.suplemento_id ?? null,
+        suplemento_nome: item.suplemento_nome,
+        data:            dataExec,
+        sacos:           item.sacos,
+        kg:              item.kg ?? item.sacos * 25,
+        os_id:           os.id,
+        observacoes:     `OS ${os.numero} — ${item.pasto_nome}`,
+        created_by:      userId,
+      })));
+    if (error) throw error;
   }
 
   // 2. Lançamentos em data_entries
-  const entriesPayload = (os.itens ?? []).map(item => ({
-    farm_id:    farmId,
-    data:       dataExec,
-    pasto_nome: item.pasto_nome,
-    suplemento: item.suplemento_nome,
-    quantidade: item.quantidade_animais ?? 0,
-    periodo:    item.periodo_dias,
-    sacos:      item.sacos,
-    kg:         item.kg ?? item.sacos * 25,
-    consumo:    item.quantidade_animais && item.quantidade_animais > 0
-                  ? ((item.kg ?? item.sacos * 25) / item.quantidade_animais / item.periodo_dias)
-                  : 0,
-    os_id:      os.id,
-  }));
-
-  if (entriesPayload.length > 0) {
-    const { error: entErr } = await supabaseAdmin
+  if (itens.length > 0) {
+    const { error } = await supabaseAdmin
       .from('data_entries')
-      .insert(entriesPayload);
-    if (entErr) throw entErr;
+      .insert(itens.map(item => ({
+        farm_id:    farmId,
+        data:       dataExec,
+        pasto_nome: item.pasto_nome,
+        suplemento: item.suplemento_nome,
+        quantidade: item.quantidade_animais ?? 0,
+        periodo:    item.periodo_dias,
+        sacos:      item.sacos,
+        kg:         item.kg ?? item.sacos * 25,
+        consumo:    item.quantidade_animais && item.quantidade_animais > 0
+                      ? ((item.kg ?? item.sacos * 25) / item.quantidade_animais / item.periodo_dias)
+                      : 0,
+        os_id:      os.id,
+      })));
+    if (error) throw error;
   }
 
-  // 3. Marcar itens como executados
+  // 3. Auto-despesa no livro_caixa — por item com valor_kg conhecido
+  if (itens.length > 0) {
+    // Busca valor_kg dos suplementos (supplement_types da fazenda)
+    const { data: suppTypes } = await supabaseAdmin
+      .from('supplement_types')
+      .select('id, nome, valor_kg, peso')
+      .eq('farm_id', farmId);
+
+    const suppMap = new Map<string, { valor_kg: number | null; peso: number }>(
+      (suppTypes ?? []).map(s => [
+        s.id as string,
+        { valor_kg: s.valor_kg as number | null, peso: (s.peso as number) ?? 25 },
+      ])
+    );
+
+    const caixaPayload = itens
+      .map(item => {
+        const supl = item.suplemento_id ? suppMap.get(item.suplemento_id) : null;
+        const valorKg = supl?.valor_kg ?? null;
+        if (!valorKg || valorKg <= 0) return null;
+        const kg = item.kg ?? item.sacos * (supl?.peso ?? 25);
+        const valor = kg * valorKg;
+        return {
+          farm_id:    farmId,
+          tipo:       'despesa',
+          categoria:  'Compra de suplemento',
+          descricao:  `OS ${os.numero} — ${item.suplemento_nome} (${item.pasto_nome})`,
+          valor,
+          data:       dataExec,
+          referencia: os.numero ?? null,
+          origem:     'os',
+          os_id:      os.id,
+          created_by: userId,
+        };
+      })
+      .filter(Boolean);
+
+    if (caixaPayload.length > 0) {
+      await supabaseAdmin.from('livro_caixa').insert(caixaPayload);
+      // Silencioso — não lança erro se caixa falhar (tabela pode não existir ainda)
+    }
+  }
+
+  // 4. Marcar itens como executados
   const { error: itemErr } = await supabaseAdmin
     .from('ordens_suplemento_itens')
     .update({ executado: true })
     .eq('os_id', os.id);
   if (itemErr) throw itemErr;
 
-  // 4. Status da OS
+  // 5. Status da OS
   const { error: osErr } = await supabaseAdmin
     .from('ordens_suplemento')
     .update({ status: 'executada' })

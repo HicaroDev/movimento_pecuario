@@ -206,8 +206,19 @@
 - [x] **T-333** Modal de lançamento — tipo/categoria/valor/data/descrição/referência
 - [x] **T-334** Gráfico mensal — barras receita vs despesa por mês (Recharts)
 - [x] **T-335** Export CSV — extrato do período (BOM pt-BR)
-- [ ] **T-336** Auto-lançamento despesa ao confirmar OS (opcional)
+- [x] **T-336** Auto-lançamento despesa ao confirmar OS — por item com valor_kg cadastrado, origem 'os'
 - [x] **T-337** Rota `/caixa` + módulo admin-only (sidebar + "EM BREVE" para clientes)
+
+---
+
+## FASE 3D — Solicitações de Compra (CONCLUÍDA ✅)
+
+- [x] **T-340** `supabase/solicitacoes_v100.sql` — tabela `solicitacoes_compra` + RLS (admin only)
+- [x] **T-341** `src/services/solicitacaoService.ts` — criar, aprovar, receber (→ entrada estoque), cancelar, deletar
+- [x] **T-342** Aba "Pedidos" no Estoque — tabela com fluxo pendente → aprovada → recebida → cancelada
+- [x] **T-343** Badge laranja de pedidos pendentes na tab "Pedidos"
+- [x] **T-344** Modal "Nova Solicitação" — suplemento, sacos, fornecedor, observações
+- [x] **T-345** Ao "Receber" → auto-entrada no `estoque_movimentos` + marca como recebida com data
 
 ---
 
@@ -242,9 +253,10 @@
 | 2J — Ajustes MP_21 MAR | 10 | 9 | 🔄 90% (falta T-296 SMTP) |
 | 3A — Estoque de Suplementos | 10 | 10 | ✅ Concluída |
 | 3B — OS: Ordens de Suplemento | 9 | 9 | ✅ Concluída |
-| 3C — Livro Caixa | 8 | 7 | ✅ Concluída (T-336 opcional pendente) |
+| 3C — Livro Caixa | 8 | 8 | ✅ Concluída |
+| 3D — Solicitações de Compra | 6 | 6 | ✅ Concluída |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **163** | **154** | **94%** |
+| **TOTAL** | **169** | **161** | **95%** |
 
 ---
 
