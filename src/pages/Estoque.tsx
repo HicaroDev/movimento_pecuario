@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Package, Plus, TrendingDown, TrendingUp, AlertTriangle,
   X, ChevronDown, ShoppingCart, BarChart2, History, Settings2,
-  CheckCircle, Trash2,
+  CheckCircle, Trash2, ClipboardCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,10 @@ import {
   type EstoqueMovimento,
   type SuppTypeWithEstoque,
 } from '../services/estoqueService';
+import {
+  solicitacaoService,
+  type SolicitacaoCompra,
+} from '../services/solicitacaoService';
 
 /* ── helpers ── */
 const fmtNum = (n: number, dec = 0) =>
@@ -25,10 +29,11 @@ const today = () => new Date().toISOString().split('T')[0];
 
 /* ── Tabs ── */
 const TABS = [
-  { key: 'saldos',      label: 'Saldos',        icon: BarChart2 },
-  { key: 'movimentos',  label: 'Movimentações',  icon: History   },
-  { key: 'alertas',     label: 'Alertas',        icon: AlertTriangle },
-  { key: 'configurar',  label: 'Configurar',     icon: Settings2 },
+  { key: 'saldos',      label: 'Saldos',        icon: BarChart2      },
+  { key: 'movimentos',  label: 'Movimentações',  icon: History        },
+  { key: 'alertas',     label: 'Alertas',        icon: AlertTriangle  },
+  { key: 'pedidos',     label: 'Pedidos',        icon: ShoppingCart   },
+  { key: 'configurar',  label: 'Configurar',     icon: Settings2      },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
@@ -427,6 +432,155 @@ function SaldoCard({ s }: { s: SaldoSuplemento }) {
 }
 
 /* ============================================================
+   Modal — Nova Solicitação de Compra
+   ============================================================ */
+function NovaSolicitacaoModal({
+  supls,
+  farmId,
+  userId,
+  onClose,
+  onSaved,
+}: {
+  supls: SuppTypeWithEstoque[];
+  farmId: string;
+  userId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [suplNome,  setSuplNome]  = useState('');
+  const [suplId,    setSuplId]    = useState<string | undefined>();
+  const [sacos,     setSacos]     = useState('');
+  const [fornecedor,setFornecedor]= useState('');
+  const [obs,       setObs]       = useState('');
+  const [saving,    setSaving]    = useState(false);
+
+  const supl = supls.find(s => s.nome === suplNome);
+  const kg = sacos && supl ? Number(sacos) * (supl.peso ?? 25) : 0;
+
+  const inputCls = 'w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500';
+  const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!suplNome || !sacos || Number(sacos) <= 0) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await solicitacaoService.criar({
+        farmId,
+        suplementoNome: suplNome,
+        suplementoId:   suplId,
+        sacos:          Number(sacos),
+        kg:             kg || undefined,
+        fornecedor:     fornecedor || undefined,
+        observacoes:    obs || undefined,
+        createdBy:      userId,
+      });
+      onSaved();
+    } catch {
+      /* toast no parent */
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 12 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(26,96,64,0.10)' }}>
+              <ShoppingCart className="w-4 h-4" style={{ color: '#1a6040' }} />
+            </div>
+            <h2 className="font-bold text-gray-900">Nova Solicitação de Compra</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4 h-4 text-gray-400" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className={labelCls}>Suplemento *</label>
+            <div className="relative">
+              <select
+                value={suplNome}
+                onChange={e => {
+                  const nome = e.target.value;
+                  setSuplNome(nome);
+                  setSuplId(supls.find(s => s.nome === nome)?.id);
+                }}
+                className={inputCls + ' pr-8 appearance-none'}
+                required
+              >
+                <option value="">Selecione...</option>
+                {supls.map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Quantidade (sacos) *</label>
+            <input
+              type="number" min="0.01" step="0.01"
+              placeholder="Ex.: 10"
+              value={sacos}
+              onChange={e => setSacos(e.target.value)}
+              className={inputCls}
+              required
+            />
+            {kg > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                ≈ <strong className="text-gray-700">{fmtNum(kg)} kg</strong>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className={labelCls}>Fornecedor preferencial</label>
+            <input
+              type="text" placeholder="Ex.: Zoo Flora"
+              value={fornecedor} onChange={e => setFornecedor(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Observações</label>
+            <textarea
+              rows={2}
+              placeholder="Urgência, prazo, condições..."
+              value={obs} onChange={e => setObs(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
+              style={{ background: '#1a6040' }}
+            >
+              {saving ? 'Salvando...' : <><ClipboardCheck className="w-4 h-4" /> Solicitar</>}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ============================================================
    Página Principal
    ============================================================ */
 export function Estoque() {
@@ -434,13 +588,15 @@ export function Estoque() {
   const { activeFarmId }  = useData();
   const farmId = activeFarmId || user?.farmId || '';
 
-  const [tab,         setTab]         = useState<TabKey>('saldos');
-  const [supls,       setSupls]       = useState<SuppTypeWithEstoque[]>([]);
-  const [saldos,      setSaldos]      = useState<SaldoSuplemento[]>([]);
-  const [movimentos,  setMovimentos]  = useState<EstoqueMovimento[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [showEntrada, setShowEntrada] = useState(false);
-  const [showSaida,   setShowSaida]   = useState(false);
+  const [tab,           setTab]           = useState<TabKey>('saldos');
+  const [supls,         setSupls]         = useState<SuppTypeWithEstoque[]>([]);
+  const [saldos,        setSaldos]        = useState<SaldoSuplemento[]>([]);
+  const [movimentos,    setMovimentos]    = useState<EstoqueMovimento[]>([]);
+  const [solicitacoes,  setSolicitacoes]  = useState<SolicitacaoCompra[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [showEntrada,   setShowEntrada]   = useState(false);
+  const [showSaida,     setShowSaida]     = useState(false);
+  const [showNovaSol,   setShowNovaSol]   = useState(false);
 
   /* Filtros da tab movimentações */
   const [filtroTipo,   setFiltroTipo]  = useState('');
@@ -462,6 +618,8 @@ export function Estoque() {
       setSaldos(sal);
       const movs = await estoqueService.listarMovimentos(farmId, { limit: 500 });
       setMovimentos(movs);
+      const sols = await solicitacaoService.listar(farmId);
+      setSolicitacoes(sols);
     } catch (e) {
       toast.error('Erro ao carregar estoque.');
     } finally {
@@ -485,6 +643,45 @@ export function Estoque() {
 
   /* Alertas count */
   const totalAlertas = saldos.filter(s => s.em_alerta).length;
+
+  /* Pedidos pendentes */
+  const totalPedidosPendentes = solicitacoes.filter(s => s.status === 'pendente').length;
+
+  async function aprovarSolicitacao(id: string) {
+    try {
+      await solicitacaoService.aprovar(id);
+      toast.success('Pedido aprovado!');
+      await carregarDados();
+    } catch { toast.error('Erro ao aprovar.'); }
+  }
+
+  async function receberSolicitacao(sol: SolicitacaoCompra) {
+    if (!confirm(`Confirmar recebimento de ${fmtNum(sol.sacos, 1)} sacos de ${sol.suplemento_nome}?\nIsso criará uma entrada no estoque.`)) return;
+    try {
+      await solicitacaoService.receber(sol, farmId, user?.id ?? '');
+      toast.success('Recebimento registrado e estoque atualizado!');
+      await carregarDados();
+    } catch { toast.error('Erro ao registrar recebimento.'); }
+  }
+
+  async function cancelarSolicitacao(id: string) {
+    const motivo = prompt('Motivo do cancelamento:');
+    if (motivo === null) return;
+    try {
+      await solicitacaoService.cancelar(id, motivo || 'Cancelado pelo administrador');
+      toast.success('Pedido cancelado.');
+      await carregarDados();
+    } catch { toast.error('Erro ao cancelar.'); }
+  }
+
+  async function deletarSolicitacao(id: string) {
+    if (!confirm('Remover este pedido?')) return;
+    try {
+      await solicitacaoService.deletar(id);
+      toast.success('Pedido removido.');
+      await carregarDados();
+    } catch { toast.error('Erro ao remover.'); }
+  }
 
   /* Movimentos filtrados */
   const movsFiltrados = useMemo(() => movimentos.filter(m => {
@@ -552,12 +749,8 @@ export function Estoque() {
         className="flex items-center justify-between gap-4 mb-8 flex-wrap"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
-            Gestão de Insumos
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Estoque de Suplementos
-          </h1>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+          <h1 className="text-3xl font-bold text-gray-900">Estoque de Suplementos</h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {totalAlertas > 0 && (
@@ -604,6 +797,12 @@ export function Estoque() {
                 <span className="text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center"
                   style={{ background: active ? 'rgba(255,255,255,0.25)' : '#ef4444', color: '#fff' }}>
                   {totalAlertas}
+                </span>
+              )}
+              {t.key === 'pedidos' && totalPedidosPendentes > 0 && (
+                <span className="text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center"
+                  style={{ background: active ? 'rgba(255,255,255,0.25)' : '#f97316', color: '#fff' }}>
+                  {totalPedidosPendentes}
                 </span>
               )}
             </button>
@@ -764,6 +963,145 @@ export function Estoque() {
         </div>
       )}
 
+      {/* ──────── TAB: PEDIDOS ──────── */}
+      {tab === 'pedidos' && (
+        <div className="space-y-4">
+          {/* Cabeçalho da tab */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {solicitacoes.length === 0
+                ? 'Nenhuma solicitação registrada.'
+                : `${solicitacoes.length} solicitação(ões) — ${totalPedidosPendentes} pendente(s)`}
+            </p>
+            <button
+              onClick={() => setShowNovaSol(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm transition-colors"
+              style={{ background: '#1a6040' }}
+            >
+              <Plus className="w-4 h-4" /> Nova Solicitação
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : solicitacoes.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-12 text-center"
+              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="font-semibold text-gray-600">Nenhuma solicitação de compra.</p>
+              <p className="text-sm text-gray-400 mt-1">Crie uma solicitação para registrar uma necessidade de compra.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200/80 overflow-hidden"
+              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
+                      {['Nº', 'Suplemento', 'Sacos', 'Fornecedor', 'Status', 'Data', ''].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {solicitacoes.map((sol, i) => {
+                      const statusCfg: Record<string, { label: string; bg: string; color: string }> = {
+                        pendente:  { label: 'Pendente',  bg: '#fff7ed', color: '#c2410c' },
+                        aprovada:  { label: 'Aprovada',  bg: '#f0fdf4', color: '#15803d' },
+                        recebida:  { label: 'Recebida',  bg: '#eff6ff', color: '#1d4ed8' },
+                        cancelada: { label: 'Cancelada', bg: '#f9fafb', color: '#9ca3af' },
+                      };
+                      const cfg = statusCfg[sol.status] ?? statusCfg.pendente;
+                      return (
+                        <tr key={sol.id} className={i % 2 === 1 ? 'bg-gray-50/40' : ''}>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{sol.numero}</td>
+                          <td className="px-4 py-3 font-medium text-gray-800">{sol.suplemento_nome}</td>
+                          <td className="px-4 py-3 tabular-nums text-gray-700">{fmtNum(sol.sacos, 1)}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{sol.fornecedor || '—'}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                              style={{ background: cfg.bg, color: cfg.color }}>
+                              {cfg.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {new Date(sol.created_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              {sol.status === 'pendente' && (
+                                <>
+                                  <button
+                                    onClick={() => aprovarSolicitacao(sol.id)}
+                                    title="Aprovar"
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-colors"
+                                    style={{ background: '#1a6040' }}
+                                  >
+                                    Aprovar
+                                  </button>
+                                  <button
+                                    onClick={() => cancelarSolicitacao(sol.id)}
+                                    title="Cancelar"
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={() => deletarSolicitacao(sol.id)}
+                                    title="Remover"
+                                    className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                              {sol.status === 'aprovada' && (
+                                <>
+                                  <button
+                                    onClick={() => receberSolicitacao(sol)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-colors"
+                                    style={{ background: '#1d4ed8' }}
+                                  >
+                                    Receber
+                                  </button>
+                                  <button
+                                    onClick={() => cancelarSolicitacao(sol.id)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </>
+                              )}
+                              {sol.status === 'recebida' && (
+                                <span className="flex items-center gap-1 text-[11px] text-green-600">
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  {sol.recebido_at ? new Date(sol.recebido_at).toLocaleDateString('pt-BR') : ''}
+                                </span>
+                              )}
+                              {sol.status === 'cancelada' && sol.motivo_cancelamento && (
+                                <span className="text-[10px] text-gray-400 max-w-[120px] truncate" title={sol.motivo_cancelamento}>
+                                  {sol.motivo_cancelamento}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ──────── TAB: CONFIGURAR ──────── */}
       {tab === 'configurar' && (
         <div className="bg-white rounded-2xl border border-gray-200/80 overflow-hidden"
@@ -844,6 +1182,13 @@ export function Estoque() {
             supls={supls} farmId={farmId} userId={user?.id ?? ''}
             onClose={() => setShowSaida(false)}
             onSaved={() => { setShowSaida(false); carregarDados(); }}
+          />
+        )}
+        {showNovaSol && (
+          <NovaSolicitacaoModal
+            supls={supls} farmId={farmId} userId={user?.id ?? ''}
+            onClose={() => setShowNovaSol(false)}
+            onSaved={() => { setShowNovaSol(false); toast.success('Solicitação criada!'); carregarDados(); }}
           />
         )}
       </AnimatePresence>

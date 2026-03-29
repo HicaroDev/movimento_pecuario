@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-03-10
+> Última atualização: 2026-03-27
 
 ## Legenda
 - [ ] Pendente
@@ -96,10 +96,10 @@
 - [x] **T-222** Executar migration_cadastros.sql no Supabase ✅
 
 ### 2D — Polish
-- [ ] **T-230** Filtro de data com range (data início / data fim) além de chips por mês
-- [ ] **T-231** Responsividade tablet/mobile
+- [x] **T-230** Filtro de data com range (data início / data fim) além de chips por mês ✅
+- [x] **T-231** Responsividade tablet/mobile ✅
 - [ ] **T-232** Empty states para Cadastros (cada tab vazia)
-- [x] **T-233** Deploy EasyPanel (Dockerfile + nginx + env vars) ✅
+- [x] **T-233** Deploy EasyPanel (Dockerfile multi-stage + nginx SPA + secrets inline) ✅
 - [x] **T-234** Sync: refresh silencioso ao voltar ao foco (visibility + focus + online, threshold 5s) ✅
 
 ### 2E — Deploy otimizado (tudo no VPS)
@@ -146,7 +146,7 @@
 - [x] **T-284** Formulário: ao selecionar pasto → auto-fill quantidade + badge N° lotes
 
 ### 2I — Entregas Finais (CONCLUÍDA ✅)
-- [x] **T-281** Relatório / Dashboard corporativo: redesign visual completo (hero banner verde com KPIs + grid responsivo)
+- [x] **T-281** Relatório / Dashboard corporativo: redesign visual completo (header limpo teal, StatsOverview cards, SummaryChart responsivo)
 - [x] **T-285** Formulário: validar/documentar formato Excel para importação (seção colapsável em ImportExcelModal)
 - [x] **T-230** Filtro de data com range (início/fim) no Relatório
 - [x] **T-231** Responsividade tablet/mobile (sidebar colapsável, top bar mobile, paddings responsivos)
@@ -169,7 +169,7 @@
 
 ---
 
-## FASE 3A — Estoque de Suplementos (EM ANDAMENTO 🔄)
+## FASE 3A — Estoque de Suplementos (CONCLUÍDA ✅)
 
 - [x] **T-310** `supabase/estoque_v100.sql` — tabela `estoque_movimentos` + ALTER supplement_types (estoque_minimo_sacos, alerta_reposicao) + RLS
 - [x] **T-311** `estoque_minimo_sacos` + `alerta_reposicao` em Cadastros > Suplementos (campo na tabela + save)
@@ -181,7 +181,33 @@
 - [x] **T-317** Tab Configurar — edição estoque mínimo + toggle alerta por suplemento
 - [x] **T-318** Badge sidebar Estoque (contagem de alertas ativos, admin only) + polling 5 min
 - [x] **T-319** Rota `/estoque` + visibilidade admin-only (sidebar + guard na página)
-- [ ] **T-320** Integração: saída automática ao confirmar OS (Fase 3B)
+
+---
+
+## FASE 3B — OS: Ordens de Suplemento (CONCLUÍDA ✅)
+
+- [x] **T-320** `supabase/os_v100.sql` — tabelas `ordens_suplemento` + `ordens_suplemento_itens` + RLS + função `generate_os_numero()`
+- [x] **T-321** `src/services/osService.ts` — CRUD OS + numeração automática OS-YYYY-NNN
+- [x] **T-322** `src/pages/OS.tsx` — lista por status (Em Aberto / Executadas / Canceladas)
+- [x] **T-323** Modal Nova OS — tabela dinâmica de itens (pasto + suplemento + sacos + kg auto + animais)
+- [x] **T-324** Auto-cálculo `kg = sacos × peso_saco` do supplement_types
+- [x] **T-325** PDF Romaneio de campo — brand bar verde, tabela de itens, totais, linha de assinatura
+- [x] **T-326** Confirmar execução → saída automática no estoque + lançamento em `data_entries`
+- [x] **T-327** Cancelar OS com motivo obrigatório
+- [x] **T-328** Rota `/os` + módulo admin-only (sidebar admin + "EM BREVE" para clientes)
+
+---
+
+## FASE 3C — Livro Caixa (CONCLUÍDA ✅)
+
+- [x] **T-330** `supabase/caixa_v100.sql` — tabela `livro_caixa` + RLS
+- [x] **T-331** `src/services/caixaService.ts` — CRUD lançamentos + calcularResumo + calcularGrafico
+- [x] **T-332** `src/pages/LivroCaixa.tsx` — cards receita/despesa/saldo + tabela filtrada
+- [x] **T-333** Modal de lançamento — tipo/categoria/valor/data/descrição/referência
+- [x] **T-334** Gráfico mensal — barras receita vs despesa por mês (Recharts)
+- [x] **T-335** Export CSV — extrato do período (BOM pt-BR)
+- [ ] **T-336** Auto-lançamento despesa ao confirmar OS (opcional)
+- [x] **T-337** Rota `/caixa` + módulo admin-only (sidebar + "EM BREVE" para clientes)
 
 ---
 
@@ -189,13 +215,16 @@
 - OBS : O CLIENTE VAI REPASSAR PARA OS CLIENTE ELE NAO VAI OMERCIALIZAR NAO !!! 
 
 
-- [ ] **T-300** Landing page pública
-- [ ] **T-301** Planos de assinatura (Mercado Pago / Stripe)
-- [ ] **T-302** Alertas de consumo fora da média 
+- [ ] **T-300** Landing page pública (NAO VAI TER )
+- [ ] **T-301** Planos de assinatura (Mercado Pago / Stripe)(NAO VAI TER )
+- [ ] **T-302** Alertas de consumo fora da média ( o que seria isso ?)
 - [ ] **T-303** Relatórios comparativos entre fazendas -ok
 - [ ] **T-304** API pública para integração -ok 
 
 ---
+
+## MODULO ESTOQUE
+- tenha a opção de solicitação de compra dos suplementeos 
 
 ## Resumo de Progresso
 
@@ -205,14 +234,17 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1.5 — Auth + Multi-tenant | 16 | 16 | ✅ Concluída |
 | 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
-| 2A–E — Melhorias Avançadas | 19 | 17 | 🔄 89% |
+| 2A–E — Melhorias Avançadas | 21 | 19 | 🔄 90% (falta T-232, T-240, T-241) |
 | 2F — Módulo Manejos | 10 | 10 | ✅ Concluída |
 | 2G — Ajustes MP_04 MAR + PDF | 19 | 19 | ✅ Concluída |
 | 2H — Ajustes MP_05 MAR | 4 | 4 | ✅ Concluída |
 | 2I — Entregas Finais | 4 | 4 | ✅ Concluída |
-| 2J — Ajustes MP_21 MAR | 10 | 9 | 🔄 90% (falta SMTP) |
+| 2J — Ajustes MP_21 MAR | 10 | 9 | 🔄 90% (falta T-296 SMTP) |
+| 3A — Estoque de Suplementos | 10 | 10 | ✅ Concluída |
+| 3B — OS: Ordens de Suplemento | 9 | 9 | ✅ Concluída |
+| 3C — Livro Caixa | 8 | 7 | ✅ Concluída (T-336 opcional pendente) |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **136** | **130** | **96%** |
+| **TOTAL** | **163** | **154** | **94%** |
 
 ---
 
@@ -235,9 +267,20 @@ Inclui: tabelas `animals`, `supplement_types` (+ coluna `consumo`), `employees`,
 
 | Hash | Descrição |
 |------|-----------|
-| `bf34c92` | chore: bump versão sidebar para v1.17 |
-| `82aa287` | feat: v1.17 — Formulário redesign + fix cursor Desmama |
-| `214f85b` | feat: header global e por pasto com peso médio bezerros + total geral |
-| `65d1b71` | feat: Exportar PDF na aba Lotes por Pasto |
-| `7024af2` | fix: PDF limpo + farm name no Histórico + PDF button no Pastos |
-| `b0b5920` | feat: PDF profissional Histórico de Manejos e Pastos |
+| `a5fe9ca` | style: padronizar fontes dos headers — text-3xl font-bold conforme sistema |
+| `cbc9fca` | chore: Dockerfile seguro — secrets inline no RUN, sem ENV persistente |
+| `e885fa1` | fix: remover hero banners de Estoque e OS — header limpo conforme padrão |
+| `fe60ee6` | fix: remover hero banner do Relatorio — header limpo conforme padrão |
+| `ecb7656` | feat: v1.23 — Módulo OS (Ordens de Suplemento) — Fase 3B |
+| `925441d` | feat: v1.22 — Módulo Estoque (Fase 3A) — admin only |
+
+## Para Rodar as Migrations (ordem obrigatória)
+
+```
+1. supabase/ajustes_v116b.sql  — base: animals, manejos, RLS
+2. supabase/estoque_v100.sql   — estoque_movimentos + alter supplement_types
+3. supabase/os_v100.sql        — ordens_suplemento + itens + generate_os_numero()
+4. supabase/caixa_v100.sql     — livro_caixa + RLS
+```
+
+Execute no SQL Editor: `https://saas-supabase.bj3amt.easypanel.host`

@@ -17,6 +17,7 @@ import { Historico } from './pages/Historico';
 import { DevPlan } from './pages/DevPlan';
 import { Estoque } from './pages/Estoque';
 import { OS } from './pages/OS';
+import { LivroCaixa } from './pages/LivroCaixa';
 
 const router = createBrowserRouter([
   { path: '/login',           Component: Login },
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
         { path: 'historico', Component: Historico },
         { path: 'estoque',   Component: Estoque   },
         { path: 'os',        Component: OS        },
+        { path: 'caixa',     Component: LivroCaixa },
         { path: 'devplan',   Component: DevPlan   },
       ],
     }],

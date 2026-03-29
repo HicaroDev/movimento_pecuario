@@ -397,6 +397,37 @@ export function DashboardLayout() {
             </motion.div>
           )}
 
+          {/* ── Livro Caixa — admin-only ── */}
+          {isAdmin && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.20 }}
+            >
+              {(() => {
+                const isActive = location.pathname.startsWith('/caixa');
+                return (
+                  <Link
+                    to="/caixa"
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
+                    style={isActive ? {
+                      background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 16px rgba(26,96,64,0.35)',
+                      border: '1px solid rgba(26,96,64,0.3)',
+                    } : { color: '#6b7280' }}
+                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
+                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <BookOpen className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm font-medium">Livro Caixa</span>
+                  </Link>
+                );
+              })()}
+            </motion.div>
+          )}
+
           {/* ── Módulos em breve (clientes veem) ── */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -452,19 +483,6 @@ export function DashboardLayout() {
                   EM BREVE
                 </span>
               </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setShowEmDev(true)}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
-                  style={{ color: '#6b7280' }}
-                >
-                  <BookOpen className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm font-medium">Livro Caixa</span>
-                  <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
-                    EM BREVE
-                  </span>
-                </button>
-              )}
             </div>
           </motion.div>
         </nav>

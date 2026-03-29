@@ -401,12 +401,8 @@ export function Relatorio() {
           className="flex items-center justify-between gap-4 mb-8 flex-wrap no-print"
         >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
-              Relatório de Consumo
-            </p>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {farmName || 'Suplemento Control'}
-            </h1>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+            <h1 className="text-3xl font-bold text-gray-900">Relatório de Consumo</h1>
             {periodoStr && (
               <p className="text-sm text-gray-500 mt-0.5">{periodoStr}</p>
             )}

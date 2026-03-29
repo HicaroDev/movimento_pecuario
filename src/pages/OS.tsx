@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { osService, type OrdemSuplemento, type OSItem, type NovaOS } from '../services/osService';
+import { osService, type OrdemSuplemento, type OSItem } from '../services/osService';
 import { estoqueService, type SuppTypeWithEstoque } from '../services/estoqueService';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
@@ -260,12 +260,8 @@ export function OS() {
         className="flex items-center justify-between gap-4 mb-8 flex-wrap no-print"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
-            Gestão de Campo
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Ordens de Suplemento
-          </h1>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+          <h1 className="text-3xl font-bold text-gray-900">Ordens de Suplemento</h1>
         </div>
         <button
           onClick={() => setShowNew(true)}
@@ -621,7 +617,7 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   Modal: Nova OS
+   Modal: Nova OS — redesign UX v2
 ══════════════════════════════════════════════════════════════════════ */
 function NovaOSModal({
   farmId, userId, userName, pastures, supls, onClose, onCreated,
@@ -635,11 +631,11 @@ function NovaOSModal({
   onCreated: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [dataEmissao, setDataEmissao]   = useState(today);
+  const [dataEmissao,  setDataEmissao]  = useState(today);
   const [dataPrevista, setDataPrevista] = useState('');
-  const [responsavel, setResponsavel]   = useState(userName);
-  const [salgador, setSalgador]         = useState('');
-  const [observacoes, setObservacoes]   = useState('');
+  const [responsavel,  setResponsavel]  = useState(userName);
+  const [salgador,     setSalgador]     = useState('');
+  const [observacoes,  setObservacoes]  = useState('');
   const [itens, setItens]               = useState<Omit<OSItem, 'id' | 'os_id'>[]>([newItemRow()]);
   const [submitting, setSubmitting]     = useState(false);
 
@@ -647,36 +643,29 @@ function NovaOSModal({
     setItens(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const updated = { ...item, ...patch };
-      // auto-calc kg = sacos × peso do suplemento (ou 25 por padrão)
       if ('sacos' in patch || 'suplemento_id' in patch) {
         const supl = supls.find(s => s.id === updated.suplemento_id);
-        const peso = supl?.peso ?? 25;
-        updated.kg = updated.sacos * peso;
+        updated.kg = updated.sacos * (supl?.peso ?? 25);
       }
-      // auto-fill suplemento_nome
       if ('suplemento_id' in patch) {
-        const supl = supls.find(s => s.id === patch.suplemento_id);
-        updated.suplemento_nome = supl?.nome ?? '';
+        updated.suplemento_nome = supls.find(s => s.id === patch.suplemento_id)?.nome ?? '';
       }
-      // auto-fill pasto_nome
       if ('pasto_id' in patch) {
-        const p = pastures.find(p => p.id === patch.pasto_id);
-        updated.pasto_nome = p?.nome ?? '';
+        updated.pasto_nome = pastures.find(p => p.id === patch.pasto_id)?.nome ?? '';
       }
       return updated;
     }));
   }
 
-  function addItem() { setItens(prev => [...prev, newItemRow()]); }
+  function addItem()             { setItens(prev => [...prev, newItemRow()]); }
   function removeItem(idx: number) { setItens(prev => prev.filter((_, i) => i !== idx)); }
 
   async function handleSubmit() {
     const validItens = itens.filter(i => i.pasto_nome && i.suplemento_nome && i.sacos > 0);
     if (validItens.length === 0) { toast.error('Adicione ao menos um item válido'); return; }
-
     setSubmitting(true);
     try {
-      const payload: NovaOS = {
+      await osService.criarOS({
         farm_id:       farmId,
         data_emissao:  dataEmissao,
         data_prevista: dataPrevista || null,
@@ -685,8 +674,7 @@ function NovaOSModal({
         observacoes:   observacoes || null,
         created_by:    userId || null,
         itens:         validItens,
-      };
-      await osService.criarOS(payload);
+      });
       toast.success('OS criada com sucesso!');
       onCreated();
     } catch (e: unknown) {
@@ -697,102 +685,142 @@ function NovaOSModal({
   }
 
   const totalSacos = itens.reduce((s, i) => s + (i.sacos || 0), 0);
-  const totalKg    = itens.reduce((s, i) => s + (i.kg || 0), 0);
+  const totalKg    = itens.reduce((s, i) => s + (i.kg   || 0), 0);
+  const totalAnim  = itens.reduce((s, i) => s + (i.quantidade_animais || 0), 0);
+  const validCount = itens.filter(i => i.pasto_nome && i.suplemento_nome && i.sacos > 0).length;
+
+  const input = 'w-full h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow';
+  const label = 'block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <motion.div
-        className="relative bg-white rounded-2xl shadow-2xl w-full z-10 flex flex-col"
-        style={{ maxWidth: '760px', maxHeight: '90vh' }}
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        className="relative bg-white rounded-2xl shadow-2xl w-full z-10 flex flex-col overflow-hidden"
+        style={{ maxWidth: '780px', maxHeight: '92vh' }}
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b">
+        {/* ── Barra de topo teal ── */}
+        <div style={{ height: '4px', background: 'linear-gradient(90deg, #1a6040, #0b9e6e, #0b2748)', flexShrink: 0 }} />
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(26,96,64,0.1)' }}>
-              <ClipboardList className="w-4.5 h-4.5" style={{ color: '#1a6040' }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, rgba(26,96,64,0.12), rgba(26,96,64,0.06))' }}>
+              <ClipboardList className="w-5 h-5" style={{ color: '#1a6040' }} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900">Nova Ordem de Suplemento</h2>
-              <p className="text-xs text-gray-400">Numeração gerada automaticamente</p>
+              <h2 className="text-lg font-bold text-gray-900 leading-tight">Nova Ordem de Suplemento</h2>
+              <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-teal-400" />
+                Numeração gerada automaticamente
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100">
-            <X className="w-4 h-4 text-gray-400" />
+          <button onClick={onClose}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Body scrollável */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Cabeçalho da OS */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Data de Emissão *</label>
-              <input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Data Prevista</label>
-              <input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Responsável</label>
-              <input type="text" value={responsavel} onChange={e => setResponsavel(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Salgador</label>
-              <input type="text" value={salgador} onChange={e => setSalgador(e.target.value)}
-                placeholder="Nome do salgador"
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Observações</label>
-              <input type="text" value={observacoes} onChange={e => setObservacoes(e.target.value)}
-                placeholder="Observações gerais..."
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        {/* ── Body ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+          style={{ background: '#fafbfc' }}>
+
+          {/* Seção: Informações da OS */}
+          <div className="bg-white rounded-xl p-4 space-y-4"
+            style={{ border: '1px solid rgba(0,0,0,0.07)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+              Informações da OS
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className={label}>Data de Emissão *</label>
+                <input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)}
+                  max={today} className={input} />
+              </div>
+              <div>
+                <label className={label}>Data Prevista</label>
+                <input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)}
+                  className={input} />
+              </div>
+              <div>
+                <label className={label}>Responsável</label>
+                <input type="text" value={responsavel} onChange={e => setResponsavel(e.target.value)}
+                  className={input} />
+              </div>
+              <div>
+                <label className={label}>Salgador</label>
+                <input type="text" value={salgador} onChange={e => setSalgador(e.target.value)}
+                  placeholder="Nome do salgador" className={input} />
+              </div>
+              <div className="md:col-span-2">
+                <label className={label}>Observações</label>
+                <input type="text" value={observacoes} onChange={e => setObservacoes(e.target.value)}
+                  placeholder="Observações gerais..." className={input} />
+              </div>
             </div>
           </div>
 
-          {/* Itens */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Itens da OS</label>
+          {/* Seção: Itens */}
+          <div className="bg-white rounded-xl overflow-hidden"
+            style={{ border: '1px solid rgba(0,0,0,0.07)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+
+            {/* Header da seção */}
+            <div className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(26,96,64,0.03)' }}>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Itens da OS</p>
+                {itens.length > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(26,96,64,0.1)', color: '#1a6040' }}>
+                    {itens.length}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={addItem}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                 style={{ background: 'rgba(26,96,64,0.08)', color: '#1a6040' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(26,96,64,0.14)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(26,96,64,0.08)'}
               >
                 <Plus className="w-3.5 h-3.5" />
-                Adicionar item
+                Adicionar Item
               </button>
             </div>
 
-            <div className="rounded-xl border overflow-hidden">
-              {/* Header */}
-              <div className="grid text-[10px] font-bold uppercase tracking-wide text-gray-400 px-3 py-2"
-                style={{ gridTemplateColumns: '2fr 2fr 1fr 0.8fr 0.8fr 0.6fr 0.5fr', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                <span>Pasto</span>
-                <span>Suplemento</span>
-                <span>Cocho</span>
-                <span>Sacos</span>
-                <span>KG</span>
-                <span>Animais</span>
-                <span></span>
-              </div>
+            {/* Cabeçalho da tabela */}
+            <div className="grid text-[10px] font-bold uppercase tracking-widest text-gray-400 px-4 py-2"
+              style={{
+                gridTemplateColumns: '2fr 2fr 0.9fr 0.7fr 0.7fr 0.6fr 36px',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                background: '#f9fafb',
+              }}>
+              <span>Pasto</span>
+              <span>Suplemento</span>
+              <span>Cocho</span>
+              <span className="text-center">Sacos</span>
+              <span className="text-center">KG</span>
+              <span className="text-center">Animais</span>
+              <span />
+            </div>
 
-              {/* Linhas */}
+            {/* Linhas de itens */}
+            <div>
               {itens.map((item, idx) => (
                 <div
                   key={idx}
-                  className="grid items-center gap-2 px-3 py-2"
+                  className="grid items-center gap-2 px-4 py-2.5 group transition-colors"
                   style={{
-                    gridTemplateColumns: '2fr 2fr 1fr 0.8fr 0.8fr 0.6fr 0.5fr',
-                    borderBottom: idx < itens.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    gridTemplateColumns: '2fr 2fr 0.9fr 0.7fr 0.7fr 0.6fr 36px',
+                    borderBottom: idx < itens.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                    background: idx % 2 === 1 ? 'rgba(0,0,0,0.015)' : 'transparent',
                   }}
                 >
                   {/* Pasto */}
@@ -800,12 +828,12 @@ function NovaOSModal({
                     <select
                       value={item.pasto_id ?? ''}
                       onChange={e => updateItem(idx, { pasto_id: e.target.value || null })}
-                      className="w-full h-8 px-2 pr-7 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none"
+                      className="w-full h-8 px-2 pr-6 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none"
                     >
                       <option value="">Selecionar...</option>
                       {pastures.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-gray-400" />
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-gray-400" />
                   </div>
 
                   {/* Suplemento */}
@@ -813,87 +841,108 @@ function NovaOSModal({
                     <select
                       value={item.suplemento_id ?? ''}
                       onChange={e => updateItem(idx, { suplemento_id: e.target.value || null })}
-                      className="w-full h-8 px-2 pr-7 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none"
+                      className="w-full h-8 px-2 pr-6 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none"
                     >
                       <option value="">Selecionar...</option>
                       {supls.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-gray-400" />
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-gray-400" />
                   </div>
 
                   {/* Cocho */}
-                  <input
-                    type="text"
-                    value={item.cocho ?? ''}
+                  <input type="text" value={item.cocho ?? ''} placeholder="C-01"
                     onChange={e => updateItem(idx, { cocho: e.target.value })}
-                    placeholder="C-01"
-                    className="h-8 px-2 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full"
-                  />
+                    className="h-8 px-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full" />
 
                   {/* Sacos */}
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={item.sacos || ''}
+                  <input type="number" min="0" step="0.5" value={item.sacos || ''}
                     onChange={e => updateItem(idx, { sacos: Number(e.target.value) })}
-                    className="h-8 px-2 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full text-center"
-                  />
+                    className="h-8 px-1 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full text-center font-semibold"
+                    style={{ color: '#1a6040' }} />
 
                   {/* KG (readonly) */}
-                  <input
-                    type="number"
-                    value={item.kg != null ? item.kg.toFixed(0) : ''}
-                    readOnly
-                    className="h-8 px-2 rounded-lg text-xs w-full text-center"
-                    style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid #e5e7eb', color: '#6b7280' }}
-                  />
+                  <input type="text" readOnly
+                    value={item.kg != null && item.kg > 0 ? item.kg.toFixed(0) : ''}
+                    className="h-8 px-1 rounded-lg text-xs w-full text-center text-gray-400"
+                    style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.07)' }} />
 
                   {/* Animais */}
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.quantidade_animais ?? ''}
+                  <input type="number" min="0" value={item.quantidade_animais ?? ''}
                     onChange={e => updateItem(idx, { quantidade_animais: e.target.value ? Number(e.target.value) : null })}
-                    className="h-8 px-2 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full text-center"
-                  />
+                    className="h-8 px-1 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 w-full text-center" />
 
                   {/* Remover */}
-                  <button
-                    onClick={() => removeItem(idx)}
-                    disabled={itens.length === 1}
-                    className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors disabled:opacity-30"
-                    style={{ color: '#6b7280' }}
-                    onMouseEnter={e => { if (itens.length > 1) { (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.08)'; (e.currentTarget as HTMLElement).style.color = '#dc2626'; } }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; }}
-                  >
+                  <button onClick={() => removeItem(idx)} disabled={itens.length === 1}
+                    className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors disabled:opacity-20 text-gray-300 hover:text-red-500 hover:bg-red-50">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
 
-            {/* Totais dos itens */}
-            <div className="flex items-center justify-end gap-6 mt-3 px-3">
-              <span className="text-xs text-gray-400">Total:</span>
-              <span className="text-sm font-bold" style={{ color: '#1a6040' }}>{totalSacos.toFixed(1)} sacos</span>
-              <span className="text-sm font-semibold text-gray-600">{totalKg.toFixed(0)} kg</span>
+            {/* Totais */}
+            <div className="flex items-center justify-between px-4 py-3"
+              style={{ borderTop: '2px solid rgba(26,96,64,0.08)', background: 'rgba(26,96,64,0.03)' }}>
+              <span className="text-xs text-gray-400 font-medium">
+                {validCount} item(ns) válido(s)
+              </span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
+                  style={{ background: 'rgba(26,96,64,0.08)' }}>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Sacos</span>
+                  <span className="text-sm font-extrabold" style={{ color: '#1a6040' }}>
+                    {totalSacos.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
+                  style={{ background: 'rgba(0,0,0,0.04)' }}>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">KG</span>
+                  <span className="text-sm font-bold text-gray-600">{totalKg.toFixed(0)}</span>
+                </div>
+                {totalAnim > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg"
+                    style={{ background: 'rgba(249,115,22,0.08)' }}>
+                    <span className="text-[10px] font-bold text-orange-400 uppercase">Animais</span>
+                    <span className="text-sm font-bold text-orange-600">{totalAnim}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-5 border-t flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border text-sm font-medium text-gray-600">
+        {/* ── Footer ── */}
+        <div className="px-6 py-4 flex gap-3"
+          style={{ borderTop: '1px solid rgba(0,0,0,0.07)', background: '#fff' }}>
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+          >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: '#1a6040' }}
+            disabled={submitting || validCount === 0}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40 transition-all"
+            style={{
+              background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
+              boxShadow: validCount > 0 ? '0 4px 16px rgba(26,96,64,0.35)' : 'none',
+            }}
           >
-            {submitting ? 'Criando...' : 'Criar OS'}
+            {submitting ? (
+              'Criando OS...'
+            ) : (
+              <>
+                <ClipboardList className="w-4 h-4" />
+                Criar OS
+                {validCount > 0 && (
+                  <span className="ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(255,255,255,0.2)' }}>
+                    {validCount} item{validCount > 1 ? 's' : ''}
+                  </span>
+                )}
+              </>
+            )}
           </button>
         </div>
       </motion.div>

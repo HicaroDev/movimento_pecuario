@@ -22,7 +22,29 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ---
 
-## 1. TOKENS DE DESIGN
+## 1. PADRÃO DE HEADER DE PÁGINA
+
+**Todas as páginas** devem usar exatamente esta estrutura de cabeçalho:
+
+```tsx
+<p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Suplemento Control</p>
+<h1 className="text-3xl font-bold text-gray-900">[Título da Página]</h1>
+<p className="text-sm text-gray-500 mt-1">[descrição opcional]</p>
+```
+
+| Elemento | Classe obrigatória |
+|----------|-------------------|
+| Subtítulo | `text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1` |
+| Texto subtítulo | **sempre "Suplemento Control"** — nunca customizado por módulo |
+| Título h1 | `text-3xl font-bold text-gray-900` |
+| Descrição (opcional) | `text-sm text-gray-500 mt-1` |
+
+❌ **NUNCA** usar `font-extrabold`, `text-2xl` ou subtítulo customizado ("Gestão de...", "Relatório de...") no header de página.
+
+---
+
+## 2. TOKENS DE DESIGN
+
 
 | Token | Hex | Uso exclusivo |
 |-------|-----|---------------|
@@ -37,7 +59,7 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ---
 
-## 2. CHECKLIST POR PÁGINA
+## 3. CHECKLIST POR PÁGINA
 
 ### DashboardLayout / Sidebar
 - [ ] Logo em card branco `bg-white rounded-xl p-3`
@@ -89,7 +111,7 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ---
 
-## 3. COMPONENTES
+## 4. COMPONENTES
 
 ### SupplementSection (v1.21)
 - [ ] Header usa gradiente `linear-gradient(135deg, ${color}ee, ${color})`
@@ -121,7 +143,7 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ---
 
-## 4. ARQUITETURA
+## 5. ARQUITETURA
 
 - `DataContext` expõe `loading: boolean` — usado em Relatorio, Formulario, Pastos
 - `Fazendas` e `Usuarios` têm `loading` local próprio
@@ -131,7 +153,7 @@ Você é um revisor de qualidade. Percorra **todos os arquivos** do projeto `sup
 
 ---
 
-## 5. AÇÃO
+## 6. AÇÃO
 
 Para cada `[ ]` não conforme:
 1. Leia o arquivo
