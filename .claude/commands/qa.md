@@ -1,7 +1,7 @@
 # /qa — Quality Assurance Completo
-> Suplemento Control — roda após qualquer implementação significativa
+> Suplemento Control v1.29D — execute após qualquer implementação significativa
 
-Você é um engenheiro de QA. Execute todos os passos abaixo em ordem e reporte o resultado.
+Você é um engenheiro de QA sênior. Execute todos os passos abaixo em ordem e reporte o resultado.
 
 ---
 
@@ -18,22 +18,30 @@ npm run build
 
 ---
 
-## PASSO 2 — IMPORTS E EXPORTS
+## PASSO 2 — PADRÃO DE HEADER (todas as páginas)
 
-Verifique se não há imports quebrados ou tipos não encontrados:
+Leia cada página e verifique:
 
-```bash
-grep -rn "from '\.\." src/ --include="*.tsx" --include="*.ts" | grep -v "node_modules"
-```
+| Página | Arquivo |
+|--------|---------|
+| Relatório | `src/pages/Relatorio.tsx` |
+| Formulário | `src/pages/Formulario.tsx` |
+| Manejos | `src/pages/Manejos.tsx` |
+| Cadastros | `src/pages/Cadastros.tsx` |
+| Fazendas | `src/pages/Fazendas.tsx` |
+| Usuários | `src/pages/Usuarios.tsx` |
+| Estoque | `src/pages/Estoque.tsx` |
+| OS | `src/pages/OS.tsx` |
+| Livro Caixa | `src/pages/LivroCaixa.tsx` |
 
-- [ ] Nenhum import apontando para arquivo inexistente
-- [ ] Nenhum `export` referenciado que não existe
+Para cada uma:
+- [ ] Subtítulo: `text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1` com texto **"Suplemento Control"**
+- [ ] Título h1: `text-3xl font-bold text-gray-900`
+- [ ] ❌ Sem `font-extrabold`, `text-2xl`, ou subtítulo customizado
 
 ---
 
 ## PASSO 3 — FLUXOS CRÍTICOS
-
-Leia os arquivos e verifique cada fluxo:
 
 ### Auth
 - [ ] `AuthContext.tsx` — `signInWithPassword` → `fetchProfile` → `setUser` com `farmId`
@@ -43,60 +51,91 @@ Leia os arquivos e verifique cada fluxo:
 
 ### DataContext
 - [ ] `entries` carregados do Supabase com `farm_id = activeFarmId`
-- [ ] Optimistic update em `addEntry` / `updateEntry` / `removeEntry`
 - [ ] Refresh ao voltar ao foco (visibility + online events, threshold 5s)
 
 ### Formulário
 - [ ] Pasto vem de `pastures` do DataContext (não hardcoded)
 - [ ] `kg = sacos × 25` calculado automaticamente
 - [ ] Suplemento vem de `supplement_types` do Supabase
-- [ ] Submit cria registro em `data_entries` com `farm_id` correto
 
 ### Manejos
 - [ ] `listarAnimais(farmId)` retorna apenas animais da fazenda
-- [ ] Transferência atualiza `pasto_id` do animal
 - [ ] Parição incrementa `bezerros_quantidade` no lote da mãe (não cria lote novo)
-- [ ] Saída (abate/venda) atualiza `status` do animal
 
-### Estoque
-- [ ] Somente admin acessa `/estoque`
+### Estoque (admin only)
+- [ ] Guard `if (!isAdmin) return null` presente
 - [ ] Entrada/saída registra em `estoque_movimentos` com `farm_id`
 - [ ] `calcularSaldos` usa soma de entradas − saídas
 - [ ] Alertas só disparam quando `alerta_reposicao = true`
+- [ ] Aba "Pedidos" lista solicitações de compra com fluxo pendente→aprovada→recebida
+- [ ] Ao "Receber" pedido → cria entrada em `estoque_movimentos`
+
+### OS — Ordens de Suplemento (admin only)
+- [ ] Guard `if (!isAdmin) return null` presente
+- [ ] Numeração automática `OS-YYYY-NNN` via `generate_os_numero()`
+- [ ] Ao confirmar execução → saída em `estoque_movimentos` + lançamento em `data_entries`
+- [ ] Ao confirmar execução → despesa em `livro_caixa` para itens com `valor_kg` cadastrado
+- [ ] Cancelar exige motivo obrigatório
+- [ ] Deletar apenas OS com status `pendente`
+
+### Livro Caixa (admin only)
+- [ ] Guard `if (!isAdmin) return null` presente
+- [ ] Cards de totalização: Receitas (verde), Despesas (vermelho), Saldo (dinâmico)
+- [ ] Filtros: tipo, categoria, período (dateFrom/dateTo)
+- [ ] Lançamentos com `origem = 'os'` não podem ser deletados (botão oculto)
+- [ ] Export CSV com BOM UTF-8 para pt-BR
+- [ ] Gráfico mensal Recharts: receitas vs despesas
 
 ---
 
-## PASSO 4 — SEGURANÇA BÁSICA
+## PASSO 4 — SEGURANÇA
 
-- [ ] Nenhuma `SERVICE_ROLE_KEY` exposta em código frontend (deve estar em variável de ambiente)
-- [ ] `supabaseAdmin` usa `import.meta.env.VITE_SUPABASE_SERVICE_KEY` (nunca hardcoded)
-- [ ] Rotas admin (`/estoque`, `/devplan`) têm guard `if (!isAdmin)` no componente
-- [ ] RLS ativo nas tabelas críticas (verificar via `/validar-dados`)
+- [ ] Nenhuma `SERVICE_ROLE_KEY` hardcoded em código frontend
+- [ ] `supabaseAdmin` usa `import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Rotas admin (`/estoque`, `/os`, `/caixa`, `/devplan`) têm guard no componente
+- [ ] RLS ativo nas tabelas: `livro_caixa`, `solicitacoes_compra`, `estoque_movimentos`, `ordens_suplemento`
 
 ---
 
-## PASSO 5 — UX E CONSISTÊNCIA
+## PASSO 5 — UX E CONSISTÊNCIA (padrão teal)
 
+- [ ] Botões primários: `bg-teal-600 hover:bg-teal-700` ou `background: '#1a6040'`
+- [ ] ❌ Sem `indigo`, `violet`, `purple` em botões de ação
 - [ ] Todos os botões de submit têm `disabled` durante `saving/loading`
-- [ ] Todos os erros de Supabase são exibidos com `toast.error()`
-- [ ] Todos os sucessos têm `toast.success()`
-- [ ] Loading states (Skeleton) em todas as páginas que carregam dados
-- [ ] Mensagem de "sem dados" apenas após loading completar
+- [ ] Todos os erros de Supabase → `toast.error()`
+- [ ] Todos os sucessos → `toast.success()`
+- [ ] Skeleton ou spinner em todas as páginas que carregam dados
+- [ ] Mensagem de "sem dados" apenas após `!loading`
 
 ---
 
-## PASSO 6 — MOBILE
+## PASSO 6 — ROTAS E SIDEBAR
 
-- [ ] Sidebar colapsável em mobile (hamburger na top bar)
+Verificar `src/App.tsx`:
+- [ ] Rota `/estoque` → `Estoque`
+- [ ] Rota `/os` → `OS`
+- [ ] Rota `/caixa` → `LivroCaixa`
+- [ ] Rota `/manejos` → `Manejos`
+
+Verificar `src/layouts/DashboardLayout.tsx`:
+- [ ] Badge de versão atualizado (`v1.29D`)
+- [ ] Admin vê links reais: Estoque, Ordens (OS), Livro Caixa
+- [ ] Clientes veem "EM BREVE" para Estoque, OS e Livro Caixa
+
+---
+
+## PASSO 7 — MOBILE
+
+- [ ] Sidebar colapsável (hamburger na top bar mobile)
 - [ ] Padding `p-4 md:p-8` nas páginas principais
-- [ ] Grids responsivos (nenhum `grid-cols-4` sem breakpoint `md:` ou `lg:`)
-- [ ] Inputs com altura mínima `h-10` para toque
+- [ ] Grids responsivos — nenhum `grid-cols-N` sem breakpoint `md:` ou `lg:`
 
 ---
 
 ## RELATÓRIO FINAL
 
-Liste:
+Produza:
 - ✅ Itens OK
 - 🔧 Itens corrigidos nesta execução
-- ⚠️ Itens que precisam de atenção mas não foram alterados (com justificativa)
+- ⚠️ Itens que precisam de atenção (com justificativa)
+- ❌ Erros bloqueantes encontrados
