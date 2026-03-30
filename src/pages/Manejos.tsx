@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
   X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, GitMerge,
+  LayoutGrid, List,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -92,6 +93,18 @@ function LotesTab({
   const [dataAlocacao, setDataAlocacao] = useState(() => new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
 
+  // ── View mode toggle ──
+  const [viewMode, setViewMode] = useState<'lista' | 'card'>(() => {
+    return (localStorage.getItem('manejos_view_mode') as 'lista' | 'card') ?? 'lista';
+  });
+  function toggleView(mode: 'lista' | 'card') {
+    setViewMode(mode);
+    localStorage.setItem('manejos_view_mode', mode);
+  }
+
+  // ── Filtro por categoria ──
+  const [catFiltro, setCatFiltro] = useState<string | null>(null);
+
   // ── Filter ──
   const [search, setSearch] = useState('');
 
@@ -106,16 +119,28 @@ function LotesTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
-  // Search filter on active animals (nome, categoria ou pasto)
+  // Categorias que têm pelo menos 1 animal ativo
+  const categoriasAtivas = useMemo(() => {
+    const ids = new Set(ativos.map(a => a.categoria_id).filter(Boolean) as string[]);
+    return categories.filter(c => ids.has(c.id));
+  }, [ativos, categories]);
+
+  // Filtro combinado: texto + categoria
   const ativosFiltrados = useMemo(() => {
-    if (!search.trim()) return ativos;
-    const q = search.toLowerCase();
-    return ativos.filter(a =>
-      a.nome.toLowerCase().includes(q) ||
-      (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q)) ||
-      (a.pasto_id && (pastoMap[a.pasto_id] ?? '').toLowerCase().includes(q))
-    );
-  }, [ativos, search, catMap, pastoMap]);
+    let result = ativos;
+    if (catFiltro) {
+      result = result.filter(a => a.categoria_id === catFiltro);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(a =>
+        a.nome.toLowerCase().includes(q) ||
+        (a.categoria_id && (catMap[a.categoria_id] ?? '').toLowerCase().includes(q)) ||
+        (a.pasto_id && (pastoMap[a.pasto_id] ?? '').toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [ativos, search, catFiltro, catMap, pastoMap]);
 
   const byPasto = useMemo(() => {
     const map: Record<string, Animal[]> = {};
@@ -218,6 +243,134 @@ function LotesTab({
     );
   }
 
+  // Card por PASTO — contém todas as infos do pasto + lotes dentro
+  function PastoCard({
+    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao,
+  }: {
+    pasto: Pasture;
+    animaisPasto: Animal[];
+    totalCab: number;
+    pesoMedio: number | null;
+    bezTotal: number;
+    bezPesoMedio: number | null;
+    taxaLotacao: number | null;
+  }) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 6 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-teal-200 transition-all overflow-hidden flex flex-col"
+      >
+        {/* ── Cabeçalho do Pasto ── */}
+        <div className="px-4 pt-3 pb-2.5 border-b border-gray-100" style={{ background: 'rgba(26,96,64,0.05)' }}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                <p className="font-bold text-gray-900 text-sm leading-tight truncate">{pasto.nome}</p>
+              </div>
+              {pasto.area && (
+                <p className="text-[10px] text-gray-400 mt-0.5 ml-5">{pasto.area} ha</p>
+              )}
+            </div>
+            {taxaLotacao != null && (
+              <span className="flex-shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 whitespace-nowrap">
+                {taxaLotacao.toFixed(2).replace('.', ',')} UA/HA
+              </span>
+            )}
+          </div>
+
+          {/* Stats do pasto em linha */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
+            <div>
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Total </span>
+              <span className="text-xs font-bold" style={{ color: '#1a6040' }}>{totalCab.toLocaleString('pt-BR')} cab.</span>
+            </div>
+            {pesoMedio != null && (
+              <div>
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Peso </span>
+                <span className="text-xs font-bold text-gray-700">{pesoMedio.toFixed(0)} kg/cab</span>
+              </div>
+            )}
+            {bezTotal > 0 && (
+              <div>
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-orange-400">Bez. </span>
+                <span className="text-xs font-bold text-orange-600">{bezTotal.toLocaleString('pt-BR')} cab.</span>
+                {bezPesoMedio != null && (
+                  <span className="text-[9px] text-orange-400 ml-1">{bezPesoMedio.toFixed(0)} kg</span>
+                )}
+              </div>
+            )}
+            <div>
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Lotes </span>
+              <span className="text-xs font-bold text-gray-600">{animaisPasto.length}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Lotes dentro do card ── */}
+        <div className="flex flex-col divide-y divide-gray-100">
+          {animaisPasto.map(a => {
+            const catNome = a.categoria_id ? catMap[a.categoria_id] ?? null : null;
+            const hasBez = (a.bezerros_quantidade ?? 0) > 0;
+            return (
+              <div key={a.id} className="px-4 py-3">
+                {/* Nome + sexo */}
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="font-bold text-gray-800 text-sm leading-tight">{a.nome}</p>
+                  {a.sexo && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wide flex-shrink-0">
+                      {a.sexo}
+                    </span>
+                  )}
+                </div>
+                {catNome && (
+                  <p className="text-[10px] font-semibold mb-2" style={{ color: '#1a6040' }}>{catNome}</p>
+                )}
+
+                {/* Cabeças + Peso lado a lado */}
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Cabeças</p>
+                    <p className="text-base font-bold leading-none" style={{ color: '#1a6040' }}>
+                      {a.quantidade.toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className="w-px h-6 bg-gray-100 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Peso Médio</p>
+                    <p className="text-base font-bold text-gray-800 leading-none">
+                      {a.peso_medio ? <>{a.peso_medio}<span className="text-[10px] font-normal text-gray-400"> kg</span></> : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bezerros */}
+                {hasBez && (
+                  <div className="mt-2 rounded-lg bg-orange-50 border border-orange-200 px-3 py-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Baby className="w-3 h-3 text-orange-500 flex-shrink-0" />
+                      <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Bezerros</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')} cab.</span>
+                      {a.bezerros_peso_medio && (
+                        <span className="text-[10px] text-orange-500 font-medium">{a.bezerros_peso_medio} kg</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+    );
+  }
+
   if (ativos.length === 0) return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-20 text-center">
       <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -281,15 +434,17 @@ function LotesTab({
         </div>
       </div>
 
-      {/* Toolbar: search + PDF */}
-      <div className="flex items-center gap-3 mb-5 no-print">
+      {/* Toolbar única: texto | categoria | lista/card | PDF */}
+      <div className="flex items-center gap-2 mb-5 no-print">
+
+        {/* 1. Filtro por texto */}
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Filtrar lotes por nome, categoria ou pasto…"
+            placeholder="Buscar lote, categoria ou pasto…"
             className="w-full h-9 pl-9 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           {search && (
@@ -299,11 +454,68 @@ function LotesTab({
             </button>
           )}
         </div>
-        {search && (
-          <span className="text-xs text-gray-500 flex-shrink-0">
+
+        {/* 2. Filtro por categoria (select) */}
+        {categoriasAtivas.length > 0 && (
+          <div className="relative flex-shrink-0">
+            <select
+              value={catFiltro ?? ''}
+              onChange={e => setCatFiltro(e.target.value || null)}
+              className="h-9 pl-3 pr-8 rounded-lg border text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+              style={{
+                borderColor: catFiltro ? '#1a6040' : '#e5e7eb',
+                color: catFiltro ? '#1a6040' : '#6b7280',
+                background: catFiltro ? 'rgba(26,96,64,0.06)' : '#fff',
+                minWidth: '11rem',
+              }}
+            >
+              <option value="">Todas as categorias</option>
+              {categoriasAtivas.map(c => {
+                const count = ativos.filter(a => a.categoria_id === c.id).length;
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.nome} ({count})
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+              style={{ color: catFiltro ? '#1a6040' : '#9ca3af' }} />
+          </div>
+        )}
+
+        {/* Contagem quando filtrado */}
+        {(search || catFiltro) && (
+          <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
             {ativosFiltrados.length} lote{ativosFiltrados.length !== 1 ? 's' : ''}
           </span>
         )}
+
+        {/* 3. Toggle lista / card */}
+        <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden flex-shrink-0">
+          <button
+            onClick={() => toggleView('lista')}
+            title="Visualização em lista"
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+              viewMode === 'lista' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Lista</span>
+          </button>
+          <button
+            onClick={() => toggleView('card')}
+            title="Visualização em cards"
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border-l border-gray-200 ${
+              viewMode === 'card' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Cards</span>
+          </button>
+        </div>
+
+        {/* PDF */}
         <button
           onClick={() => window.print()}
           className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:border-teal-400 hover:text-teal-600 transition-colors font-medium flex-shrink-0"
@@ -364,84 +576,134 @@ function LotesTab({
         )}
       </div>
 
-      <div className="space-y-6">
-        {pastosComLotes.map(p => {
-          const animaisPasto = byPasto[p.id];
-          const totalCabPasto  = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
-          const pesoNum        = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
-          const pesoDen        = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
-          const pesoMedioPasto = pesoDen > 0 ? pesoNum / pesoDen : null;
-          const bezPasto       = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
-          const bezPesoNum     = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
-          const bezPesoDen     = animaisPasto.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
-          const bezPesoMedioPasto = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
+      <AnimatePresence mode="wait" initial={false}>
 
-          // Taxa de lotação UA/HA
-          const uaTotal = (
-            animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0) +
-            animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0)
-          ) / 450;
-          const taxaLotacao = p.area && uaTotal > 0 ? uaTotal / p.area : null;
-
-          return (
-          <section key={p.id}>
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <MapPin className="w-4 h-4 text-teal-600 flex-shrink-0" />
-              <h3 className="font-semibold text-gray-800">{p.nome}</h3>
-              {p.area && <span className="text-xs text-gray-400">· {p.area} ha</span>}
-              <div className="ml-auto flex items-center gap-2 flex-wrap">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                  {totalCabPasto.toLocaleString('pt-BR')} cab.
-                </span>
-                {pesoMedioPasto != null && (
-                  <span className="text-xs bg-teal-50 px-2 py-0.5 rounded-full font-semibold" style={{ color: '#1a6040' }}>
-                    {pesoMedioPasto.toFixed(0)} kg/cab
-                  </span>
-                )}
-                {bezPasto > 0 && (
-                  <>
-                    <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-semibold">
-                      {bezPasto.toLocaleString('pt-BR')} bez.
-                    </span>
-                    {bezPesoMedioPasto != null && (
-                      <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">
-                        {bezPesoMedioPasto.toFixed(0)} kg/bez
-                      </span>
-                    )}
-                  </>
-                )}
-                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
-                  {animaisPasto.length} lote{animaisPasto.length !== 1 ? 's' : ''}
-                </span>
-                {taxaLotacao != null && (
-                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold border border-green-200">
-                    TAXA: {taxaLotacao.toFixed(2).replace('.', ',')} UA/HA
-                  </span>
-                )}
-              </div>
-            </div>
-            <TableWrap>
-              {animaisPasto.map(a => <AnimalRow key={a.id} a={a} />)}
-            </TableWrap>
-          </section>
-          );
-        })}
-
-        {semPasto.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <h3 className="font-semibold text-gray-700">Não alocados</h3>
-              <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full ml-auto">
-                {semPasto.length} lote{semPasto.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <TableWrap>
-              {semPasto.map(a => <AnimalRow key={a.id} a={a} />)}
-            </TableWrap>
-          </section>
+        {/* ══ MODO LISTA ══ */}
+        {viewMode === 'lista' && (
+          <motion.div key="lista-view" className="space-y-6"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            {pastosComLotes.map(p => {
+              const animaisPasto   = byPasto[p.id];
+              const totalCabPasto  = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
+              const pesoNum        = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+              const pesoDen        = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+              const pesoMedioPasto = pesoDen > 0 ? pesoNum / pesoDen : null;
+              const bezPasto       = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+              const bezPesoNum     = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+              const bezPesoDen     = animaisPasto.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+              const bezPesoMedioPasto = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
+              const uaTotal        = (animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0) + animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0)) / 450;
+              const taxaLotacao    = p.area && uaTotal > 0 ? uaTotal / p.area : null;
+              return (
+                <section key={p.id}>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <MapPin className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                    <h3 className="font-semibold text-gray-800">{p.nome}</h3>
+                    {p.area && <span className="text-xs text-gray-400">· {p.area} ha</span>}
+                    <div className="ml-auto flex items-center gap-2 flex-wrap">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{totalCabPasto.toLocaleString('pt-BR')} cab.</span>
+                      {pesoMedioPasto != null && <span className="text-xs bg-teal-50 px-2 py-0.5 rounded-full font-semibold" style={{ color: '#1a6040' }}>{pesoMedioPasto.toFixed(0)} kg/cab</span>}
+                      {bezPasto > 0 && <><span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-semibold">{bezPasto.toLocaleString('pt-BR')} bez.</span>{bezPesoMedioPasto != null && <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">{bezPesoMedioPasto.toFixed(0)} kg/bez</span>}</>}
+                      <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{animaisPasto.length} lote{animaisPasto.length !== 1 ? 's' : ''}</span>
+                      {taxaLotacao != null && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold border border-green-200">TAXA: {taxaLotacao.toFixed(2).replace('.', ',')} UA/HA</span>}
+                    </div>
+                  </div>
+                  <TableWrap>{animaisPasto.map(a => <AnimalRow key={a.id} a={a} />)}</TableWrap>
+                </section>
+              );
+            })}
+            {semPasto.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <h3 className="font-semibold text-gray-700">Não alocados</h3>
+                  <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full ml-auto">{semPasto.length} lote{semPasto.length !== 1 ? 's' : ''}</span>
+                </div>
+                <TableWrap>{semPasto.map(a => <AnimalRow key={a.id} a={a} />)}</TableWrap>
+              </section>
+            )}
+          </motion.div>
         )}
-      </div>
+
+        {/* ══ MODO CARD ══ — grid de PastoCards */}
+        {viewMode === 'card' && (
+          <motion.div key="card-view" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            {pastosComLotes.map(p => {
+              const animaisPasto      = byPasto[p.id];
+              const totalCabPasto     = animaisPasto.reduce((s, a) => s + a.quantidade, 0);
+              const pesoNum           = animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0);
+              const pesoDen           = animaisPasto.filter(a => a.peso_medio).reduce((s, a) => s + a.quantidade, 0);
+              const pesoMedioPasto    = pesoDen > 0 ? pesoNum / pesoDen : null;
+              const bezPasto          = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+              const bezPesoNum        = animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+              const bezPesoDen        = animaisPasto.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
+              const bezPesoMedioPasto = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
+              const uaTotal           = (animaisPasto.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0), 0) + animaisPasto.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0)) / 450;
+              const taxaLotacao       = p.area && uaTotal > 0 ? uaTotal / p.area : null;
+              return (
+                <PastoCard key={p.id}
+                  pasto={p}
+                  animaisPasto={animaisPasto}
+                  totalCab={totalCabPasto}
+                  pesoMedio={pesoMedioPasto}
+                  bezTotal={bezPasto}
+                  bezPesoMedio={bezPesoMedioPasto}
+                  taxaLotacao={taxaLotacao}
+                />
+              );
+            })}
+            {/* Não alocados como card especial */}
+            {semPasto.length > 0 && (
+              <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}
+                className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="px-4 pt-3 pb-2.5 border-b border-amber-100" style={{ background: 'rgba(251,191,36,0.06)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                    <p className="font-bold text-amber-700 text-sm">Não alocados</p>
+                  </div>
+                  <div className="mt-1.5">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Total </span>
+                    <span className="text-xs font-bold text-amber-600">{semPasto.reduce((s, a) => s + a.quantidade, 0).toLocaleString('pt-BR')} cab.</span>
+                    <span className="ml-3 text-[9px] font-semibold uppercase tracking-widest text-gray-400">Lotes </span>
+                    <span className="text-xs font-bold text-gray-600">{semPasto.length}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col divide-y divide-gray-100">
+                  {semPasto.map(a => {
+                    const catNome = a.categoria_id ? catMap[a.categoria_id] ?? null : null;
+                    return (
+                      <div key={a.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="font-bold text-gray-800 text-sm">{a.nome}</p>
+                          {a.sexo && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{a.sexo}</span>}
+                        </div>
+                        {catNome && <p className="text-[10px] font-semibold mb-2" style={{ color: '#1a6040' }}>{catNome}</p>}
+                        <div className="flex items-center gap-4 mb-2">
+                          <div>
+                            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Cabeças</p>
+                            <p className="text-base font-bold leading-none" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</p>
+                          </div>
+                          <div className="w-px h-6 bg-gray-100 flex-shrink-0" />
+                          <div>
+                            <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Peso Médio</p>
+                            <p className="text-base font-bold text-gray-800 leading-none">{a.peso_medio ? <>{a.peso_medio}<span className="text-[10px] font-normal text-gray-400"> kg</span></> : '—'}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => { setAlocarAnimal(a); setPastoSel(''); }}
+                          className="w-full text-xs px-3 py-1.5 rounded-lg border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors font-semibold no-print">
+                          Alocar ao Pasto
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+      </AnimatePresence>
 
       {/* Modal alocar */}
       <AnimatePresence>
