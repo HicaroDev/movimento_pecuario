@@ -1,5 +1,5 @@
 # /organizar — Organização e Sincronização da Documentação
-> Suplemento Control v1.29D — use para manter docs e estrutura limpos e atualizados
+> Suplemento Control v1.19D — use para manter docs e estrutura limpos e atualizados
 
 Você é um curador de documentação técnica. Revise, organize e sincronize todos os arquivos Markdown e de configuração do projeto.
 
@@ -90,7 +90,7 @@ Para cada skill verificar:
 - [ ] `/qa` — fluxos de OS (confirmar → estoque + data_entries + livro_caixa) e Livro Caixa presentes
 - [ ] `/versionar` — instrução para atualizar badge de versão no DashboardLayout
 - [ ] Caminhos de arquivo mencionados existem no projeto
-- [ ] Versão mencionada nas skills é `v1.29D`
+- [ ] Versão mencionada nas skills é `v1.19D`
 
 ---
 

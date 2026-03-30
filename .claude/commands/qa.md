@@ -1,5 +1,5 @@
 # /qa — Quality Assurance Completo
-> Suplemento Control v1.29D — execute após qualquer implementação significativa
+> Suplemento Control v1.19D — execute após qualquer implementação significativa
 
 Você é um engenheiro de QA sênior. Execute todos os passos abaixo em ordem e reporte o resultado.
 
@@ -118,7 +118,7 @@ Verificar `src/App.tsx`:
 - [ ] Rota `/manejos` → `Manejos`
 
 Verificar `src/layouts/DashboardLayout.tsx`:
-- [ ] Badge de versão atualizado (`v1.29D`)
+- [ ] Badge de versão atualizado (`v1.19D`)
 - [ ] Admin vê links reais: Estoque, Ordens (OS), Livro Caixa
 - [ ] Clientes veem "EM BREVE" para Estoque, OS e Livro Caixa
 
