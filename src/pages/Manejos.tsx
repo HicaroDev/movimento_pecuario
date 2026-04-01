@@ -1133,7 +1133,6 @@ function EvolucaoTab({
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c.nome])), [categories]);
-  const pastureMap = useMemo(() => Object.fromEntries(pastures.map(p => [p.id, p.nome])), [pastures]);
 
   const [evolSearch, setEvolSearch] = useState('');
   const ativosFiltradosEvol = useMemo(() => {
