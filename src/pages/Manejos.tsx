@@ -95,7 +95,7 @@ function LotesTab({
 
   // ── View mode toggle ──
   const [viewMode, setViewMode] = useState<'lista' | 'card'>(() => {
-    return (localStorage.getItem('manejos_view_mode') as 'lista' | 'card') ?? 'lista';
+    return (localStorage.getItem('manejos_view_mode') as 'lista' | 'card') ?? 'card';
   });
   function toggleView(mode: 'lista' | 'card') {
     setViewMode(mode);
