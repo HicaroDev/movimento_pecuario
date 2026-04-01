@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-03-27
+> Última atualização: 2026-04-01
 
 ## Legenda
 - [ ] Pendente
@@ -98,7 +98,7 @@
 ### 2D — Polish
 - [x] **T-230** Filtro de data com range (data início / data fim) além de chips por mês ✅
 - [x] **T-231** Responsividade tablet/mobile ✅
-- [ ] **T-232** Empty states para Cadastros (cada tab vazia)
+- [x] **T-232** Empty states para Cadastros (cada tab vazia) ✅
 - [x] **T-233** Deploy EasyPanel (Dockerfile multi-stage + nginx SPA + secrets inline) ✅
 - [x] **T-234** Sync: refresh silencioso ao voltar ao foco (visibility + focus + online, threshold 5s) ✅
 
@@ -150,6 +150,16 @@
 - [x] **T-285** Formulário: validar/documentar formato Excel para importação (seção colapsável em ImportExcelModal)
 - [x] **T-230** Filtro de data com range (início/fim) no Relatório
 - [x] **T-231** Responsividade tablet/mobile (sidebar colapsável, top bar mobile, paddings responsivos)
+
+### 2K — Melhorias Manejos Abr/26 (CONCLUÍDO ✅)
+- [x] **T-350** Auditoria técnica completa (13 dimensões) → `AUDITORIA-2026-03-29.md`
+- [x] **T-351** `supabase/rls_auditoria_v200.sql` — RLS em tabelas legadas + `user_farm_ids()` corrigida
+- [x] **T-352** `supabase/rpc_confirmar_os_v100.sql` — transação atômica para confirmar OS (R-02)
+- [x] **T-353** Manejos LotesTab: toggle Lista/Card com `localStorage` persistente
+- [x] **T-354** Manejos LotesTab: super filtro por categoria (select dropdown) na toolbar
+- [x] **T-355** Manejos LotesTab: PastoCard com header + stats + lotes agrupados por pasto
+- [x] **T-356** Manejos: padrão de visualização alterado para Card
+- [x] **T-357** Manejos Evolução: remover sub-aba "Transf. Parcial" (redundante com aba Transferir)
 
 ### 2J — Ajustes MP_21 MAR (PARCIALMENTE CONCLUÍDO)
 - [x] **T-290** Fazendas: edição inline para usuário cliente
@@ -245,18 +255,19 @@
 | 1 — React + Vite | 24 | 24 | ✅ Concluída |
 | 1.5 — Auth + Multi-tenant | 16 | 16 | ✅ Concluída |
 | 1.6 — Migração Supabase | 10 | 10 | ✅ Concluída |
-| 2A–E — Melhorias Avançadas | 21 | 19 | 🔄 90% (falta T-232, T-240, T-241) |
+| 2A–E — Melhorias Avançadas | 21 | 21 | ✅ Concluída |
 | 2F — Módulo Manejos | 10 | 10 | ✅ Concluída |
 | 2G — Ajustes MP_04 MAR + PDF | 19 | 19 | ✅ Concluída |
 | 2H — Ajustes MP_05 MAR | 4 | 4 | ✅ Concluída |
 | 2I — Entregas Finais | 4 | 4 | ✅ Concluída |
 | 2J — Ajustes MP_21 MAR | 10 | 9 | 🔄 90% (falta T-296 SMTP) |
+| 2K — Melhorias Manejos Abr/26 | 8 | 8 | ✅ Concluída |
 | 3A — Estoque de Suplementos | 10 | 10 | ✅ Concluída |
 | 3B — OS: Ordens de Suplemento | 9 | 9 | ✅ Concluída |
 | 3C — Livro Caixa | 8 | 8 | ✅ Concluída |
 | 3D — Solicitações de Compra | 6 | 6 | ✅ Concluída |
 | 3 — SaaS Escala | 5 | 0 | ⬜ Futuro |
-| **TOTAL** | **169** | **161** | **95%** |
+| **TOTAL** | **178** | **171** | **96%** |
 
 ---
 
