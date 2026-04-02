@@ -19,8 +19,8 @@ const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT'
 const MONTH_FULL  = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
 function monthLabel(ym: string) {
-  const [y, m] = ym.split('-').map(Number);
-  return `${MONTH_SHORT[m - 1]}/${String(y).slice(2)}`;
+  const [, m] = ym.split('-').map(Number);
+  return MONTH_SHORT[m - 1];
 }
 
 function periodFull(ym: string) {
@@ -84,13 +84,19 @@ export function Relatorio() {
     );
   }
 
-  /* ── Month chips derived from entries ── */
+  /* ── Month chips — 12 meses do ano atual + histórico com entries ── */
   const monthOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
     const set = new Set<string>();
-    for (const e of entries) {
-      if (e.data) set.add(e.data.slice(0, 7)); // YYYY-MM
+    for (let m = 1; m <= 12; m++) {
+      set.add(`${currentYear}-${String(m).padStart(2, '0')}`);
     }
-    return Array.from(set).sort((a, b) => b.localeCompare(a)); // newest first
+    for (const e of entries) {
+      if (e.data && !e.data.startsWith(String(currentYear))) {
+        set.add(e.data.slice(0, 7));
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [entries]);
 
   /* ── Mapa pastoId → nome ── */
