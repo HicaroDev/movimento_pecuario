@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   UserCog, Plus, Pencil, Trash2, Save, X, Eye, EyeOff,
-  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2, ClipboardList, KeyRound,
+  ToggleLeft, ToggleRight, Shield, BarChart3, FileText, FolderOpen, Building2, ClipboardList, KeyRound, Package, ScrollText, BookOpen,
 } from 'lucide-react';
 import type { ModulePermission } from '../types/user';
 import { toast } from 'sonner';
@@ -20,16 +20,18 @@ const inputClass =
   'w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors';
 const labelClass = 'block text-xs font-medium text-gray-600 mb-1';
 
-const ALL_MODULES: Module[] = ['relatorio', 'formulario', 'cadastros', 'manejos', 'fazendas', 'usuarios'];
+const ALL_MODULES: Module[] = ['relatorio', 'formulario', 'cadastros', 'manejos', 'fazendas', 'usuarios', 'estoque', 'os', 'caixa'];
 const MODULE_LABELS: Record<string, string> = {
   relatorio: 'Relatório', formulario: 'Lançamento', cadastros: 'Cadastros',
   manejos: 'Manejos', fazendas: 'Fazendas', usuarios: 'Usuários',
+  estoque: 'Estoque', os: 'Ordens (OS)', caixa: 'Livro Caixa',
   // nomes antigos (legado do trigger)
   pastos: 'Pastos',
 };
 const MODULE_ICONS: Record<string, React.ElementType> = {
   relatorio: BarChart3, formulario: FileText, cadastros: FolderOpen,
   manejos: ClipboardList, fazendas: Building2, usuarios: UserCog,
+  estoque: Package, os: ScrollText, caixa: BookOpen,
   // nomes antigos do trigger (legado)
   pastos: FolderOpen, usuarios_old: UserCog,
 };
@@ -40,6 +42,9 @@ const MODULE_COLORS: Record<string, string> = {
   manejos:    'bg-purple-50 text-purple-700 border-purple-100',
   fazendas:   'bg-indigo-50 text-indigo-700 border-indigo-100',
   usuarios:   'bg-rose-50 text-rose-700 border-rose-100',
+  estoque:    'bg-orange-50 text-orange-700 border-orange-100',
+  os:         'bg-cyan-50 text-cyan-700 border-cyan-100',
+  caixa:      'bg-teal-50 text-teal-700 border-teal-100',
   pastos:     'bg-sky-50 text-sky-700 border-sky-100',
 };
 

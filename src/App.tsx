@@ -51,9 +51,18 @@ const router = createBrowserRouter([
           children: [{ path: 'usuarios', Component: Usuarios }],
         },
         { path: 'historico', Component: Historico },
-        { path: 'estoque',   Component: Estoque   },
-        { path: 'os',        Component: OS        },
-        { path: 'caixa',     Component: LivroCaixa },
+        {
+          element: <ModuleRoute module="estoque" />,
+          children: [{ path: 'estoque', Component: Estoque }],
+        },
+        {
+          element: <ModuleRoute module="os" />,
+          children: [{ path: 'os', Component: OS }],
+        },
+        {
+          element: <ModuleRoute module="caixa" />,
+          children: [{ path: 'caixa', Component: LivroCaixa }],
+        },
         { path: 'devplan',   Component: DevPlan   },
       ],
     }],
