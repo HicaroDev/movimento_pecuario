@@ -1093,9 +1093,9 @@ function DestinoSelector({ destino, setDestino, loteDestId, setLoteDestId, novoN
 }
 
 function EvolucaoTab({
-  animals, categories, pastures, farmId, onReload,
+  animals, categories, farmId, onReload,
 }: {
-  animals: Animal[]; categories: AnimalCategory[]; pastures: Pasture[]; farmId: string; onReload: () => void;
+  animals: Animal[]; categories: AnimalCategory[]; farmId: string; onReload: () => void;
 }) {
   const [subOp, setSubOp]         = useState<SubOp>('categoria');
   const [saving, setSaving]       = useState(false);
@@ -1789,7 +1789,7 @@ export function Manejos() {
                   farmId={activeFarmId} onReload={reload} categories={categories} />
               )}
               {tab === 'evolucao' && (
-                <EvolucaoTab animals={animals} categories={categories} pastures={pastures}
+                <EvolucaoTab animals={animals} categories={categories}
                   farmId={activeFarmId} onReload={reload} />
               )}
               {tab === 'abate' && (
