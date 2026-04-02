@@ -11,13 +11,16 @@ import type { Farm } from '../types/farm';
 import { estoqueService } from '../services/estoqueService';
 
 const navItems = [
-  { path: '/manejos',    label: 'Manejo',     icon: ClipboardList, module: 'manejos'    as Module },
-  { path: '/formulario', label: 'Lançamento', icon: FileText,      module: 'formulario' as Module },
-  { path: '/',           label: 'Relatórios', icon: BarChart3,     module: 'relatorio'  as Module },
-  { path: '/cadastros',  label: 'Cadastros',  icon: FolderOpen,    module: 'cadastros'  as Module },
-  { path: '/historico',  label: 'Histórico',  icon: History,       module: 'historico'  as Module },
-  { path: '/usuarios',   label: 'Usuários',   icon: Users,         module: 'usuarios'   as Module },
-  { path: '/fazendas',   label: 'Fazenda',    icon: Building2,     module: 'fazendas'   as Module },
+  { path: '/manejos',    label: 'Manejo',        icon: ClipboardList, module: 'manejos'    as Module },
+  { path: '/formulario', label: 'Lançamento',    icon: FileText,      module: 'formulario' as Module },
+  { path: '/',           label: 'Relatórios',    icon: BarChart3,     module: 'relatorio'  as Module },
+  { path: '/cadastros',  label: 'Cadastros',     icon: FolderOpen,    module: 'cadastros'  as Module },
+  { path: '/historico',  label: 'Histórico',     icon: History,       module: 'historico'  as Module },
+  { path: '/usuarios',   label: 'Usuários',      icon: Users,         module: 'usuarios'   as Module },
+  { path: '/fazendas',   label: 'Fazenda',       icon: Building2,     module: 'fazendas'   as Module },
+  { path: '/estoque',    label: 'Estoque',       icon: Package,       module: 'estoque'    as Module },
+  { path: '/os',         label: 'Ordens (OS)',   icon: ScrollText,    module: 'os'         as Module },
+  { path: '/caixa',      label: 'Livro Caixa',   icon: BookOpen,      module: 'caixa'      as Module },
 ];
 
 /* ── Seletor de fazenda reutilizável ── */
@@ -217,7 +220,7 @@ export function DashboardLayout() {
               boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             }}
           >
-            <img src="/images/zooflora.png" alt="Zoo Flora Nutrição Animal" className="w-full h-auto" />
+            <img src="/images/logo.png" alt="Movimento Pecuário" className="w-full h-auto" />
           </div>
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-bold text-gray-800">Suplemento Control</h1>
@@ -278,6 +281,12 @@ export function DashboardLayout() {
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span className="text-sm font-medium">{item.label}</span>
+                  {item.module === 'estoque' && estoqueAlertas > 0 && (
+                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{ background: '#ef4444', color: '#fff', minWidth: '18px', textAlign: 'center' }}>
+                      {estoqueAlertas}
+                    </span>
+                  )}
                 </Link>
               </motion.div>
             );
@@ -327,107 +336,6 @@ export function DashboardLayout() {
             </motion.div>
           )}
 
-          {/* ── Módulos admin-only ── */}
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.10 }}
-            >
-              <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                {(() => {
-                  const isActive = location.pathname.startsWith('/estoque');
-                  return (
-                    <Link
-                      to="/estoque"
-                      onClick={() => setSidebarOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
-                      style={isActive ? {
-                        background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
-                        color: '#ffffff',
-                        boxShadow: '0 4px 16px rgba(26,96,64,0.35)',
-                        border: '1px solid rgba(26,96,64,0.3)',
-                      } : { color: '#6b7280' }}
-                      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
-                      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                    >
-                      <Package className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium">Estoque</span>
-                      {estoqueAlertas > 0 && (
-                        <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: '#ef4444', color: '#fff', minWidth: '18px', textAlign: 'center' }}>
-                          {estoqueAlertas}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })()}
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── OS — admin-only ── */}
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.15 }}
-            >
-              {(() => {
-                const isActive = location.pathname.startsWith('/os');
-                return (
-                  <Link
-                    to="/os"
-                    onClick={() => setSidebarOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
-                    style={isActive ? {
-                      background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
-                      color: '#ffffff',
-                      boxShadow: '0 4px 16px rgba(26,96,64,0.35)',
-                      border: '1px solid rgba(26,96,64,0.3)',
-                    } : { color: '#6b7280' }}
-                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
-                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  >
-                    <ScrollText className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">Ordens (OS)</span>
-                  </Link>
-                );
-              })()}
-            </motion.div>
-          )}
-
-          {/* ── Livro Caixa — admin-only ── */}
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.20 }}
-            >
-              {(() => {
-                const isActive = location.pathname.startsWith('/caixa');
-                return (
-                  <Link
-                    to="/caixa"
-                    onClick={() => setSidebarOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
-                    style={isActive ? {
-                      background: 'linear-gradient(135deg, #1a6040, #0f4a30)',
-                      color: '#ffffff',
-                      boxShadow: '0 4px 16px rgba(26,96,64,0.35)',
-                      border: '1px solid rgba(26,96,64,0.3)',
-                    } : { color: '#6b7280' }}
-                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
-                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  >
-                    <BookOpen className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">Livro Caixa</span>
-                  </Link>
-                );
-              })()}
-            </motion.div>
-          )}
-
           {/* ── Módulos em breve (clientes veem) ── */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -435,43 +343,6 @@ export function DashboardLayout() {
             transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 }}
           >
             <div className="mt-3 pt-3 space-y-1" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-              {!isAdmin && (
-                <>
-                  <button
-                    onClick={() => setShowEmDev(true)}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
-                    style={{ color: '#6b7280' }}
-                  >
-                    <Package className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">Estoque</span>
-                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
-                      EM BREVE
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => setShowEmDev(true)}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
-                    style={{ color: '#6b7280' }}
-                  >
-                    <ScrollText className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">Ordens (OS)</span>
-                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
-                      EM BREVE
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => setShowEmDev(true)}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
-                    style={{ color: '#6b7280' }}
-                  >
-                    <BookOpen className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">Livro Caixa</span>
-                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 text-gray-400">
-                      EM BREVE
-                    </span>
-                  </button>
-                </>
-              )}
               <button
                 onClick={() => setShowEmDev(true)}
                 className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 opacity-40 hover:opacity-60"
