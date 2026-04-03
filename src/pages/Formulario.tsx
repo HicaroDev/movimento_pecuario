@@ -920,6 +920,7 @@ export function Formulario() {
             <input
               type="password"
               autoFocus
+              autoComplete="new-password"
               value={senhaInput}
               onChange={e => { setSenhaInput(e.target.value); setSenhaErro(false); }}
               onKeyDown={e => e.key === 'Enter' && confirmarSenha()}
