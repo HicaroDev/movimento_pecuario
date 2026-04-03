@@ -261,7 +261,7 @@ export function Formulario() {
     }).catch(() => {}).finally(() => setLoadingData(false));
   }, [farmId]);
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormFields>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormFields>({
     defaultValues: { data: today, funcionario: '' },
   });
 
