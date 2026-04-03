@@ -327,21 +327,14 @@ export function Formulario() {
     ? supplementTypes.map(s => s.nome)
     : supplementOrder;
 
-  const onAddRow = (data: FormFields) => {
+  function executarLancamento(data: FormFields) {
     const bezTemSuppProprio = !!(data.tipoBez && Number(data.sacosBez) > 0 && (pastoInfo?.totalBez ?? 0) > 0);
     const adultoPreenchido  = !!(data.tipo && Number(data.sacos) > 0);
-
-    // Validação: pelo menos adulto OU bezerro deve estar preenchido
-    if (!adultoPreenchido && !bezTemSuppProprio) {
-      toast.error('Preencha o suplemento do adulto ou dos bezerros.');
-      return;
-    }
 
     const qtdAdulto = bezTemSuppProprio
       ? (pastoInfo?.totalCab ?? 0)
       : (pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0);
 
-    // Lançamento adulto (somente se preenchido)
     if (adultoPreenchido) {
       const entry: DataEntry = {
         pasto:        data.pasto,
@@ -366,7 +359,6 @@ export function Formulario() {
       });
     }
 
-    // Lançamento de bezerros (quando preenchido)
     if (data.tipoBez && Number(data.sacosBez) > 0 && pastoInfo && pastoInfo.totalBez > 0) {
       const entryBez: DataEntry = {
         pasto:       data.pasto,
@@ -391,7 +383,37 @@ export function Formulario() {
       });
     }
 
-    reset({ data: data.data, tipo: '', sacos: 0, pasto: '', funcionario: '', tipoBez: '', sacosBez: 0 });
+    // Manter dados do formulário — apenas limpar sacos para próximo lançamento
+    setValue('sacos', 0);
+    setValue('sacosBez', 0);
+  }
+
+  const onAddRow = (data: FormFields) => {
+    const bezTemSuppProprio = !!(data.tipoBez && Number(data.sacosBez) > 0 && (pastoInfo?.totalBez ?? 0) > 0);
+    const adultoPreenchido  = !!(data.tipo && Number(data.sacos) > 0);
+
+    if (!adultoPreenchido && !bezTemSuppProprio) {
+      toast.error('Preencha o suplemento do adulto ou dos bezerros.');
+      return;
+    }
+
+    // Verificar duplicata: mesmo pasto + data + tipo já lançado neste mês
+    const isDuplicate = adultoPreenchido && visibleEntries.some(
+      e => e.pasto === data.pasto && e.data === data.data && e.tipo === data.tipo
+    );
+
+    if (isDuplicate) {
+      toast.warning(
+        `Já existe "${data.tipo}" para ${data.pasto} nesta data. Adicionar mesmo assim?`,
+        {
+          duration: 10000,
+          action: { label: 'Sim, adicionar', onClick: () => executarLancamento(data) },
+        }
+      );
+      return;
+    }
+
+    executarLancamento(data);
   };
 
   return (

@@ -218,7 +218,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }, 20_000);
 
     Promise.all([
-      supabaseAdmin.from('data_entries').select('*').eq('farm_id', activeFarmId).order('created_at'),
+      supabaseAdmin.from('data_entries').select('*').eq('farm_id', activeFarmId).order('data', { ascending: false }).limit(5000),
       supabaseAdmin.from('pastures').select('*').eq('farm_id', activeFarmId).order('nome'),
       farmService.findById(activeFarmId),
     ]).then(([entriesRes, pasturesRes, farm]) => {
