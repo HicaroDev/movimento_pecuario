@@ -16,8 +16,8 @@ const DEFAULT_FORRAGENS = [
 const DEFAULT_CATEGORIAS = [
   'Vacas Adultas', 'Primíparas', 'Vaca descarte',
   'Bezerros macho mamando', 'Bezerras fêmea mamando',
-  'Femeas até 12 meses', 'Femeas até 13 a 24 meses',
-  'Macho até 12 meses', 'Macho > 24 meses',
+  'Femeas até 12 meses', 'Femeas de 13 a 24 meses',
+  'Macho até 12 meses', 'Machos de 13 a 24 meses', 'Macho > 24 meses',
   'Touros', 'Novilhas Precoce',
   'Vaca Adultas Prenhas', 'Vacas Adultas Paridas',
 ];

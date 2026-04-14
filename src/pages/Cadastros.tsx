@@ -1101,8 +1101,9 @@ const CATEGORIAS_ANIMAIS = [
   'Bezerros macho mamando',
   'Bezerras fêmea mamando',
   'Femeas até 12 meses',
-  'Femeas até 13 a 24 meses',
+  'Femeas de 13 a 24 meses',
   'Macho até 12 meses',
+  'Machos de 13 a 24 meses',
   'Macho > 24 meses',
   'Touros',
   'Novilhas Precoce',
@@ -1124,7 +1125,7 @@ const CONSUMO_OPTIONS = [
 
 const META_CONSUMO: Record<string, string> = {
   '20 A 30 GRAMAS/100 KG PV':  '0,030%',
-  '35 A 45 GRAMAS/100 KG PV':  '0,400%',
+  '35 A 45 GRAMAS/100 KG PV':  '0,040%',
   '50 A 100 GRAMAS/100 KG PV': '0,060%',
   '100 A 120 GRAMAS/100 KG PV':'0,110%',
   '200 A 300 GRAMAS/100 KG PV':'0,250%',
