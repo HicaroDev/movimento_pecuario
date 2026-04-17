@@ -84,17 +84,18 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
         </div>
         <div className="flex items-center gap-3">
           {avgMeta != null && (() => {
-            const over = avg > avgMeta;
+            const pct = avgMeta > 0 ? (avg / avgMeta) : 1;
+            const isVerde   = pct <= 1;
+            const isAmarelo = pct > 1 && pct <= 1.15;
+            const bg    = isVerde ? 'rgba(34,197,94,0.25)' : isAmarelo ? 'rgba(234,179,8,0.30)' : 'rgba(239,68,68,0.25)';
+            const emoji = isVerde ? '🟢' : isAmarelo ? '🟡' : '🔴';
+            const label = isVerde ? 'DENTRO DA META' : isAmarelo ? 'ATENÇÃO: META' : 'ACIMA DA META';
             return (
               <span
-                className="text-xs font-bold px-3 py-1.5 rounded-full"
-                style={{
-                  background: over ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.22)',
-                  color: '#fff',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                }}
+                className="text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5"
+                style={{ background: bg, color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}
               >
-                {over ? '▲ ACIMA DA META' : '✓ DENTRO DA META'}
+                {emoji} {label}
               </span>
             );
           })()}
@@ -121,7 +122,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 <th className="py-2 text-right font-bold w-32">CONSUMO (KG/CAB DIA)</th>
                 {hasMeta        && <th className="py-2 text-right font-bold w-32">META (KG/CAB DIA)</th>}
                 {hasDesembolso  && <th className="py-2 text-right font-bold w-32">DESEMBOLSO (R$/CAB DIA)</th>}
-                {hasDesembolso  && <th className="py-2 text-right font-bold w-36">DESEMBOLSO (R$/CAB MÊS)</th>}
+                {hasDesembolso  && <th className="py-2 text-right font-bold w-36">DESEMBOLSO NO PERÍODO (R$/CAB)</th>}
               </tr>
             </thead>
             <tbody>

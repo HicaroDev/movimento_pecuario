@@ -1136,13 +1136,16 @@ const META_CONSUMO: Record<string, string> = {
 };
 
 let _suplementosCache: SupplementType[] = [];
-interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; consumo: string; observacoes: string; }
+const COR_OPTIONS = ['AMARELO', 'VERDE', 'AZUL', 'PRETO', 'BRANCO'];
+
+interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg: number; consumo: string; observacoes: string; meta_custom: string; }
 
 function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: (d: SupplementForm) => void; onCancel: () => void; }) {
   const { register, handleSubmit, watch } = useForm<SupplementForm>({
-    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '' },
+    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '', meta_custom: '' },
   });
   const consumoWatch = watch('consumo');
+  const metaDefault = META_CONSUMO[consumoWatch] || '';
   return (
     <tr className="bg-teal-50">
       <td className="px-4 py-2">
@@ -1165,8 +1168,15 @@ function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: 
           {CONSUMO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       </td>
-      <td className="px-4 py-2 text-xs text-gray-500">{META_CONSUMO[consumoWatch] || '—'}</td>
-      <td className="px-4 py-2"><input {...upperReg(register('observacoes'))} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <input {...register('meta_custom')} placeholder={metaDefault || '0,000%'} className={inputClass} />
+      </td>
+      <td className="px-4 py-2">
+        <select {...register('observacoes')} className={inputClass}>
+          <option value="">— Cor —</option>
+          {COR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>
   );
@@ -1179,7 +1189,8 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '' } });
+  const { register, handleSubmit, reset, watch: watchAdd, formState: { errors } } = useForm<SupplementForm>({ defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_custom: '' } });
+  const consumoWatchAdd = watchAdd('consumo');
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -1215,13 +1226,14 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
       ...(data.peso     > 0 && { peso:     data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
       ...(data.consumo        && { consumo: data.consumo }),
+      ...(data.meta_custom    && { meta_pct: data.meta_custom }),
     };
     const { data: row, error } = await supabaseAdmin.from('supplement_types').insert(payload).select().single();
     if (error) { toast.error('Erro ao adicionar.'); return; }
     _suplementosCache = [..._suplementosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     setItems(_suplementosCache);
     toast.success('Suplemento adicionado!', { description: data.nome });
-    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '' }); setShowAddForm(false);
+    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_custom: '' }); setShowAddForm(false);
   }
   async function onEditSave(id: string, data: SupplementForm) {
     const payload: Record<string, unknown> = {
@@ -1231,6 +1243,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
       ...(data.peso     > 0 && { peso:     data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
       ...(data.consumo ? { consumo: data.consumo } : { consumo: null }),
+      ...(data.meta_custom ? { meta_pct: data.meta_custom } : { meta_pct: null }),
     };
     const { error } = await supabaseAdmin.from('supplement_types').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
@@ -1310,9 +1323,23 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
                 {CONSUMO_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
-            <div className="col-span-2">
-              <label className={labelClass}>Observações</label>
-              <input placeholder="Ex.: Info adicional" {...upperReg(register('observacoes'))} className={inputClass} />
+            <div>
+              <label className={labelClass}>Meta (% PV)</label>
+              <input
+                placeholder={META_CONSUMO[consumoWatchAdd] || '0,000%'}
+                {...register('meta_custom')}
+                className={inputClass}
+              />
+              {META_CONSUMO[consumoWatchAdd] && (
+                <p className="text-[10px] text-gray-400 mt-0.5">Padrão: {META_CONSUMO[consumoWatchAdd]}</p>
+              )}
+            </div>
+            <div>
+              <label className={labelClass}>Cor</label>
+              <select {...register('observacoes')} className={inputClass}>
+                <option value="">— Cor —</option>
+                {COR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div className="col-span-2 flex gap-3">
               <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"><Plus className="w-4 h-4" /> Adicionar</button>
@@ -1330,7 +1357,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Meta (% PV)', 'Obs', 'Ações'].map(h => (
+                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Meta (% PV)', 'Cor', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -1351,7 +1378,9 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
                       <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{item.consumo || '—'}</td>
-                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>{item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—'}</td>
+                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>
+                        {(item as SupplementType & { meta_custom?: string }).meta_custom || (item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—')}
+                      </td>
                       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                       <td className="px-4 py-3"><ActionBtns
                         onEdit={() => onRequestEdit

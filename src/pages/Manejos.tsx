@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { manejoService, type Animal, type AnimalCategory, type ManejoEvent } from '../services/manejoService';
 import { farmService } from '../services/farmService';
 import type { Pasture } from '../context/DataContext';
@@ -780,9 +781,9 @@ function LotesTab({
 ══════════════════════════════════════════════════════════════ */
 
 function TransferirTab({
-  animals, pastures, farmId, onReload, categories,
+  animals, pastures, farmId, onReload, categories, userName,
 }: {
-  animals: Animal[]; pastures: Pasture[]; farmId: string; onReload: () => void; categories: AnimalCategory[];
+  animals: Animal[]; pastures: Pasture[]; farmId: string; onReload: () => void; categories: AnimalCategory[]; userName?: string;
 }) {
   const [loteId, setLoteId]         = useState('');
   const [destPastoId, setDestPastoId] = useState('');
@@ -796,6 +797,7 @@ function TransferirTab({
   const [isParcial, setIsParcial]   = useState(false);
   const [parcQtd, setParcQtd]       = useState('');
   const [parcBezQtd, setParcBezQtd] = useState('');
+  const [parcPeso, setParcPeso]     = useState('');
   // Se o pasto destino já tem lotes, o usuário pode agregar em um deles ou criar novo
   const [parcModo, setParcModo]     = useState<'novo' | 'agregar'>('novo');
   const [parcMergeId, setParcMergeId] = useState('');
@@ -820,7 +822,7 @@ function TransferirTab({
 
   function resetForm() {
     setLoteId(''); setDestPastoId(''); setObs(''); setData(new Date().toISOString().split('T')[0]);
-    setIsParcial(false); setParcQtd(''); setParcBezQtd(''); setParcModo('novo'); setParcMergeId(''); setParcNovoNome('');
+    setIsParcial(false); setParcQtd(''); setParcBezQtd(''); setParcPeso(''); setParcModo('novo'); setParcMergeId(''); setParcNovoNome('');
   }
 
   async function confirmar() {
@@ -853,12 +855,14 @@ function TransferirTab({
       try {
         await manejoService.transferirParcialParaPasto({
           origem: lote, qtd, bezQtd: parcBezQtd ? Number(parcBezQtd) : undefined,
+          pesoNovoLote: parcPeso ? Number(parcPeso) : undefined,
           destPastoId, destPastoNome: destNome, farmId, data,
           mergeLoteId:      mergeLote?.id,
           mergeLoteNome:    mergeLote?.nome,
           mergeLoteQtd:     mergeLote?.quantidade,
           mergeLoteBezQtd:  mergeLote?.bezerros_quantidade,
           novoLoteNome: parcModo === 'novo' ? parcNovoNome.trim() : undefined,
+          userName,
         });
         toast.success(`${qtd} cab. de "${lote.nome}" → ${destNome}!`);
         resetForm(); onReload();
@@ -943,6 +947,22 @@ function TransferirTab({
               type="number" min="0" max={lote.bezerros_quantidade}
               value={parcBezQtd} onChange={e => setParcBezQtd(e.target.value)}
               placeholder="Ex: 5" className={inputClass}
+            />
+          </div>
+        )}
+
+        {/* Peso médio do novo lote (apenas parcial — novo lote) */}
+        {isParcial && parcModo === 'novo' && (
+          <div>
+            <label className={labelClass}>
+              Peso médio do novo lote (kg)
+              <span className="ml-1 text-gray-400 font-normal">· deixe em branco para manter o peso do lote origem</span>
+            </label>
+            <input
+              type="number" min="0" step="0.1"
+              value={parcPeso} onChange={e => setParcPeso(e.target.value)}
+              placeholder={lote?.peso_medio ? `Padrão: ${lote.peso_medio} kg` : 'Ex: 350'}
+              className={inputClass}
             />
           </div>
         )}
@@ -1696,6 +1716,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 export function Manejos() {
   const { activeFarmId, pastures } = useData();
+  const { user } = useAuth();
   const [tab, setTab]             = useState<Tab>('lotes');
   const [animals, setAnimals]     = useState<Animal[]>([]);
   const [categories, setCategories] = useState<AnimalCategory[]>([]);
@@ -1786,7 +1807,7 @@ export function Manejos() {
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
-                  farmId={activeFarmId} onReload={reload} categories={categories} />
+                  farmId={activeFarmId} onReload={reload} categories={categories} userName={user?.name} />
               )}
               {tab === 'evolucao' && (
                 <EvolucaoTab animals={animals} categories={categories}

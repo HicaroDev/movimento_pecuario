@@ -50,6 +50,7 @@ export function Relatorio() {
   const [animals,    setAnimals]    = useState<Animal[]>([]);
   const [suppTypes,  setSuppTypes]  = useState<SuppType[]>([]);
   const [evolucaoHistorico, setEvolucaoHistorico] = useState<Array<{animal_id: string; created_at: string; peso_medio: number}>>([]);
+  const [lotePastosHistorico, setLotePastosHistorico] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!farmId) return;
@@ -65,6 +66,26 @@ export function Relatorio() {
         .not('peso_medio', 'is', null)
     ).then(({ data }) => setEvolucaoHistorico((data ?? []) as Array<{animal_id: string; created_at: string; peso_medio: number}>)).catch(() => {});
   }, [farmId]);
+
+  // Quando filterLote muda, buscar histórico de pastos do lote no manejo_historico
+  useEffect(() => {
+    if (!filterLote || !farmId) { setLotePastosHistorico(new Set()); return; }
+    const animal = animals.find(a => a.nome === filterLote);
+    if (!animal) { setLotePastosHistorico(new Set()); return; }
+    void supabaseAdmin
+      .from('manejo_historico')
+      .select('pasto_origem, pasto_destino')
+      .eq('farm_id', farmId)
+      .eq('animal_id', animal.id)
+      .then(({ data }) => {
+        const pastos = new Set<string>();
+        for (const row of data ?? []) {
+          if (row.pasto_origem)  pastos.add(row.pasto_origem);
+          if (row.pasto_destino) pastos.add(row.pasto_destino);
+        }
+        setLotePastosHistorico(pastos);
+      });
+  }, [filterLote, farmId, animals]);
 
   const hasFilters = !!filterSupplement || !!filterPasto || !!filterLote || filterMonths.length > 0 || !!dateFrom || !!dateTo;
 
@@ -198,13 +219,17 @@ export function Relatorio() {
       entries.filter((e) => {
         if (filterSupplement && e.tipo !== filterSupplement) return false;
         if (filterPasto      && e.pasto !== filterPasto)     return false;
-        if (filterLote && !pastoLotesMap[e.pasto]?.includes(filterLote)) return false;
+        if (filterLote) {
+          const emAtual    = pastoLotesMap[e.pasto]?.includes(filterLote);
+          const emHistorico = lotePastosHistorico.has(e.pasto);
+          if (!emAtual && !emHistorico) return false;
+        }
         if (filterMonths.length > 0 && (!e.data || !filterMonths.some(m => e.data!.startsWith(m)))) return false;
         if (dateFrom && e.data && e.data < dateFrom) return false;
         if (dateTo   && e.data && e.data > dateTo)   return false;
         return true;
       }),
-    [entries, filterSupplement, filterPasto, filterLote, filterMonths, dateFrom, dateTo, pastoLotesMap]
+    [entries, filterSupplement, filterPasto, filterLote, filterMonths, dateFrom, dateTo, pastoLotesMap, lotePastosHistorico]
   );
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);

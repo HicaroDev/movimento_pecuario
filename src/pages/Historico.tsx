@@ -83,8 +83,10 @@ export function Historico() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterLote, setFilterLote] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo,   setDateTo]   = useState('');
+  const [loteOptions, setLoteOptions] = useState<string[]>([]);
 
   useEffect(() => {
     if (!farmId) return;
@@ -93,10 +95,12 @@ export function Historico() {
       supabaseAdmin.from('manejo_historico').select('id, tipo, descricao, created_at, user_name').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('data_entries').select('id, pasto_nome, suplemento, data, quantidade, sacos, kg').eq('farm_id', farmId).order('data', { ascending: false }).limit(300),
       supabaseAdmin.from('activity_log').select('id, module, action, description, user_name, created_at').eq('farm_id', farmId).order('created_at', { ascending: false }).limit(300),
-    ]).then(([manRes, lanRes, actRes]) => {
+      supabaseAdmin.from('animals').select('nome').eq('farm_id', farmId).eq('status', 'ativo').order('nome'),
+    ]).then(([manRes, lanRes, actRes, animRes]) => {
       setManejos(manRes.data ?? []);
       setLancamentos(lanRes.data ?? []);
       setActivityLogs(actRes.data ?? []);
+      setLoteOptions((animRes.data ?? []).map((a: { nome: string }) => a.nome));
     }).catch(() => {}).finally(() => setLoading(false));
   }, [farmId]);
 
@@ -138,6 +142,12 @@ export function Historico() {
     // Filter by date range
     if (dateFrom) entries = entries.filter(e => e.created_at >= dateFrom);
     if (dateTo)   entries = entries.filter(e => e.created_at.slice(0, 10) <= dateTo);
+    // Filter by lote
+    if (filterLote) {
+      entries = entries.filter(e =>
+        e.descricao.toLowerCase().includes(filterLote.toLowerCase())
+      );
+    }
     // Filter by search
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -149,11 +159,18 @@ export function Historico() {
       );
     }
     return entries;
-  }, [allEntries, search, filterType, dateFrom, dateTo]);
+  }, [allEntries, search, filterType, filterLote, dateFrom, dateTo]);
 
-  function fmtDate(iso: string) {
+  function fmtDate(iso: string, dateOnly = false) {
     if (!iso) return '—';
-    try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    try {
+      if (dateOnly || iso.length === 10) {
+        // Data sem hora — evitar bug de timezone (ex: "2026-03-15" → 14/03 no UTC-3)
+        const [y, m, d] = iso.slice(0, 10).split('-');
+        return `${d}/${m}/${y.slice(2)}`;
+      }
+      return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
     catch { return iso.slice(0, 10); }
   }
 
@@ -173,6 +190,26 @@ export function Historico() {
           <h1 className="text-3xl font-bold text-gray-900">Histórico</h1>
           <p className="text-sm text-gray-500 mt-1">Registro completo de manejos, lançamentos e atividades do sistema.</p>
         </div>
+
+        {/* Filtro por lote */}
+        {loteOptions.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Lote</span>
+            <select
+              value={filterLote}
+              onChange={e => setFilterLote(e.target.value)}
+              className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="">Todos os lotes</option>
+              {loteOptions.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+            {filterLote && (
+              <button onClick={() => setFilterLote('')} className="text-xs text-teal-600 hover:text-teal-700 font-medium transition-colors">
+                Limpar
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Filtro de datas */}
         <div className="flex items-center gap-3 flex-wrap bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
@@ -272,7 +309,7 @@ export function Historico() {
                         {e.user_name}
                       </span>
                     )}
-                    <p className="text-[10px] text-gray-400">{fmtDate(e.created_at)}</p>
+                    <p className="text-[10px] text-gray-400">{fmtDate(e.created_at, e.source === 'lancamento')}</p>
                   </div>
                 </div>
               ))}

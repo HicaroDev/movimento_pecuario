@@ -543,8 +543,8 @@ export function Formulario() {
                       </p>
                     )}
 
-                    {/* Detalhe por lote quando há mais de 1 */}
-                    {pastoInfo.nLotes > 1 && (
+                    {/* Detalhe por lote */}
+                    {pastoInfo.nLotes >= 1 && (
                       <div className="mt-2 space-y-1" style={{ borderTop: '1px solid rgba(26,96,64,0.15)', paddingTop: '6px' }}>
                         {pastoInfo.lotes.map((lote, i) => (
                           <div key={i} className="flex items-center justify-between text-xs">

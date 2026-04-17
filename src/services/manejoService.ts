@@ -95,6 +95,7 @@ async function insertHistorico(payload: {
   categoria_destino?: string | null;
   quantidade?: number | null;
   peso_medio?: number | null;
+  user_name?: string | null;
 }) {
   await supabaseAdmin.from('manejo_historico').insert(payload);
 }
@@ -469,6 +470,7 @@ export const manejoService = {
     origem: Animal;
     qtd: number;
     bezQtd?: number;
+    pesoNovoLote?: number;
     destPastoId: string;
     destPastoNome: string;
     farmId: string;
@@ -478,8 +480,9 @@ export const manejoService = {
     mergeLoteQtd?: number;
     mergeLoteBezQtd?: number;
     novoLoteNome?: string;
+    userName?: string;
   }): Promise<void> {
-    const { origem, qtd, bezQtd, destPastoId, destPastoNome, farmId, data, mergeLoteId, mergeLoteNome, mergeLoteQtd, mergeLoteBezQtd, novoLoteNome } = params;
+    const { origem, qtd, bezQtd, pesoNovoLote, destPastoId, destPastoNome, farmId, data, mergeLoteId, mergeLoteNome, mergeLoteQtd, mergeLoteBezQtd, novoLoteNome, userName } = params;
     if (qtd <= 0) throw new Error('Quantidade inválida.');
     if (qtd > origem.quantidade) throw new Error(`Quantidade maior que o disponível no lote (${origem.quantidade} cab.).`);
     if (bezQtd && bezQtd > (origem.bezerros_quantidade ?? 0)) throw new Error(`Quantidade de bezerros maior que o disponível (${origem.bezerros_quantidade ?? 0}).`);
@@ -509,7 +512,7 @@ export const manejoService = {
         nome:        novoLoteNome ?? `${origem.nome} (parcial)`,
         quantidade:  qtd,
         categoria_id: origem.categoria_id ?? null,
-        peso_medio:  origem.peso_medio ?? null,
+        peso_medio:  pesoNovoLote ?? origem.peso_medio ?? null,
         raca:        origem.raca ?? null,
         sexo:        origem.sexo ?? null,
         prenha:      origem.prenha ?? false,
@@ -527,6 +530,7 @@ export const manejoService = {
       tipo:       'transf_parcial',
       descricao:  `${qtd} cab. de "${origem.nome}" → ${descrDest}${dataStr}`,
       quantidade: qtd,
+      user_name:  userName ?? null,
     });
   },
 

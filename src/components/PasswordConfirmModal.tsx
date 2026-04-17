@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, X } from 'lucide-react';
+import { Lock, X, Eye, EyeOff } from 'lucide-react';
 
 interface PasswordConfirmModalProps {
   title: string;
@@ -10,9 +10,10 @@ interface PasswordConfirmModalProps {
 }
 
 export function PasswordConfirmModal({ title, description, onConfirm, onCancel }: PasswordConfirmModalProps) {
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [password, setPassword]   = useState('');
+  const [error, setError]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [showPass, setShowPass]   = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,17 +72,28 @@ export function PasswordConfirmModal({ title, description, onConfirm, onCancel }
           )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Senha</label>
-            <input
-              ref={inputRef}
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setError(''); }}
-              onKeyDown={handleKeyDown}
-              placeholder="Digite sua senha"
-              className={`w-full h-10 px-3 rounded-lg border text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${
-                error ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-300 bg-white focus:ring-teal-500 focus:border-transparent'
-              }`}
-            />
+            <div className="relative">
+              <input
+                ref={inputRef}
+                type={showPass ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
+                onKeyDown={handleKeyDown}
+                placeholder="Digite sua senha"
+                className={`w-full h-10 px-3 pr-10 rounded-lg border text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${
+                  error ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-300 bg-white focus:ring-teal-500 focus:border-transparent'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(p => !p)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                tabIndex={-1}
+              >
+                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
           </div>
         </div>
