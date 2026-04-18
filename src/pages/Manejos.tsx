@@ -94,6 +94,15 @@ function LotesTab({
   const [dataAlocacao, setDataAlocacao] = useState(() => new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
 
+  async function handleMetaSave(animalId: string, pct: number | null) {
+    try {
+      await manejoService.atualizarMetaPercentagem(animalId, pct);
+      onReload();
+    } catch {
+      toast.error('Erro ao salvar percentagem.');
+    }
+  }
+
   // ── View mode toggle ──
   const [viewMode, setViewMode] = useState<'lista' | 'card'>(() => {
     return (localStorage.getItem('manejos_view_mode') as 'lista' | 'card') ?? 'card';
@@ -190,6 +199,10 @@ function LotesTab({
   }
 
   function AnimalRow({ a }: { a: Animal }) {
+    const [draft, setDraft] = useState('');
+    const meta = a.meta_percentagem != null && a.peso_medio != null
+      ? (a.peso_medio * a.meta_percentagem / 100)
+      : null;
     return (
       <>
         <tr className="hover:bg-gray-50 transition-colors">
@@ -197,6 +210,30 @@ function LotesTab({
           <td className="px-4 py-2.5 text-xs text-gray-600">{a.categoria_id ? catMap[a.categoria_id] ?? '—' : '—'}</td>
           <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
           <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
+          <td className="px-4 py-2.5">
+            <div className="flex items-center gap-1">
+              <input
+                type="number" step="0.1" min="0" max="100"
+                value={draft !== '' ? draft : (a.meta_percentagem != null ? String(a.meta_percentagem) : '')}
+                placeholder="—"
+                onChange={e => setDraft(e.target.value)}
+                onBlur={async () => {
+                  if (draft === '') return;
+                  const val = draft === '' ? null : parseFloat(draft.replace(',', '.'));
+                  if (val !== null && isNaN(val)) return;
+                  await handleMetaSave(a.id, val);
+                  setDraft('');
+                }}
+                className="w-12 h-6 px-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-center"
+              />
+              <span className="text-[10px] text-blue-400">%</span>
+              {meta != null && (
+                <span className="text-xs font-bold text-blue-700 ml-1">
+                  ={meta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                </span>
+              )}
+            </div>
+          </td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
           <td className="px-4 py-2.5 no-print">
             {!a.pasto_id ? (
@@ -232,8 +269,8 @@ function LotesTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', 'Sexo', ''].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider${i === 5 ? ' no-print' : ''}`}>{h}</th>
+                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', '% Meta', 'Sexo', ''].map((h, i) => (
+                  <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider${h === '% Meta' ? ' text-blue-400' : ' text-gray-500'}${i === 6 ? ' no-print' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -246,7 +283,7 @@ function LotesTab({
 
   // Card por PASTO — contém todas as infos do pasto + lotes dentro
   function PastoCard({
-    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao,
+    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao, onMetaSave,
   }: {
     pasto: Pasture;
     animaisPasto: Animal[];
@@ -255,7 +292,9 @@ function LotesTab({
     bezTotal: number;
     bezPesoMedio: number | null;
     taxaLotacao: number | null;
+    onMetaSave: (animalId: string, pct: number | null) => Promise<void>;
   }) {
+    const [metaDraft, setMetaDraft] = useState<Record<string, string>>({});
     return (
       <motion.div
         layout
@@ -347,6 +386,43 @@ function LotesTab({
                       {a.peso_medio ? <>{a.peso_medio}<span className="text-[10px] font-normal text-gray-400"> kg</span></> : '—'}
                     </p>
                   </div>
+                </div>
+
+                {/* META % */}
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-widest text-blue-400 whitespace-nowrap">% Meta</p>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={metaDraft[a.id] ?? (a.meta_percentagem != null ? String(a.meta_percentagem).replace('.', ',') : '')}
+                        placeholder="0,0"
+                        onChange={e => setMetaDraft(d => ({ ...d, [a.id]: e.target.value }))}
+                        onBlur={async () => {
+                          const raw = metaDraft[a.id];
+                          if (raw === undefined) return;
+                          const val = raw === '' ? null : parseFloat(raw.replace(',', '.'));
+                          if (val !== null && isNaN(val)) return;
+                          await onMetaSave(a.id, val);
+                          setMetaDraft(d => { const n = { ...d }; delete n[a.id]; return n; });
+                        }}
+                        className="w-14 h-6 px-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-center"
+                      />
+                      <span className="text-[10px] text-blue-400 font-medium">%</span>
+                    </div>
+                  </div>
+                  {a.peso_medio != null && a.meta_percentagem != null && (
+                    <div className="flex-shrink-0 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 text-right">
+                      <p className="text-[9px] text-blue-400 font-semibold uppercase tracking-wide leading-none mb-0.5">META/cab/dia</p>
+                      <p className="text-sm font-bold text-blue-700 leading-none">
+                        {(a.peso_medio * a.meta_percentagem / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className="text-[10px] font-normal text-blue-400"> kg</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bezerros */}
@@ -651,6 +727,7 @@ function LotesTab({
                   bezTotal={bezPasto}
                   bezPesoMedio={bezPesoMedioPasto}
                   taxaLotacao={taxaLotacao}
+                  onMetaSave={handleMetaSave}
                 />
               );
             })}

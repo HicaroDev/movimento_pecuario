@@ -17,6 +17,7 @@ export interface Animal {
   observacoes?: string;
   pasto_id?: string;
   status: 'ativo' | 'abatido' | 'vendido';
+  meta_percentagem?: number;
   created_at?: string;
 }
 
@@ -55,9 +56,10 @@ function toAnimal(row: Record<string, unknown>): Animal {
     bezerros_quantidade: (row.bezerros_quantidade as number) ?? undefined,
     bezerros_peso_medio: (row.bezerros_peso_medio as number) ?? undefined,
     observacoes:         (row.observacoes as string) ?? undefined,
-    pasto_id:     (row.pasto_id as string) ?? undefined,
-    status:       ((row.status as string) ?? 'ativo') as Animal['status'],
-    created_at:   (row.created_at as string) ?? undefined,
+    pasto_id:          (row.pasto_id as string) ?? undefined,
+    status:            ((row.status as string) ?? 'ativo') as Animal['status'],
+    meta_percentagem:  (row.meta_percentagem as number) ?? undefined,
+    created_at:        (row.created_at as string) ?? undefined,
   };
 }
 
@@ -532,6 +534,14 @@ export const manejoService = {
       quantidade: qtd,
       user_name:  userName ?? null,
     });
+  },
+
+  async atualizarMetaPercentagem(animalId: string, percentagem: number | null): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('animals')
+      .update({ meta_percentagem: percentagem })
+      .eq('id', animalId);
+    if (error) throw new Error(error.message);
   },
 
   async listarHistorico(farmId: string, tipo?: string | string[], limit = 30): Promise<ManejoEvent[]> {
