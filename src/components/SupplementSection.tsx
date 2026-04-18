@@ -21,6 +21,16 @@ interface SupplementSectionProps {
   farmName?: string;
 }
 
+function RefLabel({ value, color, viewBox }: { value: string; color: string; viewBox?: { x: number; y: number; width: number } }) {
+  if (!viewBox) return null;
+  const { x, y, width } = viewBox;
+  return (
+    <text x={x + width + 6} y={y - 3} fill={color} fontSize={10} fontWeight="bold" dominantBaseline="auto">
+      {value}
+    </text>
+  );
+}
+
 function calcScale(dataMax: number): { max: number; step: number } {
   if (dataMax <= 0) return { max: 1.0, step: 0.25 };
   const step = dataMax <= 0.3 ? 0.05 : dataMax <= 1.0 ? 0.25 : dataMax <= 3.0 ? 0.5 : 1.0;
@@ -243,7 +253,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 28, right: 50, left: 10, bottom: 100 }}
+              margin={{ top: 28, right: 90, left: 10, bottom: 100 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
               <XAxis
@@ -268,20 +278,13 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                 formatter={(value) => [`${fmt(Number(value))} kg/cab dia`, 'Consumo']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
-              {/* Linha de referência vermelha tracejada — só exibe quando avg > 0 */}
               {avg > 0 && (
                 <ReferenceLine
                   y={avg}
                   stroke="#e53e3e"
                   strokeWidth={2}
                   strokeDasharray="6 3"
-                  label={{
-                    value: `média ${fmt(avg)}`,
-                    position: 'insideTopRight',
-                    fill: '#e53e3e',
-                    fontSize: 11,
-                    fontWeight: 'bold',
-                  }}
+                  label={<RefLabel value={`média ${fmt(avg)}`} color="#e53e3e" />}
                 />
               )}
               {avgMeta != null && (
@@ -290,13 +293,7 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
                   stroke="#1a4a7a"
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
-                  label={{
-                    value: `meta ${fmt(avgMeta)}`,
-                    position: 'insideTopRight',
-                    fill: '#1a4a7a',
-                    fontSize: 10,
-                    fontWeight: 'bold',
-                  }}
+                  label={<RefLabel value={`meta ${fmt(avgMeta)}`} color="#1a4a7a" />}
                 />
               )}
               <Bar dataKey="value" radius={[3, 3, 0, 0]}>
