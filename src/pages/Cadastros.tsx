@@ -40,7 +40,7 @@ function formatPhone(raw: string): string {
 /* ── Local types ── */
 interface AnimalCategory  { id: string; farm_id: string; nome: string; observacoes?: string; }
 interface Animal          { id: string; farm_id: string; nome: string; quantidade: number; raca?: string; categoria_id?: string; peso_medio?: number; sexo?: string; prenha?: boolean; bezerros_quantidade?: number; bezerros_peso_medio?: number; observacoes?: string; }
-interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; consumo?: string; observacoes?: string; }
+interface SupplementType  { id: string; farm_id: string; nome: string; unidade: string; peso?: number; valor_kg?: number; consumo?: string; meta_pct?: string; observacoes?: string; }
 interface Employee        { id: string; farm_id: string; nome: string; funcao?: string; contato?: string; }
 
 const RACAS = ['NELORE', 'CRUZAMENTO INDUSTRIAL', 'COMPOSTO'] as const;
@@ -1142,7 +1142,7 @@ interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg
 
 function SupEditRow({ item, onSave, onCancel }: { item: SupplementType; onSave: (d: SupplementForm) => void; onCancel: () => void; }) {
   const { register, handleSubmit, watch } = useForm<SupplementForm>({
-    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '', meta_custom: '' },
+    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, consumo: item.consumo || '', observacoes: item.observacoes || '', meta_custom: item.meta_pct || '' },
   });
   const consumoWatch = watch('consumo');
   const metaDefault = META_CONSUMO[consumoWatch] || '';
@@ -1379,7 +1379,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
                       <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{item.consumo || '—'}</td>
                       <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>
-                        {(item as SupplementType & { meta_custom?: string }).meta_custom || (item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—')}
+                        {item.meta_pct || (item.consumo ? (META_CONSUMO[item.consumo] || '—') : '—')}
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{item.observacoes || '—'}</td>
                       <td className="px-4 py-3"><ActionBtns

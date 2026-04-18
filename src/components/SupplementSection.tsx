@@ -193,34 +193,35 @@ export function SupplementSection({ tipo, color, entries, periodo = 'MARÇO 2025
             <span className="text-lg font-extrabold tabular-nums" style={{ color }}>{fmt(avg)}</span>
             <span className="text-xs text-gray-400">kg/cab/dia</span>
           </div>
-          {/* Meta */}
+          {/* Meta + Semáforo */}
           {avgMeta != null && (() => {
-            const over = avg > avgMeta;
+            const ratio = avg / avgMeta;
+            const semaforo = ratio <= 1 ? '🟢' : ratio <= 1.15 ? '🟡' : '🔴';
+            const bgColor  = ratio <= 1 ? '#dcfce7' : ratio <= 1.15 ? '#fef9c3' : '#fee2e2';
+            const txtColor = ratio <= 1 ? '#14532d' : ratio <= 1.15 ? '#854d0e' : '#991b1b';
+            const label    = ratio <= 1 ? 'DENTRO' : ratio <= 1.15 ? 'ATENÇÃO' : 'ACIMA';
             return (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Meta</span>
                 <span
                   className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
-                  style={{
-                    backgroundColor: over ? '#fee2e2' : '#dcfce7',
-                    color:           over ? '#991b1b' : '#14532d',
-                  }}
+                  style={{ backgroundColor: bgColor, color: txtColor }}
                 >
-                  {over ? '▲ ACIMA' : '▼ DENTRO'} — {fmt(avgMeta)} kg/cab dia
+                  {semaforo} {label} — {fmt(avgMeta)} kg/cab dia
                 </span>
               </div>
             );
           })()}
-          {/* Desembolso */}
+          {/* Desembolso no período */}
           {avgDesembolso != null && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Desembolso</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Desembolso no Período (R$/cab)</span>
               <span className="text-base font-extrabold tabular-nums" style={{ color: '#b45309' }}>
-                R$ {fmt(avgDesembolso, 2)}/cab/dia
+                {avgDesembolsoMes != null ? `R$ ${fmt(avgDesembolsoMes, 2)}` : `R$ ${fmt(avgDesembolso, 2)}/dia`}
               </span>
               {avgDesembolsoMes != null && (
-                <span className="text-sm font-bold tabular-nums text-gray-400">
-                  · R$ {fmt(avgDesembolsoMes, 2)}/mês
+                <span className="text-xs font-semibold tabular-nums text-gray-400">
+                  · R$ {fmt(avgDesembolso, 2)}/cab/dia
                 </span>
               )}
             </div>

@@ -179,7 +179,11 @@ function LotesTab({
     const bezPesoNum   = base.reduce((s, a) => s + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
     const bezPesoDen   = base.filter(a => a.bezerros_quantidade && a.bezerros_peso_medio).reduce((s, a) => s + (a.bezerros_quantidade ?? 0), 0);
     const bezPesoMedio = bezPesoDen > 0 ? bezPesoNum / bezPesoDen : null;
-    return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio };
+    // Taxa de Lotação: UA = (cab×pesoGado + bez×pesoBez) / 450 → UA/ha
+    const totalKgUA    = base.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0) + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
+    const totalUA      = totalKgUA / 450;
+    const taxaLotacao  = totalHA > 0 && totalKgUA > 0 ? totalUA / totalHA : null;
+    return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio, taxaLotacao };
   }, [pastosComLotes, ativosFiltrados, ativos, search, byPasto, pastures]);
 
   async function confirmarAlocacao() {
@@ -508,6 +512,12 @@ function LotesTab({
               </div>
             </>
           )}
+          {globalStats.taxaLotacao != null && (
+            <div className="flex-1 border border-teal-200 rounded-lg px-4 py-3" style={{ background: '#f0fdf4' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#1a6040' }}>Taxa de Lotação</p>
+              <p className="text-sm font-bold" style={{ color: '#1a6040' }}>{globalStats.taxaLotacao.toFixed(2).replace('.', ',')} UA/ha</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -648,6 +658,15 @@ function LotesTab({
                 {(globalStats.totalCab + globalStats.totalBez).toLocaleString('pt-BR')} cab.
               </p>
               <p className="text-[10px] text-gray-400">gado + bezerros</p>
+            </div>
+          </>
+        )}
+        {globalStats.taxaLotacao != null && (
+          <>
+            <div className="w-px h-8 bg-teal-200 self-center" />
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: '#1a6040' }}>Taxa de Lotação</p>
+              <p className="text-base font-bold" style={{ color: '#1a6040' }}>{globalStats.taxaLotacao.toFixed(2).replace('.', ',')} UA/ha</p>
             </div>
           </>
         )}

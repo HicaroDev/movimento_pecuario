@@ -350,6 +350,30 @@ export function Relatorio() {
     return { points, tiposUnicos, pesoVivo };
   }, [filterLote, filtered, animals]);
 
+  /* ── Tabela de pastos percorridos pelo lote ── */
+  const lotePastosTable = useMemo(() => {
+    if (!filterLote || filtered.length === 0) return null;
+    const byPasto: Record<string, { datas: string[]; consumos: number[]; tipos: Set<string> }> = {};
+    for (const e of filtered) {
+      if (!byPasto[e.pasto]) byPasto[e.pasto] = { datas: [], consumos: [], tipos: new Set() };
+      if (e.data) byPasto[e.pasto].datas.push(e.data);
+      byPasto[e.pasto].consumos.push(e.consumo);
+      byPasto[e.pasto].tipos.add(e.tipo.toUpperCase());
+    }
+    return Object.entries(byPasto).map(([pasto, info]) => {
+      const sortedDatas = [...info.datas].sort();
+      const avgCons = info.consumos.reduce((s, v) => s + v, 0) / info.consumos.length;
+      return {
+        pasto,
+        dataInicio: sortedDatas[0] ?? null,
+        dataFim:    sortedDatas[sortedDatas.length - 1] ?? null,
+        avgConsumo: avgCons,
+        tipos: Array.from(info.tipos).join(', '),
+        registros: info.consumos.length,
+      };
+    }).sort((a, b) => (a.dataInicio ?? '').localeCompare(b.dataInicio ?? ''));
+  }, [filterLote, filtered]);
+
   /* ── Ficha de consumo PDF pré-preenchida ── */
   const handleFichaPDF = () => {
     if (!filterLote) return;
@@ -710,6 +734,52 @@ export function Relatorio() {
                 ))}
               </LineChart>
             </ResponsiveContainer>
+          </motion.div>
+        )}
+
+        {/* ── Tabela de pastos percorridos pelo lote ── */}
+        {!loading && filterLote && lotePastosTable && lotePastosTable.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider" style={{ color: '#1a6040' }}>
+                Pastos Percorridos — {filterLote}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">Média de consumo por cabeça/dia em cada pasto</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Pasto', 'Período', 'Suplemento', 'Registros', 'Consumo Médio (kg/cab/dia)'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {lotePastosTable.map((row, i) => {
+                    const fmtD = (d: string | null) => d ? d.split('-').reverse().join('/') : '—';
+                    return (
+                      <tr key={i} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-3 font-semibold text-gray-800">{row.pasto}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs tabular-nums">
+                          {fmtD(row.dataInicio)}{row.dataFim !== row.dataInicio ? ` → ${fmtD(row.dataFim)}` : ''}
+                        </td>
+                        <td className="px-5 py-3 text-gray-600 text-xs">{row.tipos}</td>
+                        <td className="px-5 py-3 text-gray-400 text-xs tabular-nums">{row.registros}</td>
+                        <td className="px-5 py-3 font-bold tabular-nums" style={{ color: '#1a6040' }}>
+                          {row.avgConsumo.toFixed(3).replace('.', ',')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
         )}
 
