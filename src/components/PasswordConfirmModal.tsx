@@ -76,7 +76,7 @@ export function PasswordConfirmModal({ title, description, onConfirm, onCancel }
               <input
                 ref={inputRef}
                 type={showPass ? 'text' : 'password'}
-                autoComplete="new-password"
+                autoComplete="current-password"
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError(''); }}
                 onKeyDown={handleKeyDown}
