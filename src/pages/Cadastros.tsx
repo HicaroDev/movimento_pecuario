@@ -1249,13 +1249,13 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
     if (error) { toast.error('Erro ao atualizar.'); return; }
     _suplementosCache = _suplementosCache.map(s => s.id === id ? {
       ...s,
-      nome:      data.nome.toUpperCase(),
-      unidade:   data.unidade,
-      peso:      data.peso,
-      valor_kg:  data.valor_kg,
-      consumo:   data.consumo   || null,
-      meta_pct:  data.meta_custom || null,
-      observacoes: data.observacoes || null,
+      nome:        data.nome.toUpperCase(),
+      unidade:     data.unidade,
+      peso:        data.peso,
+      valor_kg:    data.valor_kg,
+      consumo:     data.consumo     || undefined,
+      meta_pct:    data.meta_custom || undefined,
+      observacoes: data.observacoes || undefined,
     } : s);
     setItems(_suplementosCache);
     toast.success('Suplemento atualizado!'); setEditingId(null);
