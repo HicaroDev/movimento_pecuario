@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { FileDown, ChevronDown, Filter, CalendarDays, TrendingUp, Printer } from 'lucide-react';
+import { FileDown, ChevronDown, Filter, TrendingUp, Printer } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
@@ -15,13 +15,7 @@ import { manejoService, type Animal } from '../services/manejoService';
 import { groupByType, averageConsumo, sortedTypes, aggregateEntriesByPasto } from '../lib/utils';
 import { getSupplementColor } from '../lib/data';
 
-const MONTH_SHORT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-const MONTH_FULL  = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-
-function monthLabel(ym: string) {
-  const [, m] = ym.split('-').map(Number);
-  return MONTH_SHORT[m - 1];
-}
+const MONTH_FULL = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
 function periodFull(ym: string) {
   const [y, m] = ym.split('-').map(Number);
@@ -42,9 +36,7 @@ export function Relatorio() {
   const [filterSupplement, setFilterSupplement] = useState('');
   const [filterPasto,      setFilterPasto]      = useState('');
   const [filterLote,       setFilterLote]       = useState('');
-  const [filterMonths,     setFilterMonths]     = useState<string[]>([]);
-  const [dateFrom,         setDateFrom]         = useState('');
-  const [dateTo,           setDateTo]           = useState('');
+  const [filterMonth,      setFilterMonth]      = useState('');
 
   // Animals + supplement_types para meta/desembolso/lote
   const [animals,    setAnimals]    = useState<Animal[]>([]);
@@ -87,25 +79,17 @@ export function Relatorio() {
       });
   }, [filterLote, farmId, animals]);
 
-  const hasFilters = !!filterSupplement || !!filterPasto || !!filterLote || filterMonths.length > 0 || !!dateFrom || !!dateTo;
+  const hasFilters = !!filterSupplement || !!filterPasto || !!filterLote || !!filterMonth;
 
   const clearFilters = () => {
     setFilterSupplement('');
     setFilterPasto('');
     setFilterLote('');
-    setFilterMonths([]);
-    setDateFrom('');
-    setDateTo('');
+    setFilterMonth('');
     toast.info('Filtros limpos');
   };
 
-  function toggleMonth(ym: string) {
-    setFilterMonths(prev =>
-      prev.includes(ym) ? prev.filter(m => m !== ym) : [...prev, ym]
-    );
-  }
-
-  /* ── Month chips — 12 meses do ano atual + histórico com entries ── */
+  /* ── Month options — meses com lançamentos + meses do ano atual ── */
   const monthOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const set = new Set<string>();
@@ -113,9 +97,7 @@ export function Relatorio() {
       set.add(`${currentYear}-${String(m).padStart(2, '0')}`);
     }
     for (const e of entries) {
-      if (e.data && !e.data.startsWith(String(currentYear))) {
-        set.add(e.data.slice(0, 7));
-      }
+      if (e.data) set.add(e.data.slice(0, 7));
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [entries]);
@@ -224,12 +206,10 @@ export function Relatorio() {
           const emHistorico = lotePastosHistorico.has(e.pasto);
           if (!emAtual && !emHistorico) return false;
         }
-        if (filterMonths.length > 0 && (!e.data || !filterMonths.some(m => e.data!.startsWith(m)))) return false;
-        if (dateFrom && e.data && e.data < dateFrom) return false;
-        if (dateTo   && e.data && e.data > dateTo)   return false;
+        if (filterMonth && (!e.data || !e.data.startsWith(filterMonth))) return false;
         return true;
       }),
-    [entries, filterSupplement, filterPasto, filterLote, filterMonths, dateFrom, dateTo, pastoLotesMap, lotePastosHistorico]
+    [entries, filterSupplement, filterPasto, filterLote, filterMonth, pastoLotesMap, lotePastosHistorico]
   );
 
   const groups = useMemo(() => groupByType(filtered), [filtered]);
@@ -314,13 +294,9 @@ export function Relatorio() {
     color: getSupplementColor(name, i),
   })), [activeTypes, aggregatedGroupsWithMeta]);
 
-  /* ── Dynamic subtitle (farm + selected months) ── */
+  /* ── Dynamic subtitle (farm + selected month) ── */
   const farmName   = clientInfo?.nomeFazenda ?? '';
-  const periodoStr = filterMonths.length > 0
-    ? filterMonths.slice().sort().map(periodFull).join(' · ')
-    : dateFrom || dateTo
-    ? [dateFrom, dateTo].filter(Boolean).join(' a ')
-    : '';
+  const periodoStr = filterMonth ? periodFull(filterMonth) : '';
   const subtitle   = [farmName, periodoStr].filter(Boolean).join(' — ');
 
   /* ── Dados do gráfico de linha por lote ── */
@@ -507,64 +483,22 @@ export function Relatorio() {
             )}
           </div>
 
-          {/* ── Month chips (multi-select) ── */}
-          {monthOptions.length > 0 && (
-            <div className="mb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarDays className="w-4 h-4 text-gray-400" />
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Período</span>
-                {filterMonths.length > 0 && (
-                  <span className="text-xs text-gray-400">
-                    — {filterMonths.length} {filterMonths.length === 1 ? 'mês' : 'meses'} selecionado{filterMonths.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {monthOptions.map((ym) => {
-                  const active = filterMonths.includes(ym);
-                  return (
-                    <button
-                      key={ym}
-                      onClick={() => toggleMonth(ym)}
-                      className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
-                        active
-                          ? 'text-white shadow-md scale-105'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
-                      }`}
-                      style={active ? { backgroundColor: '#1a6040' } : {}}
-                    >
-                      {monthLabel(ym)}
-                    </button>
-                  );
-                })}
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            {/* Mês */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mês</label>
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl appearance-none bg-white text-sm pr-10 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              >
+                <option value="">Todos</option>
+                {monthOptions.map((ym) => (
+                  <option key={ym} value={ym}>{periodFull(ym)}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
-          )}
-
-          {/* ── Filtro de data De/Até ── */}
-          <div className="flex items-center gap-3 mb-5 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Data</span>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">De</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)}
-                className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">Até</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={e => setDateTo(e.target.value)}
-                className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Suplemento */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">Suplemento</label>

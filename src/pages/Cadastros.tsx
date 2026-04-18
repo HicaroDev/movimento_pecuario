@@ -1247,7 +1247,16 @@ function SuplementosTab({ onRequestDelete, onRequestEdit }: { onRequestDelete?: 
     };
     const { error } = await supabaseAdmin.from('supplement_types').update(payload).eq('id', id);
     if (error) { toast.error('Erro ao atualizar.'); return; }
-    _suplementosCache = _suplementosCache.map(s => s.id === id ? { ...s, ...data } : s);
+    _suplementosCache = _suplementosCache.map(s => s.id === id ? {
+      ...s,
+      nome:      data.nome.toUpperCase(),
+      unidade:   data.unidade,
+      peso:      data.peso,
+      valor_kg:  data.valor_kg,
+      consumo:   data.consumo   || null,
+      meta_pct:  data.meta_custom || null,
+      observacoes: data.observacoes || null,
+    } : s);
     setItems(_suplementosCache);
     toast.success('Suplemento atualizado!'); setEditingId(null);
   }
