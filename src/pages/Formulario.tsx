@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'motion/react';
-import { Plus, BarChart3, Trash2, Info, Pencil, Save, X, Lock, LockOpen, KeyRound, Search } from 'lucide-react';
+import { Plus, BarChart3, Trash2, Info, Pencil, Save, X, Lock, LockOpen, KeyRound, Search, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router';
 import { useData } from '../context/DataContext';
@@ -144,10 +144,12 @@ export function Formulario() {
   const [senhaModal, setSenhaModal] = useState<{ acao: 'fechar' | 'reabrir'; alvo: string } | null>(null);
   const [senhaInput, setSenhaInput] = useState('');
   const [senhaErro,  setSenhaErro]  = useState(false);
+  const [showSenha,  setShowSenha]  = useState(false);
 
   function abrirModalSenha(acao: 'fechar' | 'reabrir', alvo: string) {
     setSenhaInput('');
     setSenhaErro(false);
+    setShowSenha(false);
     setSenhaModal({ acao, alvo });
   }
 
@@ -940,20 +942,29 @@ export function Formulario() {
               </div>
             </div>
 
-            <input
-              type="password"
-              autoFocus
-              autoComplete="new-password"
-              value={senhaInput}
-              onChange={e => { setSenhaInput(e.target.value); setSenhaErro(false); }}
-              onKeyDown={e => e.key === 'Enter' && confirmarSenha()}
-              placeholder="Senha"
-              className={`w-full h-10 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-colors mb-1 ${
-                senhaErro
-                  ? 'border-red-400 bg-red-50 focus:ring-red-400'
-                  : 'border-gray-200 bg-gray-50 focus:ring-teal-500'
-              }`}
-            />
+            <div className="relative mb-1">
+              <input
+                type={showSenha ? 'text' : 'password'}
+                autoFocus
+                autoComplete="new-password"
+                value={senhaInput}
+                onChange={e => { setSenhaInput(e.target.value); setSenhaErro(false); }}
+                onKeyDown={e => e.key === 'Enter' && confirmarSenha()}
+                placeholder="Senha"
+                className={`w-full h-10 px-3 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-colors ${
+                  senhaErro
+                    ? 'border-red-400 bg-red-50 focus:ring-red-400'
+                    : 'border-gray-200 bg-gray-50 focus:ring-teal-500'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenha(p => !p)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {senhaErro && (
               <p className="text-xs text-red-500 mb-3">Senha incorreta. Tente novamente.</p>
             )}
