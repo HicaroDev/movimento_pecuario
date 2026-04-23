@@ -10,9 +10,22 @@ export interface DataEntry {
   consumo: number;      // kg/cab/dia = kg / (quantidade * periodo)
   funcionario?: string; // nome do funcionário responsável
   lote?: string;        // nome(s) do lote animal no pasto
-  meta?: number;        // META KG/cab/dia = peso_medio_pasto × consumo_pct / 100
+  meta?: number;        // META kg/cab/dia = peso_medio_pasto × consumo_pct / 100
+  metaLabel?: string;   // META formatada ex: "0,040%" para exibição na coluna
   desembolso?: number;  // R$/cab/dia = consumo × valor_kg
 }
+
+export const META_CONSUMO: Record<string, string> = {
+  '20 A 30 GRAMAS/100 KG PV':   '0,030%',
+  '35 A 45 GRAMAS/100 KG PV':   '0,040%',
+  '50 A 100 GRAMAS/100 KG PV':  '0,060%',
+  '100 A 120 GRAMAS/100 KG PV': '0,110%',
+  '200 A 300 GRAMAS/100 KG PV': '0,250%',
+  '300 A 400 GRAMAS/100 KG PV': '0,350%',
+  '500 A 700 GRAMAS/100 KG PV': '0,600%',
+  '1,0 A 1,50% PV':             '1,300%',
+  '1,50 A 2,30% PV':            '2,000%',
+};
 
 export const STORAGE_KEY = 'suplementoControlData';
 

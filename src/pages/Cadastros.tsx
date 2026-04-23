@@ -8,6 +8,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { SkeletonTable } from '../components/Skeleton';
+import { META_CONSUMO } from '../lib/data';
 import { PasswordConfirmModal } from '../components/PasswordConfirmModal';
 import { verifyPassword } from '../lib/verifyPassword';
 
@@ -1124,17 +1125,6 @@ const CONSUMO_OPTIONS = [
   '1,50 A 2,30% PV',
 ] as const;
 
-const META_CONSUMO: Record<string, string> = {
-  '20 A 30 GRAMAS/100 KG PV':  '0,030%',
-  '35 A 45 GRAMAS/100 KG PV':  '0,040%',
-  '50 A 100 GRAMAS/100 KG PV': '0,060%',
-  '100 A 120 GRAMAS/100 KG PV':'0,110%',
-  '200 A 300 GRAMAS/100 KG PV':'0,250%',
-  '300 A 400 GRAMAS/100 KG PV':'0,350%',
-  '500 A 700 GRAMAS/100 KG PV':'0,600%',
-  '1,0 A 1,50% PV':            '1,300%',
-  '1,50 A 2,30% PV':           '2,000%',
-};
 
 let _suplementosCache: SupplementType[] = [];
 const COR_OPTIONS = ['AMARELO', 'VERDE', 'AZUL', 'PRETO', 'BRANCO'];

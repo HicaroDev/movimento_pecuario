@@ -13,7 +13,7 @@ import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { SupplementPills } from '../components/SupplementPills';
 import { manejoService, type Animal } from '../services/manejoService';
 import { groupByType, averageConsumo, sortedTypes, aggregateEntriesByPasto, timeSeriesConsumo } from '../lib/utils';
-import { getSupplementColor } from '../lib/data';
+import { getSupplementColor, META_CONSUMO } from '../lib/data';
 
 const MONTH_FULL = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
@@ -165,16 +165,20 @@ export function Relatorio() {
     return map;
   }, [animals, pastoIdToNome]);
 
-  /* ── Mapa suppNome → { consumo_pct, valor_kg } ── */
+  /* ── Mapa suppNome → { consumoPct, consumoPctLabel, valorKg } ── */
   const suppTypeMap = useMemo(() => {
-    const map: Record<string, { consumoPct: number | null; valorKg: number | null }> = {};
+    const map: Record<string, { consumoPct: number | null; consumoPctLabel: string | null; valorKg: number | null }> = {};
     for (const s of suppTypes) {
       let consumoPct: number | null = null;
-      if (s.consumo != null && s.consumo !== '') {
-        const v = parseFloat(String(s.consumo).replace('%', '').replace(',', '.'));
+      let consumoPctLabel: string | null = null;
+      // Prioridade: meta_pct (custom) → META_CONSUMO lookup → fallback parseFloat direto
+      const pctStr = s.meta_pct || META_CONSUMO[s.consumo ?? ''] || null;
+      if (pctStr) {
+        consumoPctLabel = pctStr; // ex: "0,040%"
+        const v = parseFloat(pctStr.replace('%', '').replace(',', '.'));
         if (!isNaN(v)) consumoPct = v;
       }
-      map[s.nome.toUpperCase()] = { consumoPct, valorKg: typeof s.valor_kg === 'number' ? s.valor_kg : null };
+      map[s.nome.toUpperCase()] = { consumoPct, consumoPctLabel, valorKg: typeof s.valor_kg === 'number' ? s.valor_kg : null };
     }
     return map;
   }, [suppTypes]);
@@ -258,11 +262,12 @@ export function Relatorio() {
         const meta = pesoPasto != null && consumoPct != null && consumoPct > 0
           ? pesoPasto * (consumoPct / 100)
           : undefined;
+        const metaLabel = suppInfo?.consumoPctLabel ?? undefined;
         const desembolso = valorKg != null && e.consumo > 0
           ? e.consumo * valorKg
           : undefined;
         const lote = (pastoLotesMap[e.pasto] ?? []).join(', ') || undefined;
-        return { ...e, meta, desembolso, lote };
+        return { ...e, meta, metaLabel, desembolso, lote };
       });
     }
     return result;
