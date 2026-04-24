@@ -1,5 +1,5 @@
 export type Role = 'admin' | 'client' | 'representante';
-export type Module = 'relatorio' | 'formulario' | 'cadastros' | 'manejos' | 'fazendas' | 'usuarios' | 'historico' | 'estoque' | 'os' | 'caixa';
+export type Module = 'relatorio' | 'formulario' | 'cadastros' | 'manejos' | 'fazendas' | 'usuarios' | 'historico' | 'estoque' | 'os' | 'caixa' | 'simulador';
 export type ModulePermission = 'view' | 'edit';
 
 export interface FarmUser {

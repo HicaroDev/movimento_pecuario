@@ -18,6 +18,7 @@ import { DevPlan } from './pages/DevPlan';
 import { Estoque } from './pages/Estoque';
 import { OS } from './pages/OS';
 import { LivroCaixa } from './pages/LivroCaixa';
+import { Simulador } from './pages/Simulador';
 
 const router = createBrowserRouter([
   { path: '/login',           Component: Login },
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
           element: <ModuleRoute module="caixa" />,
           children: [{ path: 'caixa', Component: LivroCaixa }],
         },
+        { path: 'simulador', Component: Simulador },
         { path: 'devplan',   Component: DevPlan   },
       ],
     }],

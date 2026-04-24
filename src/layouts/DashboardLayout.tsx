@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router';
-import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp, Menu, X as XIcon, Package, ScrollText } from 'lucide-react';
+import { FileText, BarChart3, Building2, LogOut, User, FolderOpen, Users, ChevronDown, ClipboardList, BookOpen, Construction, Leaf, History, ArrowUp, Menu, X as XIcon, Package, ScrollText, FlaskConical } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -292,14 +292,43 @@ export function DashboardLayout() {
             );
           })}
 
-            {/* ── Planejamento (DevPlan) — somente admin ── */}
+            {/* ── Simulador + Planejamento — somente admin ── */}
           {isAdmin && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: visibleNavItems.length * 0.08 + 0.05 }}
             >
-              <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                {/* Simulador */}
+                {(() => {
+                  const isActive = location.pathname.startsWith('/simulador');
+                  return (
+                    <Link
+                      to="/simulador"
+                      onClick={() => setSidebarOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200"
+                      style={isActive ? {
+                        background: 'linear-gradient(135deg, #1a6040, #4c1d7a)',
+                        color: '#ffffff',
+                        boxShadow: '0 4px 16px rgba(26,96,64,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(26,96,64,0.3)',
+                      } : { color: '#6b7280' }}
+                      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'; }}
+                      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <FlaskConical className="w-4 h-4 flex-shrink-0" />
+                      <span className="text-sm font-medium">Simulador</span>
+                      <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded uppercase"
+                        style={isActive
+                          ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                          : { background: 'rgba(26,96,64,0.10)', color: '#1a6040', border: '1px solid rgba(26,96,64,0.2)' }}>
+                        admin
+                      </span>
+                    </Link>
+                  );
+                })()}
+                {/* DevPlan */}
                 {(() => {
                   const isActive = location.pathname.startsWith('/devplan');
                   return (
