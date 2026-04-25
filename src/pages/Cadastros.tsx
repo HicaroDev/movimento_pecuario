@@ -1431,30 +1431,7 @@ interface SupplementSimulated {
   ganho_peso_esperado?: number; categoria_alvo?: string; custo_cab_dia?: number;
   observacoes_tecnicas?: string; categoria?: string;
 }
-interface SimuladoForm {
-  nome: string; unidade: string; peso: number; valor_kg: number;
-  consumo: string; meta_pct: string; ganho_peso_esperado: number;
-  categoria_alvo: string; custo_cab_dia: number; observacoes_tecnicas: string;
-  categoria: string;
-}
-
 let _simuladosCache: SupplementSimulated[] = [];
-
-// Categorias técnicas do simulador (tabela Consumo x GMD x Época)
-const CATEGORIAS_SUPL_SIM = [
-  'MINERAL',
-  'MINERAL ADITIVADO',
-  'PROTEICO 0,1% PV',
-  'PROTEICO 0,3% PV',
-  'PROTEICO ENERGETICO 0,5% PV',
-  'RACAO SEMI 1,0% PV',
-] as const;
-
-const CATEGORIAS_SIMULADOR = [
-  'Vacas Adultas', 'Primíparas', 'Vaca descarte', 'Novilhas Precoce',
-  'Femeas até 12 meses', 'Femeas de 13 a 24 meses',
-  'Macho até 12 meses', 'Machos de 13 a 24 meses', 'Touros', 'Todas',
-] as const;
 
 /* ── Inline product add/edit forms for CatProdutoPanel ── */
 interface CatProdForm { nome: string; unidade: string; peso: number; valor_kg: number; observacoes_tecnicas: string; }
