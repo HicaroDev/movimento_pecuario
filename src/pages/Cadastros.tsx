@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1456,17 +1456,194 @@ const CATEGORIAS_SIMULADOR = [
   'Macho até 12 meses', 'Machos de 13 a 24 meses', 'Touros', 'Todas',
 ] as const;
 
-function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRequestDelete?: (t: DeleteTarget) => void; onRequestEdit?: (t: EditTarget) => void; canEdit?: boolean }) {
-  const { activeFarmId } = useData();
-  const [items,      setItems]      = useState<SupplementSimulated[]>(_simuladosCache);
-  const [loading,    setLoading]    = useState(false);
-  const [editingId,  setEditingId]  = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [params,     setParams]     = useState<SimuladorParam[]>(_paramsCache);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SimuladoForm>({
-    defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '', categoria: '' },
+/* ── Inline product add/edit forms for CatProdutoPanel ── */
+interface CatProdForm { nome: string; unidade: string; peso: number; valor_kg: number; observacoes_tecnicas: string; }
+
+function CatProdutoAddForm({ categoria, farmId, onAdded, onCancel }: {
+  categoria: string; farmId: string;
+  onAdded: (item: SupplementSimulated) => void;
+  onCancel: () => void;
+}) {
+  const { register, handleSubmit, formState: { errors } } = useForm<CatProdForm>({
+    defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, observacoes_tecnicas: '' },
   });
+  async function onSave(data: CatProdForm) {
+    const { data: row, error } = await supabaseAdmin.from('supplement_simulated').insert({
+      farm_id: farmId, nome: data.nome.toUpperCase(), categoria,
+      unidade: data.unidade,
+      ...(data.peso > 0 && { peso: data.peso }),
+      ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
+      ...(data.observacoes_tecnicas && { observacoes_tecnicas: data.observacoes_tecnicas }),
+    }).select().single();
+    if (error) { toast.error('Erro ao adicionar.'); return; }
+    toast.success('Produto adicionado!');
+    onAdded(row);
+  }
+  return (
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-wrap items-end gap-2 p-3 rounded-lg border border-teal-200 mb-2" style={{ background: 'rgba(26,96,64,0.04)' }}>
+      <div className="flex-1 min-w-[180px]">
+        <label className={labelClass}>Nome *</label>
+        <input {...upperReg(register('nome', { required: true }))} className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} placeholder="Nome do produto" />
+      </div>
+      <div className="w-24">
+        <label className={labelClass}>Unidade</label>
+        <select {...register('unidade')} className={inputClass}><option value="kg">KG</option><option value="saco">SACO</option></select>
+      </div>
+      <div className="w-32">
+        <label className={labelClass}>Peso saco (kg)</label>
+        <input type="number" step="0.1" min="0" {...register('peso', { valueAsNumber: true })} className={inputClass} placeholder="Ex: 30" />
+      </div>
+      <div className="w-32">
+        <label className={labelClass}>R$ / kg</label>
+        <input type="number" step="0.001" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} placeholder="Ex: 2.500" />
+      </div>
+      <div className="flex-1 min-w-[150px]">
+        <label className={labelClass}>Observações</label>
+        <input {...register('observacoes_tecnicas')} className={inputClass} placeholder="Opcional" />
+      </div>
+      <div className="flex gap-2 pb-0.5">
+        <button type="submit" className="flex items-center gap-1 px-3 py-2 rounded-lg text-white text-xs font-semibold" style={{ background: '#1a6040' }}>
+          <Save className="w-3.5 h-3.5" /> Salvar
+        </button>
+        <button type="button" onClick={onCancel} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CatProdutoEditForm({ item, onSaved, onCancel }: {
+  item: SupplementSimulated;
+  onSaved: (updated: SupplementSimulated) => void;
+  onCancel: () => void;
+}) {
+  const { register, handleSubmit } = useForm<CatProdForm>({
+    defaultValues: { nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0, observacoes_tecnicas: item.observacoes_tecnicas || '' },
+  });
+  async function onSave(data: CatProdForm) {
+    const { error } = await supabaseAdmin.from('supplement_simulated').update({
+      nome: data.nome.toUpperCase(), unidade: data.unidade,
+      peso: data.peso > 0 ? data.peso : null,
+      valor_kg: data.valor_kg > 0 ? data.valor_kg : null,
+      observacoes_tecnicas: data.observacoes_tecnicas || null,
+    }).eq('id', item.id);
+    if (error) { toast.error('Erro ao atualizar.'); return; }
+    toast.success('Atualizado!');
+    onSaved({ ...item, nome: data.nome.toUpperCase(), unidade: data.unidade, peso: data.peso || undefined, valor_kg: data.valor_kg || undefined, observacoes_tecnicas: data.observacoes_tecnicas || undefined });
+  }
+  return (
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-wrap items-end gap-2 p-3 rounded-lg border border-blue-200 mb-1" style={{ background: '#eff6ff' }}>
+      <div className="flex-1 min-w-[180px]">
+        <label className={labelClass}>Nome *</label>
+        <input {...upperReg(register('nome', { required: true }))} className={inputClass} />
+      </div>
+      <div className="w-24">
+        <label className={labelClass}>Unidade</label>
+        <select {...register('unidade')} className={inputClass}><option value="kg">KG</option><option value="saco">SACO</option></select>
+      </div>
+      <div className="w-32">
+        <label className={labelClass}>Peso saco (kg)</label>
+        <input type="number" step="0.1" min="0" {...register('peso', { valueAsNumber: true })} className={inputClass} />
+      </div>
+      <div className="w-32">
+        <label className={labelClass}>R$ / kg</label>
+        <input type="number" step="0.001" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} />
+      </div>
+      <div className="flex-1 min-w-[150px]">
+        <label className={labelClass}>Observações</label>
+        <input {...register('observacoes_tecnicas')} className={inputClass} />
+      </div>
+      <div className="flex gap-2 pb-0.5">
+        <button type="submit" className="flex items-center gap-1 px-3 py-2 rounded-lg text-white text-xs font-semibold" style={{ background: '#1a6040' }}>
+          <Save className="w-3.5 h-3.5" /> Salvar
+        </button>
+        <button type="button" onClick={onCancel} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CatProdutoPanel({ categoria, farmId, items, onItemsChange, canEdit }: {
+  categoria: string; farmId: string;
+  items: SupplementSimulated[];
+  onItemsChange: (updated: SupplementSimulated[]) => void;
+  canEdit: boolean;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const catItems = items.filter(i => i.categoria === categoria);
+
+  async function handleDelete(id: string, nome: string) {
+    if (!window.confirm(`Remover "${nome}"?`)) return;
+    const { error } = await supabaseAdmin.from('supplement_simulated').delete().eq('id', id);
+    if (error) { toast.error('Erro ao remover.'); return; }
+    _simuladosCache = _simuladosCache.filter(s => s.id !== id);
+    onItemsChange([..._simuladosCache]);
+    toast.success('Removido!');
+  }
+
+  return (
+    <div className="px-4 py-3 border-t" style={{ background: 'rgba(26,96,64,0.03)', borderColor: 'rgba(26,96,64,0.10)' }}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#1a6040' }}>
+          Produtos — {categoria}
+        </p>
+        {canEdit && !showAdd && (
+          <button onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+            style={{ background: '#1a6040' }}>
+            <Plus className="w-3.5 h-3.5" /> Adicionar Produto
+          </button>
+        )}
+      </div>
+      {showAdd && canEdit && (
+        <CatProdutoAddForm
+          categoria={categoria} farmId={farmId}
+          onAdded={row => { _simuladosCache = [..._simuladosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')); onItemsChange([..._simuladosCache]); setShowAdd(false); }}
+          onCancel={() => setShowAdd(false)}
+        />
+      )}
+      {catItems.length === 0 && !showAdd ? (
+        <p className="text-xs text-gray-400 py-1">Nenhum produto nesta categoria.</p>
+      ) : (
+        <div className="space-y-1">
+          {catItems.map(item =>
+            editId === item.id ? (
+              <CatProdutoEditForm key={item.id} item={item}
+                onSaved={updated => { _simuladosCache = _simuladosCache.map(s => s.id === updated.id ? updated : s); onItemsChange([..._simuladosCache]); setEditId(null); }}
+                onCancel={() => setEditId(null)}
+              />
+            ) : (
+              <div key={item.id} className="flex items-center gap-3 rounded-lg px-3 py-2 bg-white border border-gray-100 text-sm">
+                <span className="font-semibold text-gray-900 flex-1">{item.nome}</span>
+                <span className="text-xs uppercase text-gray-500">{item.unidade}</span>
+                <span className="text-xs font-medium text-gray-700 min-w-[110px]">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(3)}/kg` : '—'}</span>
+                <span className="text-xs text-gray-500">{item.peso ? `${item.peso} kg/saco` : ''}</span>
+                {item.observacoes_tecnicas && <span className="text-xs text-gray-400 italic truncate max-w-[200px]">{item.observacoes_tecnicas}</span>}
+                {canEdit && (
+                  <div className="flex gap-1">
+                    <button onClick={() => setEditId(item.id)} className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleDelete(item.id, item.nome)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SimuladosTab({ canEdit = true }: { onRequestDelete?: (t: DeleteTarget) => void; onRequestEdit?: (t: EditTarget) => void; canEdit?: boolean }) {
+  const { activeFarmId } = useData();
+  const [items, setItems] = useState<SupplementSimulated[]>(_simuladosCache);
+  const [loading, setLoading] = useState(false);
+  const [params, setParams] = useState<SimuladorParam[]>(_paramsCache);
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -1479,357 +1656,108 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
           _paramsCache.length > 0 ? Promise.resolve({ data: _paramsCache }) : supabaseAdmin.from('simulador_parametros').select('*'),
         ]);
         if (mounted) {
-          _simuladosCache = supls ?? []; setItems(_simuladosCache);
-          if (prms && prms.length > 0) { _paramsCache = prms as SimuladorParam[]; setParams(_paramsCache); }
+          _simuladosCache = supls ?? []; setItems([..._simuladosCache]);
+          if (prms && prms.length > 0) { _paramsCache = prms as SimuladorParam[]; setParams([..._paramsCache]); }
         }
       } finally { if (mounted) setLoading(false); }
     })();
     return () => { mounted = false; };
   }, [activeFarmId]);
 
-  async function onAdd(data: SimuladoForm) {
-    if (!activeFarmId) return;
-    const dup = _simuladosCache.find(s => s.nome.trim().toLowerCase() === data.nome.trim().toLowerCase());
-    if (dup) { toast.error('Já existe um suplemento simulado com este nome.'); return; }
-    const { data: row, error } = await supabaseAdmin.from('supplement_simulated').insert({
-      farm_id: activeFarmId,
-      nome: data.nome.toUpperCase(),
-      unidade: data.unidade,
-      ...(data.categoria && { categoria: data.categoria }),
-      ...(data.peso > 0 && { peso: data.peso }),
-      ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
-      ...(data.consumo && { consumo: data.consumo }),
-      ...(data.meta_pct && { meta_pct: data.meta_pct }),
-      ...(data.ganho_peso_esperado > 0 && { ganho_peso_esperado: data.ganho_peso_esperado }),
-      ...(data.categoria_alvo && { categoria_alvo: data.categoria_alvo }),
-      ...(data.custo_cab_dia > 0 && { custo_cab_dia: data.custo_cab_dia }),
-      ...(data.observacoes_tecnicas && { observacoes_tecnicas: data.observacoes_tecnicas }),
-    }).select().single();
-    if (error) { toast.error('Erro ao adicionar. Verifique se a tabela supplement_simulated foi criada.'); return; }
-    _simuladosCache = [..._simuladosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    setItems(_simuladosCache);
-    toast.success('Suplemento simulado adicionado!');
-    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '', categoria: '' });
-    setShowAddForm(false);
-  }
-
-  async function onEditSave(id: string, data: SimuladoForm) {
-    const { error } = await supabaseAdmin.from('supplement_simulated').update({
-      nome: data.nome.toUpperCase(), unidade: data.unidade,
-      categoria: data.categoria || null,
-      ...(data.peso > 0 ? { peso: data.peso } : { peso: null }),
-      ...(data.valor_kg > 0 ? { valor_kg: data.valor_kg } : { valor_kg: null }),
-      consumo: data.consumo || null, meta_pct: data.meta_pct || null,
-      ganho_peso_esperado: data.ganho_peso_esperado || null,
-      categoria_alvo: data.categoria_alvo || null,
-      custo_cab_dia: data.custo_cab_dia || null,
-      observacoes_tecnicas: data.observacoes_tecnicas || null,
-    }).eq('id', id);
-    if (error) { toast.error('Erro ao atualizar.'); return; }
-    _simuladosCache = _simuladosCache.map(s => s.id === id ? { ...s, ...data, nome: data.nome.toUpperCase() } : s);
-    setItems(_simuladosCache);
-    toast.success('Suplemento simulado atualizado!');
-    setEditingId(null);
-  }
-
-  function onDelete(id: string, nome: string) {
-    if (onRequestDelete) {
-      onRequestDelete({ id, label: `Remover suplemento simulado "${nome}"?`, onDelete: async () => {
-        const { error } = await supabaseAdmin.from('supplement_simulated').delete().eq('id', id);
-        if (error) throw new Error('Erro ao remover.');
-        _simuladosCache = _simuladosCache.filter(s => s.id !== id); setItems(_simuladosCache);
-      }});
-    }
-  }
-
   const EPOCAS_ORDER = [
-    { key: 'seca',      label: 'SECA',       periodo: 'Jul · Ago · Set · Out' },
-    { key: 'transicao', label: 'TRANSIÇÃO',  periodo: 'Mar · Abr · Mai · Jun' },
-    { key: 'aguas',     label: 'ÁGUAS',      periodo: 'Nov · Dez · Jan · Fev' },
+    { key: 'seca',      label: 'SECA',      periodo: 'Jul · Ago · Set · Out' },
+    { key: 'transicao', label: 'TRANSIÇÃO', periodo: 'Mar · Abr · Mai · Jun' },
+    { key: 'aguas',     label: 'ÁGUAS',     periodo: 'Nov · Dez · Jan · Fev' },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 flex-1">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide"
-            style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040', border: '1px solid rgba(26,96,64,0.2)' }}>
-            <FlaskConical className="w-3 h-3" /> Admin Only
-          </span>
-          <p className="text-xs text-gray-400">Base técnica do Simulador — Consumo × GMD × Época</p>
-        </div>
-        {canEdit && <AddBtn label="Novo Produto" onClick={() => setShowAddForm(v => !v)} />}
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide"
+          style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040', border: '1px solid rgba(26,96,64,0.2)' }}>
+          <FlaskConical className="w-3 h-3" /> Admin Only
+        </span>
+        <p className="text-xs text-gray-400">Clique em uma categoria para gerenciar os produtos vinculados</p>
       </div>
 
-      {/* ══════════════════════════════════════════════════════
-          SEÇÃO 1 — Tabela Técnica (simulador_parametros)
-          Idêntica ao PDF CONSUMO X GANHO do Phyllypi Melo
-      ══════════════════════════════════════════════════════ */}
-      <div>
-        <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#1a6040' }}>
-          Tabela Técnica — Consumo × Ganho Médio Diário × Época
-        </h3>
-        {loading ? <SkeletonTable rows={6} cols={5} /> : params.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Carregando parâmetros técnicos...</p>
-        ) : (
-          <div className="grid gap-4">
-            {EPOCAS_ORDER.map(({ key, label, periodo }) => {
-              const es = EPOCA_STYLE[key];
-              const rows = params.filter(p => p.epoca === key)
-                .sort((a, b) => a.g_100kg_pv - b.g_100kg_pv);
-              return (
-                <div key={key} className="rounded-xl border overflow-hidden" style={{ borderColor: es.color + '33' }}>
-                  {/* epoch header */}
-                  <div className="px-4 py-2.5 flex items-center gap-3" style={{ background: es.bg }}>
-                    <span className="text-sm font-bold" style={{ color: es.color }}>{label}</span>
-                    <span className="text-xs font-medium" style={{ color: es.color + 'cc' }}>{periodo}</span>
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b" style={{ borderColor: es.color + '22', background: es.bg + '66' }}>
-                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Produto / Categoria</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Consumo Sugerido<br /><span className="font-normal normal-case text-gray-400">g / 100kg PV</span></th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Regular<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1d4ed8' }}>Boa<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>Ótima<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((p, i) => (
-                        <tr key={p.categoria} className={`border-t ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ borderColor: '#f3f4f6' }}>
-                          <td className="px-4 py-2.5">
-                            <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{p.categoria}</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-bold" style={{ color: '#1a6040' }}>{p.g_100kg_pv}g</td>
-                          <td className="px-4 py-2.5 text-center font-semibold text-gray-700">
-                            {p.gmd_regular < 0 ? <span className="text-red-500">{p.gmd_regular.toFixed(3)}</span> : p.gmd_regular.toFixed(3)}
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1d4ed8' }}>{p.gmd_bom.toFixed(3)}</td>
-                          <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1a6040' }}>{p.gmd_otimo.toFixed(3)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      {loading ? <SkeletonTable rows={6} cols={6} /> : params.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8">Carregando parâmetros técnicos...</p>
+      ) : (
+        <div className="grid gap-4">
+          {EPOCAS_ORDER.map(({ key, label, periodo }) => {
+            const es = EPOCA_STYLE[key];
+            const rows = params.filter(p => p.epoca === key).sort((a, b) => a.g_100kg_pv - b.g_100kg_pv);
+            return (
+              <div key={key} className="rounded-xl border overflow-hidden" style={{ borderColor: es.color + '33' }}>
+                <div className="px-4 py-2.5 flex items-center gap-3" style={{ background: es.bg }}>
+                  <span className="text-sm font-bold" style={{ color: es.color }}>{label}</span>
+                  <span className="text-xs font-medium" style={{ color: es.color + 'cc' }}>{periodo}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ══════════════════════════════════════════════════════
-          SEÇÃO 2 — Produtos Cadastrados (supplement_simulated)
-      ══════════════════════════════════════════════════════ */}
-      <div>
-        <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#1a6040' }}>
-          Produtos Cadastrados
-        </h3>
-
-      {showAddForm && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border p-6 mb-6" style={{ background: 'rgba(26,96,64,0.04)', borderColor: 'rgba(26,96,64,0.2)' }}>
-          <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <FlaskConical className="w-4 h-4" style={{ color: '#1a6040' }} /> Adicionar Suplemento Simulado
-          </h2>
-          <form onSubmit={handleSubmit(onAdd)} className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Nome *</label>
-              <input {...upperReg(register('nome', { required: true }))} placeholder="Nome do suplemento"
-                className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
-            </div>
-            <div>
-              <label className={labelClass}>Categoria Técnica *</label>
-              <select {...register('categoria', { required: true })} className={`${inputClass} ${errors.categoria ? 'border-red-400' : ''}`}>
-                <option value="">— Selecione a categoria —</option>
-                {CATEGORIAS_SUPL_SIM.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Unidade</label>
-              <select {...register('unidade')} className={inputClass}>
-                <option value="kg">KG</option><option value="saco">SACO</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Peso por Unidade (kg)</label>
-              <input type="number" step="0.1" min="0" {...register('peso', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 30" />
-            </div>
-            <div>
-              <label className={labelClass}>Valor / KG (R$)</label>
-              <input type="number" step="0.01" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 2.50" />
-            </div>
-            <div>
-              <label className={labelClass}>Meta (% PV)</label>
-              <input {...register('meta_pct')} className={inputClass} placeholder="Ex.: 0,100%" />
-            </div>
-            <div>
-              <label className={labelClass}>Ganho de Peso Esperado (kg/mês)</label>
-              <input type="number" step="0.1" min="0" {...register('ganho_peso_esperado', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 8.5" />
-            </div>
-            <div>
-              <label className={labelClass}>Categoria Animal Alvo</label>
-              <select {...register('categoria_alvo')} className={inputClass}>
-                <option value="">— Selecione —</option>
-                {CATEGORIAS_SIMULADOR.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Custo Estimado / Cab / Dia (R$)</label>
-              <input type="number" step="0.01" min="0" {...register('custo_cab_dia', { valueAsNumber: true })} className={inputClass} placeholder="Ex.: 0.85" />
-            </div>
-            <div className="col-span-2">
-              <label className={labelClass}>Observações Técnicas</label>
-              <input {...register('observacoes_tecnicas')} className={inputClass} placeholder="Notas técnicas do produto..." />
-            </div>
-            <div className="col-span-2 flex gap-3">
-              <button type="submit" className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
-                style={{ background: '#1a6040' }}>
-                <Plus className="w-4 h-4" /> Adicionar
-              </button>
-              <button type="button" onClick={() => setShowAddForm(false)}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      )}
-
-      {loading ? <SkeletonTable rows={3} cols={7} /> : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {items.length === 0 ? (
-            <div className="py-16 text-center">
-              <FlaskConical className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(26,96,64,0.3)' }} />
-              <p className="text-gray-500 font-medium">Nenhum suplemento simulado cadastrado</p>
-              <p className="text-xs text-gray-400 mt-1">Adicione suplementos para usar no módulo Simulador</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200" style={{ background: 'rgba(26,96,64,0.04)' }}>
-                    {['', 'Nome', 'Categoria Técnica', 'Unidade', 'Valor/KG', 'Peso Saco', 'Ações'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map(item => {
-                    const isExpanded = expandedId === item.id;
-                    const itemParams = item.categoria
-                      ? ['seca', 'transicao', 'aguas'].map(ep => params.find(p => p.epoca === ep && p.categoria === item.categoria)).filter(Boolean) as SimuladorParam[]
-                      : [];
-
-                    return editingId === item.id ? (
-                      <SimuladoEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-                    ) : (
-                      <>
-                        <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                          className={`border-b border-gray-100 cursor-pointer transition-colors ${isExpanded ? 'bg-teal-50/40' : 'hover:bg-teal-50/20'}`}
-                          onClick={() => setExpandedId(isExpanded ? null : item.id)}>
-                          {/* Expand toggle */}
-                          <td className="px-3 py-3 w-8">
-                            <ChevronDown className={`w-4 h-4 text-teal-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-gray-900">{item.nome}</td>
-                          <td className="px-4 py-3">
-                            {item.categoria
-                              ? <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{item.categoria}</span>
-                              : <span className="text-gray-400 text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 uppercase text-sm">{item.unidade}</td>
-                          <td className="px-4 py-3 text-gray-700 font-medium">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(3)}/kg` : '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
-                          <td className="px-4 py-3">
-                            {canEdit && <ActionBtns onEdit={() => { setExpandedId(null); setEditingId(item.id); }} onDelete={() => onDelete(item.id, item.nome)} />}
-                          </td>
-                        </motion.tr>
-
-                        {/* ── Linha expandida: matriz Consumo × GMD × Época ── */}
-                        {isExpanded && (
-                          <tr key={item.id + '_exp'} className="border-b border-gray-100">
-                            <td colSpan={7} className="px-6 py-4" style={{ background: 'rgba(26,96,64,0.03)' }}>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
-                                Consumo × Ganho Médio Diário × Época — {item.categoria || 'categoria não definida'}
-                              </p>
-                              {itemParams.length > 0 ? (
-                                <table className="text-xs border-collapse">
-                                  <thead>
-                                    <tr>
-                                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Época do Ano</th>
-                                      <th className="px-3 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Consumo Sugerido<br/><span className="font-normal normal-case">g / 100kg PV</span></th>
-                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#6b7280' }}>Regular<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#1d4ed8' }}>Boa<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#1a6040' }}>Ótima<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {itemParams.map(p => {
-                                      const es = EPOCA_STYLE[p.epoca];
-                                      return (
-                                        <tr key={p.epoca} className="border-t border-gray-100">
-                                          <td className="px-3 py-2">
-                                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: es.bg, color: es.color }}>{es.label}</span>
-                                          </td>
-                                          <td className="px-3 py-2 text-center font-bold" style={{ color: '#1a6040' }}>{p.g_100kg_pv}g</td>
-                                          <td className="px-3 py-2 text-center font-semibold text-gray-700">{p.gmd_regular < 0 ? <span className="text-red-500">{p.gmd_regular.toFixed(3)}</span> : p.gmd_regular.toFixed(3)}</td>
-                                          <td className="px-3 py-2 text-center font-semibold" style={{ color: '#1d4ed8' }}>{p.gmd_bom.toFixed(3)}</td>
-                                          <td className="px-3 py-2 text-center font-semibold" style={{ color: '#1a6040' }}>{p.gmd_otimo.toFixed(3)}</td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              ) : (
-                                <p className="text-xs text-gray-400">Categoria não vinculada à tabela técnica.</p>
-                              )}
-                              {item.observacoes_tecnicas && (
-                                <p className="mt-3 text-xs text-gray-500"><span className="font-semibold">Obs.:</span> {item.observacoes_tecnicas}</p>
-                              )}
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b" style={{ borderColor: es.color + '22', background: es.bg + '66' }}>
+                      <th className="w-8 px-3 py-2"></th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Categoria</th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Consumo Sugerido<br /><span className="font-normal normal-case text-gray-400">g / 100kg PV</span></th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Regular<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1d4ed8' }}>Boa<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>Ótima<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((p, i) => {
+                      const catKey = `${key}:${p.categoria}`;
+                      const isExpanded = expandedCat === catKey;
+                      const prodCount = items.filter(it => it.categoria === p.categoria).length;
+                      return (
+                        <Fragment key={p.categoria}>
+                          <tr
+                            className={`border-t cursor-pointer select-none transition-colors ${isExpanded ? '' : (i % 2 === 0 ? 'bg-white hover:bg-teal-50/20' : 'bg-gray-50/50 hover:bg-teal-50/20')}`}
+                            style={{ borderColor: '#f3f4f6', ...(isExpanded ? { background: 'rgba(26,96,64,0.06)' } : {}) }}
+                            onClick={() => setExpandedCat(isExpanded ? null : catKey)}>
+                            <td className="px-3 py-2.5 w-8">
+                              <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : 'text-gray-300'}`}
+                                style={isExpanded ? { color: '#1a6040' } : {}} />
                             </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{p.categoria}</span>
+                                {prodCount > 0 && (
+                                  <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ background: '#1a6040' }}>{prodCount}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-center font-bold" style={{ color: '#1a6040' }}>{p.g_100kg_pv}g</td>
+                            <td className="px-4 py-2.5 text-center font-semibold text-gray-700">
+                              {p.gmd_regular < 0 ? <span className="text-red-500">{p.gmd_regular.toFixed(3)}</span> : p.gmd_regular.toFixed(3)}
+                            </td>
+                            <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1d4ed8' }}>{p.gmd_bom.toFixed(3)}</td>
+                            <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1a6040' }}>{p.gmd_otimo.toFixed(3)}</td>
                           </tr>
-                        )}
-                      </>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          {isExpanded && activeFarmId && (
+                            <tr>
+                              <td colSpan={6} className="p-0">
+                                <CatProdutoPanel
+                                  categoria={p.categoria}
+                                  farmId={activeFarmId}
+                                  items={items}
+                                  onItemsChange={newItems => { _simuladosCache = newItems; setItems([...newItems]); }}
+                                  canEdit={canEdit}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       )}
-      </div>{/* fim SEÇÃO 2 */}
     </div>
-  );
-}
-
-function SimuladoEditRow({ item, onSave, onCancel }: { item: SupplementSimulated; onSave: (d: SimuladoForm) => void; onCancel: () => void }) {
-  const { register, handleSubmit } = useForm<SimuladoForm>({
-    defaultValues: {
-      nome: item.nome, unidade: item.unidade, peso: item.peso ?? 0, valor_kg: item.valor_kg ?? 0,
-      consumo: item.consumo || '', meta_pct: item.meta_pct || '',
-      ganho_peso_esperado: item.ganho_peso_esperado ?? 0, categoria_alvo: item.categoria_alvo || '',
-      custo_cab_dia: item.custo_cab_dia ?? 0, observacoes_tecnicas: item.observacoes_tecnicas || '',
-      categoria: item.categoria || '',
-    },
-  });
-  return (
-    <tr className="bg-teal-50">
-      <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
-      <td className="px-4 py-2">
-        <select {...register('categoria')} className={inputClass}>
-          <option value="">— Categoria —</option>
-          {CATEGORIAS_SUPL_SIM.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </td>
-      <td className="px-4 py-2"><select {...register('unidade')} className={inputClass}><option value="kg">KG</option><option value="saco">SACO</option></select></td>
-      <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input {...register('meta_pct')} className={inputClass} placeholder="0,100%" /></td>
-      <td className="px-4 py-2"><input type="number" step="0.1" min="0" {...register('ganho_peso_esperado', { valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('custo_cab_dia', { valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
-    </tr>
   );
 }
 
