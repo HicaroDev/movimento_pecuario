@@ -1542,18 +1542,89 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
     }
   }
 
+  const EPOCAS_ORDER = [
+    { key: 'seca',      label: 'SECA',       periodo: 'Jul · Ago · Set · Out' },
+    { key: 'transicao', label: 'TRANSIÇÃO',  periodo: 'Mar · Abr · Mai · Jun' },
+    { key: 'aguas',     label: 'ÁGUAS',      periodo: 'Nov · Dez · Jan · Fev' },
+  ];
+
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
+    <div className="space-y-6">
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 flex-1">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide"
             style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040', border: '1px solid rgba(26,96,64,0.2)' }}>
             <FlaskConical className="w-3 h-3" /> Admin Only
           </span>
-          <p className="text-xs text-gray-400">Suplementos usados pelo módulo Simulador</p>
+          <p className="text-xs text-gray-400">Base técnica do Simulador — Consumo × GMD × Época</p>
         </div>
-        {canEdit && <AddBtn label="Novo Suplemento Simulado" onClick={() => setShowAddForm(v => !v)} />}
+        {canEdit && <AddBtn label="Novo Produto" onClick={() => setShowAddForm(v => !v)} />}
       </div>
+
+      {/* ══════════════════════════════════════════════════════
+          SEÇÃO 1 — Tabela Técnica (simulador_parametros)
+          Idêntica ao PDF CONSUMO X GANHO do Phyllypi Melo
+      ══════════════════════════════════════════════════════ */}
+      <div>
+        <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#1a6040' }}>
+          Tabela Técnica — Consumo × Ganho Médio Diário × Época
+        </h3>
+        {loading ? <SkeletonTable rows={6} cols={5} /> : params.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">Carregando parâmetros técnicos...</p>
+        ) : (
+          <div className="grid gap-4">
+            {EPOCAS_ORDER.map(({ key, label, periodo }) => {
+              const es = EPOCA_STYLE[key];
+              const rows = params.filter(p => p.epoca === key)
+                .sort((a, b) => a.g_100kg_pv - b.g_100kg_pv);
+              return (
+                <div key={key} className="rounded-xl border overflow-hidden" style={{ borderColor: es.color + '33' }}>
+                  {/* epoch header */}
+                  <div className="px-4 py-2.5 flex items-center gap-3" style={{ background: es.bg }}>
+                    <span className="text-sm font-bold" style={{ color: es.color }}>{label}</span>
+                    <span className="text-xs font-medium" style={{ color: es.color + 'cc' }}>{periodo}</span>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b" style={{ borderColor: es.color + '22', background: es.bg + '66' }}>
+                        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Produto / Categoria</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Consumo Sugerido<br /><span className="font-normal normal-case text-gray-400">g / 100kg PV</span></th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Regular<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1d4ed8' }}>Boa<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>Ótima<br /><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((p, i) => (
+                        <tr key={p.categoria} className={`border-t ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ borderColor: '#f3f4f6' }}>
+                          <td className="px-4 py-2.5">
+                            <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{p.categoria}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-center font-bold" style={{ color: '#1a6040' }}>{p.g_100kg_pv}g</td>
+                          <td className="px-4 py-2.5 text-center font-semibold text-gray-700">
+                            {p.gmd_regular < 0 ? <span className="text-red-500">{p.gmd_regular.toFixed(3)}</span> : p.gmd_regular.toFixed(3)}
+                          </td>
+                          <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1d4ed8' }}>{p.gmd_bom.toFixed(3)}</td>
+                          <td className="px-4 py-2.5 text-center font-semibold" style={{ color: '#1a6040' }}>{p.gmd_otimo.toFixed(3)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ══════════════════════════════════════════════════════
+          SEÇÃO 2 — Produtos Cadastrados (supplement_simulated)
+      ══════════════════════════════════════════════════════ */}
+      <div>
+        <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#1a6040' }}>
+          Produtos Cadastrados
+        </h3>
 
       {showAddForm && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
@@ -1728,6 +1799,7 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
           )}
         </div>
       )}
+      </div>{/* fim SEÇÃO 2 */}
     </div>
   );
 }
