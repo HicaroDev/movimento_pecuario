@@ -1415,15 +1415,27 @@ function SuplementosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { on
 interface SupplementSimulated {
   id: string; farm_id: string; nome: string; unidade: string;
   peso?: number; valor_kg?: number; consumo?: string; meta_pct?: string;
-  ganho_peso_esperado?: number; categoria_alvo?: string; custo_cab_dia?: number; observacoes_tecnicas?: string;
+  ganho_peso_esperado?: number; categoria_alvo?: string; custo_cab_dia?: number;
+  observacoes_tecnicas?: string; categoria?: string;
 }
 interface SimuladoForm {
   nome: string; unidade: string; peso: number; valor_kg: number;
   consumo: string; meta_pct: string; ganho_peso_esperado: number;
   categoria_alvo: string; custo_cab_dia: number; observacoes_tecnicas: string;
+  categoria: string;
 }
 
 let _simuladosCache: SupplementSimulated[] = [];
+
+// Categorias técnicas do simulador (tabela Consumo x GMD x Época)
+const CATEGORIAS_SUPL_SIM = [
+  'MINERAL',
+  'MINERAL ADITIVADO',
+  'PROTEICO 0,1% PV',
+  'PROTEICO 0,3% PV',
+  'PROTEICO ENERGETICO 0,5% PV',
+  'RACAO SEMI 1,0% PV',
+] as const;
 
 const CATEGORIAS_SIMULADOR = [
   'Vacas Adultas', 'Primíparas', 'Vaca descarte', 'Novilhas Precoce',
@@ -1438,7 +1450,7 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SimuladoForm>({
-    defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '' },
+    defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '', categoria: '' },
   });
 
   useEffect(() => {
@@ -1462,6 +1474,7 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
       farm_id: activeFarmId,
       nome: data.nome.toUpperCase(),
       unidade: data.unidade,
+      ...(data.categoria && { categoria: data.categoria }),
       ...(data.peso > 0 && { peso: data.peso }),
       ...(data.valor_kg > 0 && { valor_kg: data.valor_kg }),
       ...(data.consumo && { consumo: data.consumo }),
@@ -1475,13 +1488,14 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
     _simuladosCache = [..._simuladosCache, row].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     setItems(_simuladosCache);
     toast.success('Suplemento simulado adicionado!');
-    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '' });
+    reset({ unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '', categoria: '' });
     setShowAddForm(false);
   }
 
   async function onEditSave(id: string, data: SimuladoForm) {
     const { error } = await supabaseAdmin.from('supplement_simulated').update({
       nome: data.nome.toUpperCase(), unidade: data.unidade,
+      categoria: data.categoria || null,
       ...(data.peso > 0 ? { peso: data.peso } : { peso: null }),
       ...(data.valor_kg > 0 ? { valor_kg: data.valor_kg } : { valor_kg: null }),
       consumo: data.consumo || null, meta_pct: data.meta_pct || null,
@@ -1531,6 +1545,13 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
               <label className={labelClass}>Nome *</label>
               <input {...upperReg(register('nome', { required: true }))} placeholder="Nome do suplemento"
                 className={`${inputClass} ${errors.nome ? 'border-red-400' : ''}`} />
+            </div>
+            <div>
+              <label className={labelClass}>Categoria Técnica *</label>
+              <select {...register('categoria', { required: true })} className={`${inputClass} ${errors.categoria ? 'border-red-400' : ''}`}>
+                <option value="">— Selecione a categoria —</option>
+                {CATEGORIAS_SUPL_SIM.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Unidade</label>
@@ -1596,7 +1617,7 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200" style={{ background: 'rgba(26,96,64,0.04)' }}>
-                    {['Nome', 'Unidade', 'Valor/KG', 'Meta %PV', 'Ganho/mês', 'Categoria Alvo', 'Custo/Cab/Dia', 'Ações'].map(h => (
+                    {['Nome', 'Categoria Técnica', 'Unidade', 'Valor/KG', 'Meta %PV', 'Ganho/mês', 'Custo/Cab/Dia', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>{h}</th>
                     ))}
                   </tr>
@@ -1607,11 +1628,15 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
                   ) : (
                     <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:hover:bg-teal-50/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
+                      <td className="px-4 py-3">
+                        {item.categoria
+                          ? <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{item.categoria}</span>
+                          : <span className="text-gray-400 text-xs">—</span>}
+                      </td>
                       <td className="px-4 py-3 text-gray-600 uppercase">{item.unidade}</td>
                       <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>{item.meta_pct || '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.ganho_peso_esperado ? `${item.ganho_peso_esperado} kg` : '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{item.categoria_alvo || '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.custo_cab_dia ? `R$ ${item.custo_cab_dia.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-3">{canEdit && <ActionBtns
                         onEdit={() => onRequestEdit
@@ -1638,21 +1663,22 @@ function SimuladoEditRow({ item, onSave, onCancel }: { item: SupplementSimulated
       consumo: item.consumo || '', meta_pct: item.meta_pct || '',
       ganho_peso_esperado: item.ganho_peso_esperado ?? 0, categoria_alvo: item.categoria_alvo || '',
       custo_cab_dia: item.custo_cab_dia ?? 0, observacoes_tecnicas: item.observacoes_tecnicas || '',
+      categoria: item.categoria || '',
     },
   });
   return (
-    <tr className="bg-purple-50">
+    <tr className="bg-teal-50">
       <td className="px-4 py-2"><input {...upperReg(register('nome', { required: true }))} className={inputClass} /></td>
+      <td className="px-4 py-2">
+        <select {...register('categoria')} className={inputClass}>
+          <option value="">— Categoria —</option>
+          {CATEGORIAS_SUPL_SIM.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </td>
       <td className="px-4 py-2"><select {...register('unidade')} className={inputClass}><option value="kg">KG</option><option value="saco">SACO</option></select></td>
       <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('valor_kg', { valueAsNumber: true })} className={inputClass} /></td>
       <td className="px-4 py-2"><input {...register('meta_pct')} className={inputClass} placeholder="0,100%" /></td>
       <td className="px-4 py-2"><input type="number" step="0.1" min="0" {...register('ganho_peso_esperado', { valueAsNumber: true })} className={inputClass} /></td>
-      <td className="px-4 py-2">
-        <select {...register('categoria_alvo')} className={inputClass}>
-          <option value="">— Categoria —</option>
-          {CATEGORIAS_SIMULADOR.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </td>
       <td className="px-4 py-2"><input type="number" step="0.01" min="0" {...register('custo_cab_dia', { valueAsNumber: true })} className={inputClass} /></td>
       <td className="px-4 py-2"><SaveCancelBtns onSave={handleSubmit(onSave)} onCancel={onCancel} /></td>
     </tr>

@@ -14,10 +14,14 @@ const readCls  = 'w-full h-9 px-3 rounded-lg border border-gray-200 bg-teal-50 t
 
 /* ── Types ── */
 interface SupplSim {
-  id: string; nome: string; valor_kg?: number; meta_pct?: string; ganho_peso_esperado?: number;
+  id: string; nome: string; valor_kg?: number; meta_pct?: string;
+  ganho_peso_esperado?: number; categoria?: string;
 }
 interface Pasture { id: string; nome: string; }
-
+interface SimuladorParam {
+  epoca: string; categoria: string; g_100kg_pv: number;
+  gmd_regular: number; gmd_bom: number; gmd_otimo: number;
+}
 interface Fase {
   id: number;
   dataInicio: string;
@@ -27,6 +31,17 @@ interface Fase {
   consumo: number;
   gmd: number;
 }
+
+type Qualidade = 'regular' | 'bom' | 'otimo';
+type Epoca = 'seca' | 'transicao' | 'aguas';
+
+const EPOCA_INFO: Record<Epoca, { label: string; color: string; bg: string }> = {
+  seca:      { label: 'Seca',      color: '#b45309', bg: '#fef3c7' },
+  transicao: { label: 'Transição', color: '#1d4ed8', bg: '#dbeafe' },
+  aguas:     { label: 'Águas',     color: '#1a6040', bg: '#dcfce7' },
+};
+
+const PIE_COLORS = ['#1a6040', '#4aab7c', '#a8d8c0', '#d4ece3'];
 
 /* ── Helpers ── */
 function emptyFase(id: number): Fase {
@@ -48,7 +63,59 @@ function brl(n: number): string {
   return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const PIE_COLORS = ['#1a6040', '#4aab7c', '#a8d8c0', '#d4ece3'];
+function getEpocaForMonth(month: number): Epoca {
+  if (month >= 7 && month <= 10) return 'seca';
+  if (month >= 11 || month <= 2) return 'aguas';
+  return 'transicao';
+}
+
+function getDiasPorEpoca(inicio: string, fim: string): Record<Epoca, number> {
+  const result: Record<Epoca, number> = { seca: 0, transicao: 0, aguas: 0 };
+  const start = new Date(inicio + 'T00:00:00');
+  const end   = new Date(fim   + 'T00:00:00');
+  const total = Math.round((end.getTime() - start.getTime()) / 86400000);
+  if (total <= 0) return result;
+  for (let i = 0; i < total; i++) {
+    const d = new Date(start.getTime() + i * 86400000);
+    result[getEpocaForMonth(d.getMonth() + 1)]++;
+  }
+  return result;
+}
+
+function getEpocaPrimaria(inicio: string, fim: string): Epoca | null {
+  if (!inicio || !fim) return null;
+  const dias = getDiasPorEpoca(inicio, fim);
+  const entries = Object.entries(dias) as [Epoca, number][];
+  const max = entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0]);
+  return max[1] > 0 ? max[0] : null;
+}
+
+function calcGMDPonderado(
+  inicio: string, fim: string,
+  categoria: string,
+  qualidade: Qualidade,
+  params: SimuladorParam[]
+): number {
+  if (!inicio || !fim) return 0;
+  const diasPorEpoca = getDiasPorEpoca(inicio, fim);
+  const totalDias = Object.values(diasPorEpoca).reduce((s, v) => s + v, 0);
+  if (totalDias === 0) return 0;
+  const qKey = `gmd_${qualidade}` as keyof SimuladorParam;
+  let total = 0;
+  for (const [epoca, dias] of Object.entries(diasPorEpoca) as [Epoca, number][]) {
+    if (dias === 0) continue;
+    const p = params.find(x => x.epoca === epoca && x.categoria === categoria);
+    if (p) total += (p[qKey] as number) * dias;
+  }
+  return parseFloat((total / totalDias).toFixed(3));
+}
+
+function calcConsumoFromParams(categoria: string, pesoAnimal: number, params: SimuladorParam[]): number {
+  const p = params.find(x => x.categoria === categoria);
+  if (!p || pesoAnimal <= 0) return 0;
+  // g/100kg PV → kg/cab/dia: pesoAnimal × g / 100 / 1000
+  return parseFloat((pesoAnimal * p.g_100kg_pv / 100000).toFixed(3));
+}
 
 /* ── Sub-componentes ── */
 function NumInput({ value, onChange, step = '0.01', placeholder = '', cls = '' }: {
@@ -76,22 +143,35 @@ function SectionTitle({ n, label }: { n: number; label: string }) {
   );
 }
 
+function EpocaBadge({ epoca }: { epoca: Epoca | null }) {
+  if (!epoca) return null;
+  const info = EPOCA_INFO[epoca];
+  return (
+    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap"
+      style={{ background: info.bg, color: info.color }}>
+      {info.label}
+    </span>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════
    Página Principal
 ══════════════════════════════════════════════════════════ */
 export function Simulador() {
-  const navigate     = useNavigate();
-  const { isAdmin }  = useAuth();
+  const navigate        = useNavigate();
+  const { isAdmin }     = useAuth();
   const { activeFarmId } = useData();
 
   const [pastures,    setPastures]    = useState<Pasture[]>([]);
   const [suppls,      setSuppls]      = useState<SupplSim[]>([]);
+  const [params,      setParams]      = useState<SimuladorParam[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
   /* Lote */
-  const [pastureId,   setPastureId]   = useState('');
-  const [pesoInicial, setPesoInicial] = useState<number>(0);
-  const [qtdAnimais,  setQtdAnimais]  = useState<number>(0);
+  const [pastureId,          setPastureId]          = useState('');
+  const [pesoInicial,        setPesoInicial]        = useState<number>(0);
+  const [qtdAnimais,         setQtdAnimais]         = useState<number>(0);
+  const [qualidadePastagem,  setQualidadePastagem]  = useState<Qualidade>('bom');
 
   /* Parâmetros econômicos */
   const [rc,                setRc]                = useState<number>(50);
@@ -113,10 +193,12 @@ export function Simulador() {
     setLoadingData(true);
     Promise.all([
       supabaseAdmin.from('pastures').select('id, nome').eq('farm_id', activeFarmId).order('nome'),
-      supabaseAdmin.from('supplement_simulated').select('id, nome, valor_kg, meta_pct, ganho_peso_esperado').eq('farm_id', activeFarmId).order('nome'),
-    ]).then(([p, s]) => {
+      supabaseAdmin.from('supplement_simulated').select('id, nome, valor_kg, meta_pct, ganho_peso_esperado, categoria').eq('farm_id', activeFarmId).order('nome'),
+      supabaseAdmin.from('simulador_parametros').select('*'),
+    ]).then(([p, s, pr]) => {
       setPastures(p.data ?? []);
       setSuppls(s.data ?? []);
+      setParams(pr.data ?? []);
       setLoadingData(false);
     });
   }, [activeFarmId]);
@@ -132,7 +214,7 @@ export function Simulador() {
       .eq('status', 'ativo')
       .then(({ data }) => {
         const list = data ?? [];
-        const qtd = list.reduce((s, a) => s + (a.quantidade ?? 0), 0);
+        const qtd  = list.reduce((s, a) => s + (a.quantidade ?? 0), 0);
         const pond = list.reduce((s, a) => s + (a.peso_medio ?? 0) * (a.quantidade ?? 0), 0);
         setQtdAnimais(qtd);
         setPesoInicial(qtd > 0 ? Math.round(pond / qtd) : 0);
@@ -141,15 +223,45 @@ export function Simulador() {
 
   /* Auto-fill ao selecionar suplemento em uma fase */
   function handleSelectSupl(faseId: number, suplId: string) {
-    const s = suppls.find(x => x.id === suplId);
+    const s    = suppls.find(x => x.id === suplId);
+    const fase = fases.find(f => f.id === faseId);
     if (!s) { updateFase(faseId, { suplementoId: suplId, valorKg: 0, consumo: 0, gmd: 0 }); return; }
-    const consumo = pesoInicial > 0 && s.meta_pct
-      ? parseFloat((pesoInicial * parseMeta(s.meta_pct) / 100).toFixed(3))
-      : 0;
-    const gmd = s.ganho_peso_esperado
-      ? parseFloat((s.ganho_peso_esperado / 30).toFixed(3))
-      : 0;
+
+    const consumo = s.categoria && params.length > 0
+      ? calcConsumoFromParams(s.categoria, pesoInicial, params)
+      : (pesoInicial > 0 && s.meta_pct
+          ? parseFloat((pesoInicial * parseMeta(s.meta_pct) / 100).toFixed(3))
+          : 0);
+
+    const gmd = s.categoria && params.length > 0 && fase?.dataInicio && fase?.dataFim
+      ? calcGMDPonderado(fase.dataInicio, fase.dataFim, s.categoria, qualidadePastagem, params)
+      : (s.ganho_peso_esperado ? parseFloat((s.ganho_peso_esperado / 30).toFixed(3)) : 0);
+
     updateFase(faseId, { suplementoId: suplId, valorKg: s.valor_kg ?? 0, consumo, gmd });
+  }
+
+  /* Quando muda qualidade da pastagem → recalcula GMD de todas as fases */
+  function handleQualidadeChange(q: Qualidade) {
+    setQualidadePastagem(q);
+    if (params.length === 0) return;
+    setFases(prev => prev.map(f => {
+      const s = suppls.find(x => x.id === f.suplementoId);
+      if (!s?.categoria || !f.dataInicio || !f.dataFim) return f;
+      return { ...f, gmd: calcGMDPonderado(f.dataInicio, f.dataFim, s.categoria, q, params) };
+    }));
+  }
+
+  /* Quando muda data de uma fase → recalcula GMD daquela fase */
+  function handleDateChange(faseId: number, field: 'dataInicio' | 'dataFim', value: string) {
+    setFases(prev => prev.map(f => {
+      if (f.id !== faseId) return f;
+      const updated = { ...f, [field]: value };
+      const s = suppls.find(x => x.id === updated.suplementoId);
+      if (s?.categoria && params.length > 0 && updated.dataInicio && updated.dataFim) {
+        updated.gmd = calcGMDPonderado(updated.dataInicio, updated.dataFim, s.categoria, qualidadePastagem, params);
+      }
+      return updated;
+    }));
   }
 
   function updateFase(id: number, changes: Partial<Fase>) {
@@ -173,7 +285,8 @@ export function Simulador() {
       const custoPer    = f.consumo * f.valorKg * dias;
       const custoMes    = dias > 0 ? custoPer / (dias / 30) : 0;
       const ganhoKg     = f.gmd * dias;
-      return { ...f, dias, custoPer, custoMes, ganhoKg };
+      const epocaPrimaria = getEpocaPrimaria(f.dataInicio, f.dataFim);
+      return { ...f, dias, custoPer, custoMes, ganhoKg, epocaPrimaria };
     });
 
     const totalDias    = fasesCalc.reduce((s, f) => s + f.dias, 0);
@@ -203,13 +316,13 @@ export function Simulador() {
     const rentabAm     = meses > 0 ? rentabPer / meses : 0;
     const breakEven    = arrobasF > 0 ? custoTotal / arrobasF : 0;
     const desembAlim   = meses > 0 ? totalSuplem / meses : 0;
-    const desembTotal  = meses > 0 ? custoTotal / meses : 0;
+    const desembTotal  = meses > 0 ? (totalSuplem + despesaTotal) / meses : 0;
 
     const pieData = [
-      { name: 'Preço do animal',      value: parseFloat(precoAnimal.toFixed(2))  },
-      { name: 'Suplementação',         value: parseFloat(totalSuplem.toFixed(2)) },
-      { name: 'Despesa Oper./Pasto',   value: parseFloat(despesaTotal.toFixed(2))},
-      { name: 'Financeiro',            value: parseFloat(financeiro.toFixed(2))  },
+      { name: 'Preço do animal',    value: parseFloat(precoAnimal.toFixed(2))  },
+      { name: 'Suplementação',      value: parseFloat(totalSuplem.toFixed(2)) },
+      { name: 'Despesa Oper./Pasto', value: parseFloat(despesaTotal.toFixed(2))},
+      { name: 'Financeiro',         value: parseFloat(financeiro.toFixed(2))  },
     ].filter(d => d.value > 0);
 
     return {
@@ -241,7 +354,7 @@ export function Simulador() {
         {/* ── 1. Dados do Lote ── */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <SectionTitle n={1} label="Dados do Lote" />
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             <div>
               <label className={labelCls}>Pasto / Lote</label>
               {loadingData ? <div className="h-9 bg-gray-100 rounded-lg animate-pulse" /> : (
@@ -262,6 +375,18 @@ export function Simulador() {
             <div>
               <label className={labelCls}>Qtd. Animais</label>
               <NumInput value={qtdAnimais} onChange={setQtdAnimais} step="1" placeholder="Ex.: 50" />
+            </div>
+            <div>
+              <label className={labelCls}>Qualidade da Pastagem</label>
+              <div className="relative">
+                <select value={qualidadePastagem} onChange={e => handleQualidadeChange(e.target.value as Qualidade)}
+                  className={inputCls + ' pr-8 appearance-none'}>
+                  <option value="regular">Regular</option>
+                  <option value="bom">Boa</option>
+                  <option value="otimo">Ótima</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
             <div>
               <label className={labelCls}>Arrobas Iniciais</label>
@@ -316,6 +441,17 @@ export function Simulador() {
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Fases de Suplementação</h2>
               <span className="text-xs text-gray-400">até 4 fases</span>
             </div>
+            {params.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span>Época detectada automaticamente</span>
+                {(['seca', 'transicao', 'aguas'] as Epoca[]).map(e => (
+                  <span key={e} className="px-1.5 py-0.5 rounded font-semibold"
+                    style={{ background: EPOCA_INFO[e].bg, color: EPOCA_INFO[e].color }}>
+                    {EPOCA_INFO[e].label}
+                  </span>
+                ))}
+              </div>
+            )}
             {fases.length < 4 && (
               <button onClick={addFase}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors">
@@ -328,7 +464,7 @@ export function Simulador() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['#','Período Inicial','Período Final','Dias','Produto','R$/kg','Consumo kg/boi/dia','Custo/Período','Custo/cab/mês','GMD kg/dia','Ganho (kg)',''].map(h => (
+                  {['#','Período Inicial','Período Final','Época','Dias','Produto','R$/kg','Consumo kg/boi/dia','Custo/Período','Custo/cab/mês','GMD kg/dia','Ganho (kg)',''].map(h => (
                     <th key={h} className="px-2 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -343,20 +479,23 @@ export function Simulador() {
                       </td>
                       <td className="px-2 py-2">
                         <input type="date" value={fase.dataInicio}
-                          onChange={e => updateFase(fase.id, { dataInicio: e.target.value })}
+                          onChange={e => handleDateChange(fase.id, 'dataInicio', e.target.value)}
                           className={inputCls + ' w-36 text-xs'} />
                       </td>
                       <td className="px-2 py-2">
                         <input type="date" value={fase.dataFim}
-                          onChange={e => updateFase(fase.id, { dataFim: e.target.value })}
+                          onChange={e => handleDateChange(fase.id, 'dataFim', e.target.value)}
                           className={inputCls + ' w-36 text-xs'} />
                       </td>
+                      <td className="px-2 py-2">
+                        <EpocaBadge epoca={fc.epocaPrimaria} />
+                      </td>
                       <td className="px-2 py-2 text-center font-bold text-teal-700">
-                        {fc.dias > 0 ? `${fc.dias} dias` : '—'}
+                        {fc.dias > 0 ? `${fc.dias}d` : '—'}
                       </td>
                       <td className="px-2 py-2">
                         {suppls.length === 0 ? (
-                          <span className="text-gray-400 text-xs">Cadastre suplementos simulados</span>
+                          <span className="text-gray-400 text-xs">Cadastre suplementos</span>
                         ) : (
                           <div className="relative">
                             <select value={fase.suplementoId}
@@ -388,13 +527,13 @@ export function Simulador() {
                         {fc.custoMes > 0 ? brl(fc.custoMes) : '—'}
                       </td>
                       <td className="px-2 py-2">
-                        <input type="number" step="0.001" min="0" placeholder="0,000"
+                        <input type="number" step="0.001" placeholder="0,000"
                           value={fase.gmd || ''}
                           onChange={e => updateFase(fase.id, { gmd: parseFloat(e.target.value) || 0 })}
                           className={inputCls + ' w-20 text-xs'} />
                       </td>
                       <td className="px-2 py-2 text-right font-semibold whitespace-nowrap" style={{ color: '#1a6040' }}>
-                        {fc.ganhoKg > 0 ? fc.ganhoKg.toFixed(2) + ' kg' : '—'}
+                        {fc.ganhoKg !== 0 ? fc.ganhoKg.toFixed(2) + ' kg' : '—'}
                       </td>
                       <td className="px-2 py-2">
                         {fases.length > 1 && (
@@ -411,11 +550,11 @@ export function Simulador() {
               {calc.totalDias > 0 && (
                 <tfoot>
                   <tr className="border-t-2 border-teal-200 bg-teal-50 font-bold text-xs">
-                    <td colSpan={3} className="px-2 py-2.5 text-teal-700">TOTAL</td>
-                    <td className="px-2 py-2.5 text-teal-700 text-center">{calc.totalDias} dias</td>
+                    <td colSpan={4} className="px-2 py-2.5 text-teal-700">TOTAL</td>
+                    <td className="px-2 py-2.5 text-teal-700 text-center">{calc.totalDias}d</td>
                     <td colSpan={3} />
                     <td className="px-2 py-2.5 text-right whitespace-nowrap" style={{ color: '#1a6040' }}>
-                      {brl(calc.totalSuplem)} /cab período
+                      {brl(calc.totalSuplem)} /cab
                     </td>
                     <td />
                     <td />
