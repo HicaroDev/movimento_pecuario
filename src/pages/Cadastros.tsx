@@ -1425,7 +1425,19 @@ interface SimuladoForm {
   categoria: string;
 }
 
+interface SimuladorParam {
+  epoca: string; categoria: string; g_100kg_pv: number;
+  gmd_regular: number; gmd_bom: number; gmd_otimo: number;
+}
+
+const EPOCA_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  seca:      { label: 'Seca (Jul–Out)',       color: '#b45309', bg: '#fef3c7' },
+  transicao: { label: 'Transição (Mar–Jun)',  color: '#1d4ed8', bg: '#dbeafe' },
+  aguas:     { label: 'Águas (Nov–Fev)',      color: '#1a6040', bg: '#dcfce7' },
+};
+
 let _simuladosCache: SupplementSimulated[] = [];
+let _paramsCache: SimuladorParam[] = [];
 
 // Categorias técnicas do simulador (tabela Consumo x GMD x Época)
 const CATEGORIAS_SUPL_SIM = [
@@ -1445,9 +1457,11 @@ const CATEGORIAS_SIMULADOR = [
 
 function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRequestDelete?: (t: DeleteTarget) => void; onRequestEdit?: (t: EditTarget) => void; canEdit?: boolean }) {
   const { activeFarmId } = useData();
-  const [items, setItems] = useState<SupplementSimulated[]>(_simuladosCache);
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [items,      setItems]      = useState<SupplementSimulated[]>(_simuladosCache);
+  const [params,     setParams]     = useState<SimuladorParam[]>(_paramsCache);
+  const [loading,    setLoading]    = useState(false);
+  const [editingId,  setEditingId]  = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SimuladoForm>({
     defaultValues: { unidade: 'kg', peso: 0, valor_kg: 0, consumo: '', meta_pct: '', ganho_peso_esperado: 0, categoria_alvo: '', custo_cab_dia: 0, observacoes_tecnicas: '', categoria: '' },
@@ -1459,8 +1473,14 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
     setLoading(true);
     (async () => {
       try {
-        const { data } = await supabaseAdmin.from('supplement_simulated').select('*').eq('farm_id', activeFarmId).order('nome');
-        if (mounted) { _simuladosCache = data ?? []; setItems(_simuladosCache); }
+        const [{ data: suplementos }, { data: paramsData }] = await Promise.all([
+          supabaseAdmin.from('supplement_simulated').select('*').eq('farm_id', activeFarmId).order('nome'),
+          _paramsCache.length ? { data: _paramsCache } : supabaseAdmin.from('simulador_parametros').select('*'),
+        ]);
+        if (mounted) {
+          _simuladosCache = suplementos ?? []; setItems(_simuladosCache);
+          _paramsCache = paramsData ?? []; setParams(_paramsCache);
+        }
       } finally { if (mounted) setLoading(false); }
     })();
     return () => { mounted = false; };
@@ -1617,35 +1637,88 @@ function SimuladosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { onRe
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200" style={{ background: 'rgba(26,96,64,0.04)' }}>
-                    {['Nome', 'Categoria Técnica', 'Unidade', 'Valor/KG', 'Meta %PV', 'Ganho/mês', 'Custo/Cab/Dia', 'Ações'].map(h => (
+                    {['', 'Nome', 'Categoria Técnica', 'Unidade', 'Valor/KG', 'Peso Saco', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#1a6040' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map(item => editingId === item.id ? (
-                    <SimuladoEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
-                  ) : (
-                    <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:hover:bg-teal-50/30 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{item.nome}</td>
-                      <td className="px-4 py-3">
-                        {item.categoria
-                          ? <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{item.categoria}</span>
-                          : <span className="text-gray-400 text-xs">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 uppercase">{item.unidade}</td>
-                      <td className="px-4 py-3 text-gray-600">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(2)}` : '—'}</td>
-                      <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#1a6040' }}>{item.meta_pct || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{item.ganho_peso_esperado ? `${item.ganho_peso_esperado} kg` : '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{item.custo_cab_dia ? `R$ ${item.custo_cab_dia.toFixed(2)}` : '—'}</td>
-                      <td className="px-4 py-3">{canEdit && <ActionBtns
-                        onEdit={() => onRequestEdit
-                          ? onRequestEdit({ id: item.id, label: `Editar "${item.nome}"`, onEdit: () => setEditingId(item.id) })
-                          : setEditingId(item.id)}
-                        onDelete={() => onDelete(item.id, item.nome)} />}
-                      </td>
-                    </motion.tr>
-                  ))}
+                <tbody>
+                  {items.map(item => {
+                    const isExpanded = expandedId === item.id;
+                    const itemParams = item.categoria
+                      ? ['seca', 'transicao', 'aguas'].map(ep => params.find(p => p.epoca === ep && p.categoria === item.categoria)).filter(Boolean) as SimuladorParam[]
+                      : [];
+
+                    return editingId === item.id ? (
+                      <SimuladoEditRow key={item.id} item={item} onSave={d => onEditSave(item.id, d)} onCancel={() => setEditingId(null)} />
+                    ) : (
+                      <>
+                        <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          className={`border-b border-gray-100 cursor-pointer transition-colors ${isExpanded ? 'bg-teal-50/40' : 'hover:bg-teal-50/20'}`}
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}>
+                          {/* Expand toggle */}
+                          <td className="px-3 py-3 w-8">
+                            <ChevronDown className={`w-4 h-4 text-teal-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-gray-900">{item.nome}</td>
+                          <td className="px-4 py-3">
+                            {item.categoria
+                              ? <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: 'rgba(26,96,64,0.10)', color: '#1a6040' }}>{item.categoria}</span>
+                              : <span className="text-gray-400 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 uppercase text-sm">{item.unidade}</td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{item.valor_kg ? `R$ ${item.valor_kg.toFixed(3)}/kg` : '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.peso ? `${item.peso} kg` : '—'}</td>
+                              </td>
+                        </motion.tr>
+
+                        {/* ── Linha expandida: matriz Consumo × GMD × Época ── */}
+                        {isExpanded && (
+                          <tr key={item.id + '_exp'} className="border-b border-gray-100">
+                            <td colSpan={7} className="px-6 py-4" style={{ background: 'rgba(26,96,64,0.03)' }}>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                Consumo × Ganho Médio Diário × Época — {item.categoria || 'categoria não definida'}
+                              </p>
+                              {itemParams.length > 0 ? (
+                                <table className="text-xs border-collapse">
+                                  <thead>
+                                    <tr>
+                                      <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Época do Ano</th>
+                                      <th className="px-3 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Consumo Sugerido<br/><span className="font-normal normal-case">g / 100kg PV</span></th>
+                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#6b7280' }}>Regular<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#1d4ed8' }}>Boa<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                                      <th className="px-3 py-2 text-center text-[10px] font-bold uppercase" style={{ color: '#1a6040' }}>Ótima<br/><span className="font-normal normal-case text-gray-400">GMD kg/dia</span></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {itemParams.map(p => {
+                                      const es = EPOCA_STYLE[p.epoca];
+                                      return (
+                                        <tr key={p.epoca} className="border-t border-gray-100">
+                                          <td className="px-3 py-2">
+                                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: es.bg, color: es.color }}>{es.label}</span>
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-bold" style={{ color: '#1a6040' }}>{p.g_100kg_pv}g</td>
+                                          <td className="px-3 py-2 text-center font-semibold text-gray-700">{p.gmd_regular < 0 ? <span className="text-red-500">{p.gmd_regular.toFixed(3)}</span> : p.gmd_regular.toFixed(3)}</td>
+                                          <td className="px-3 py-2 text-center font-semibold" style={{ color: '#1d4ed8' }}>{p.gmd_bom.toFixed(3)}</td>
+                                          <td className="px-3 py-2 text-center font-semibold" style={{ color: '#1a6040' }}>{p.gmd_otimo.toFixed(3)}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <p className="text-xs text-gray-400">Categoria não vinculada à tabela técnica.</p>
+                              )}
+                              {item.observacoes_tecnicas && (
+                                <p className="mt-3 text-xs text-gray-500"><span className="font-semibold">Obs.:</span> {item.observacoes_tecnicas}</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
