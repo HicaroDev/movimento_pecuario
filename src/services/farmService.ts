@@ -22,14 +22,6 @@ const DEFAULT_CATEGORIAS = [
   'Vaca Adultas Prenhas', 'Vacas Adultas Paridas',
 ];
 
-const DEFAULT_SUPLEMENTOS = [
-  'Energetico 0,3%', 'Energetico 0,5%',
-  'Mineral Adensado Aguas', 'Mineral Adensado Seca', 'Mineral Adensado Transicao',
-  'Proteico 0,1% Aguas', 'Proteico 0,1% Seca', 'Proteico 0,1% Transicao', 'Proteico 0,2%',
-  'Racao Creep', 'Ração Engorda TIP', 'Sal Mieneral Reprodução',
-  'Sal Mineral Águas', 'Sal Mineral Águas Aditivado', 'Sal Mineral com Ureia',
-];
-
 async function seedFarmDefaults(farmId: string): Promise<void> {
   await Promise.all([
     supabaseAdmin.from('forage_types').insert(
@@ -37,9 +29,6 @@ async function seedFarmDefaults(farmId: string): Promise<void> {
     ),
     supabaseAdmin.from('animal_categories').insert(
       DEFAULT_CATEGORIAS.map(nome => ({ farm_id: farmId, nome }))
-    ),
-    supabaseAdmin.from('supplement_types').insert(
-      DEFAULT_SUPLEMENTOS.map(nome => ({ farm_id: farmId, nome, unidade: 'kg' }))
     ),
   ]);
 }

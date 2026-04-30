@@ -35,6 +35,7 @@ function toDataEntry(row: Record<string, unknown>): DataEntry {
     kg:          row.kg as number,
     consumo:     row.consumo as number,
     funcionario: (row.funcionario as string) ?? undefined,
+    lote:        (row.lote as string) ?? undefined,
   };
 }
 
@@ -276,6 +277,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       kg:          entry.kg,
       consumo:     entry.consumo,
       ...(entry.funcionario ? { funcionario: entry.funcionario } : {}),
+      ...(entry.lote        ? { lote:        entry.lote }        : {}),
     }).select().single().then(({ data, error }) => {
       if (data) setEntries(prev => prev.map(e => e.id === tempId ? toDataEntry(data) : e));
       if (error) setEntries(prev => prev.filter(e => e.id !== tempId));

@@ -376,7 +376,7 @@ function LotesTab({
                 )}
 
                 {/* Cabeças + Peso lado a lado */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <div>
                     <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Cabeças</p>
                     <p className="text-base font-bold leading-none" style={{ color: '#1a6040' }}>
@@ -390,6 +390,23 @@ function LotesTab({
                       {a.peso_medio ? <>{a.peso_medio}<span className="text-[10px] font-normal text-gray-400"> kg</span></> : '—'}
                     </p>
                   </div>
+                  {(() => {
+                    if (!a.gmd || !a.data_entrada || !a.peso_medio) return null;
+                    const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+                    const pesoSim = a.peso_medio + a.gmd * dias;
+                    return (
+                      <>
+                        <div className="w-px h-6 bg-gray-100 flex-shrink-0" />
+                        <div>
+                          <p className="text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#1a6040' }}>Peso Simulado</p>
+                          <p className="text-base font-bold leading-none" style={{ color: '#1a6040' }}>
+                            {pesoSim.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}<span className="text-[10px] font-normal text-gray-400"> kg</span>
+                          </p>
+                          <p className="text-[9px] text-gray-400">+{dias}d · {a.gmd} kg/d</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* META % */}

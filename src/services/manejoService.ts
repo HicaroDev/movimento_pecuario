@@ -19,6 +19,8 @@ export interface Animal {
   status: 'ativo' | 'abatido' | 'vendido';
   meta_percentagem?: number;
   created_at?: string;
+  gmd?: number;
+  data_entrada?: string;
 }
 
 export interface AnimalCategory {
@@ -60,6 +62,8 @@ function toAnimal(row: Record<string, unknown>): Animal {
     status:            ((row.status as string) ?? 'ativo') as Animal['status'],
     meta_percentagem:  (row.meta_percentagem as number) ?? undefined,
     created_at:        (row.created_at as string) ?? undefined,
+    gmd:               (row.gmd as number) ?? undefined,
+    data_entrada:      (row.data_entrada as string) ?? undefined,
   };
 }
 

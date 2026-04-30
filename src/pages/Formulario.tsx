@@ -338,6 +338,8 @@ export function Formulario() {
       ? (pastoInfo?.totalCab ?? 0)
       : (pastoInfo?.equivalentCab ?? pastoInfo?.totalCab ?? 0);
 
+    const lotesNomes = pastoInfo?.lotes.map(l => l.nome).filter((n): n is string => !!n).join(', ') || undefined;
+
     if (adultoPreenchido) {
       const entry: DataEntry = {
         pasto:        data.pasto,
@@ -349,6 +351,7 @@ export function Formulario() {
         kg:           kgCalculado,
         consumo:      0,
         funcionario:  data.funcionario || undefined,
+        lote:         lotesNomes,
       };
       addEntry(entry);
       toast.success('Registro adicionado!', { description: `${entry.pasto} — ${entry.tipo}` });
@@ -373,6 +376,7 @@ export function Formulario() {
         kg:          kgCalculadoBez,
         consumo:     0,
         funcionario: data.funcionario || undefined,
+        lote:        lotesNomes,
       };
       addEntry(entryBez);
       toast.success('Bezerros adicionados!', { description: `${entryBez.pasto} — ${entryBez.tipo} (${fmtInt(pastoInfo.totalBez)} bez.)` });
@@ -791,6 +795,7 @@ export function Formulario() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pasto</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Data</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Lotes</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantidade</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de Suplemento</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sacos</th>
@@ -830,6 +835,9 @@ export function Formulario() {
                         <td className="px-4 py-3 text-gray-500 text-xs">
                           {entry.data ? new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
                         </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={entry.lote || ''}>
+                          {entry.lote || <span className="text-gray-300">—</span>}
+                        </td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
                         <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>
@@ -864,7 +872,7 @@ export function Formulario() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 border-t-2 border-gray-200">
-                    <td className="px-6 py-2.5 text-xs font-semibold text-gray-500" colSpan={4}>
+                    <td className="px-6 py-2.5 text-xs font-semibold text-gray-500" colSpan={5}>
                       {savedFilter ? `${filteredEntries.length} de ${visibleEntries.length} registros` : `${visibleEntries.length} registro${visibleEntries.length !== 1 ? 's' : ''}`}
                     </td>
                     <td className="px-4 py-2.5 text-xs font-bold tabular-nums" style={{ color: '#1a6040' }}>
