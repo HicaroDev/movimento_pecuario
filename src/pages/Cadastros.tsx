@@ -1383,7 +1383,7 @@ function SuplementosTab({ onRequestDelete, onRequestEdit, canEdit = true }: { on
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Cat. Simulador', 'Meta (% PV)', 'Cor', 'Ações'].map(h => (
+                    {['Nome', 'Unidade', 'Peso (kg)', 'Valor/KG (R$)', 'Consumo', 'Categoria', 'Meta (% PV)', 'Cor', 'Ações'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>

@@ -183,7 +183,9 @@ function LotesTab({
     const totalKgUA    = base.reduce((s, a) => s + a.quantidade * (a.peso_medio ?? 0) + (a.bezerros_quantidade ?? 0) * (a.bezerros_peso_medio ?? 0), 0);
     const totalUA      = totalKgUA / 450;
     const taxaLotacao  = totalHA > 0 && totalKgUA > 0 ? totalUA / totalHA : null;
-    return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio, taxaLotacao };
+    const pastosTotal    = pastures.length;
+    const pastosOcupados = new Set(ativos.filter(a => a.pasto_id).map(a => a.pasto_id)).size;
+    return { totalHA, totalLotes, totalCab, pesoMedio, totalBez, bezPesoMedio, taxaLotacao, pastosTotal, pastosOcupados };
   }, [pastosComLotes, ativosFiltrados, ativos, search, byPasto, pastures]);
 
   async function confirmarAlocacao() {
@@ -637,8 +639,12 @@ function LotesTab({
           <p className="text-base font-bold text-gray-800">{globalStats.totalHA > 0 ? `${globalStats.totalHA.toLocaleString('pt-BR')} ha` : '—'}</p>
         </div>
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">N° Pastos</p>
-          <p className="text-base font-bold text-gray-800">{globalStats.totalLotes}</p>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Pastos Total</p>
+          <p className="text-base font-bold text-gray-800">{globalStats.pastosTotal}</p>
+        </div>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">Pastos Ocupados</p>
+          <p className="text-base font-bold" style={{ color: '#1a6040' }}>{globalStats.pastosOcupados}</p>
         </div>
 
         <div className="w-px h-8 bg-gray-200 self-center" />

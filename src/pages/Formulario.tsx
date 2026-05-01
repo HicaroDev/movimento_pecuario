@@ -307,6 +307,19 @@ export function Formulario() {
     return { totalCab, nLotes: lotesNoPasto.length, totalBez, bezEquiv, equivalentCab, lotes };
   }, [selectedPasto, pastures, animals, animalCategories]);
 
+  /* Fallback A-15: pasto → lotes atuais (para registros sem campo lote) */
+  const pastoAnimaisNomesMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const a of animals) {
+      if (!a.pasto_id || !a.nome) continue;
+      const pasture = pastures.find(p => p.id === a.pasto_id);
+      if (!pasture) continue;
+      if (!map[pasture.nome]) map[pasture.nome] = [];
+      map[pasture.nome].push(a.nome);
+    }
+    return map;
+  }, [animals, pastures]);
+
   /* Auto-fill: peso da sacaria */
   const suppInfo = useMemo(() => {
     if (!selectedTipo) return null;
@@ -835,9 +848,17 @@ export function Formulario() {
                         <td className="px-4 py-3 text-gray-500 text-xs">
                           {entry.data ? new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={entry.lote || ''}>
-                          {entry.lote || <span className="text-gray-300">—</span>}
-                        </td>
+                        {(() => {
+                          const loteFallback = pastoAnimaisNomesMap[entry.pasto]?.join(', ') || null;
+                          const loteDisplay = entry.lote || loteFallback;
+                          return (
+                            <td className="px-4 py-3 text-xs max-w-[140px] truncate" title={loteDisplay || ''}
+                              style={{ color: loteDisplay ? (entry.lote ? undefined : '#9ca3af') : undefined }}
+                            >
+                              {loteDisplay || <span className="text-gray-300">—</span>}
+                            </td>
+                          );
+                        })()}
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.quantidade)}</td>
                         <td className="px-4 py-3 text-gray-700">{entry.tipo}</td>
                         <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: '#1a6040' }}>{fmtInt(entry.sacos)}</td>

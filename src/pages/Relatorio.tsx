@@ -281,6 +281,18 @@ export function Relatorio() {
   const allAggregated = useMemo(() => Object.values(aggregatedGroupsWithMeta).flat(), [aggregatedGroupsWithMeta]);
   const avgConsumption = averageConsumo(allAggregated);
 
+  /* ── A-12: %PV Simulado Atual — consumo médio / peso médio ponderado × 100 ── */
+  const avgPvSimulado = useMemo(() => {
+    const pvValues: number[] = [];
+    for (const e of allAggregated) {
+      const peso = pastoNomePesoMap[e.pasto];
+      if (peso && peso > 0 && e.consumo > 0) {
+        pvValues.push((e.consumo / peso) * 100);
+      }
+    }
+    return pvValues.length > 0 ? pvValues.reduce((s, v) => s + v, 0) / pvValues.length : 0;
+  }, [allAggregated, pastoNomePesoMap]);
+
   /* ── Total cabeças: max por pasto (sem duplicidade) ── */
   const totalAnimals = useMemo(() => {
     const pastoMax = new Map<string, number>();
@@ -572,6 +584,7 @@ export function Relatorio() {
             totalAnimals={totalAnimals}
             totalPastos={totalPastos}
             avgConsumption={avgConsumption}
+            avgPvSimulado={avgPvSimulado}
           />
         )}
 

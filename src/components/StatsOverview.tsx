@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Package, Beef, MapPin, Activity } from 'lucide-react';
+import { Package, Beef, MapPin, Activity, BarChart2 } from 'lucide-react';
 import { fmt } from '../lib/utils';
 
 interface StatsOverviewProps {
@@ -7,6 +7,7 @@ interface StatsOverviewProps {
   totalAnimals: number;
   totalPastos: number;
   avgConsumption: number;
+  avgPvSimulado?: number;
 }
 
 const CARDS = [
@@ -45,20 +46,29 @@ const CARDS = [
     bg: 'rgba(146,64,14,0.05)',
     iconBg: 'rgba(146,64,14,0.10)',
     iconColor: '#b45309',
-    isConsumption: true,
+  },
+  {
+    icon: BarChart2,
+    label: '%PV Simulado',
+    sublabel: 'consumo / peso vivo',
+    accent: '#6b2fa0',
+    bg: 'rgba(107,47,160,0.05)',
+    iconBg: 'rgba(107,47,160,0.10)',
+    iconColor: '#6b2fa0',
   },
 ] as const;
 
-export function StatsOverview({ totalEntries, totalAnimals, totalPastos, avgConsumption }: StatsOverviewProps) {
+export function StatsOverview({ totalEntries, totalAnimals, totalPastos, avgConsumption, avgPvSimulado }: StatsOverviewProps) {
   const values = [
     String(totalEntries),
     totalAnimals > 0 ? String(totalAnimals) : '—',
     String(totalPastos),
     avgConsumption > 0 ? fmt(avgConsumption) : '—',
+    avgPvSimulado && avgPvSimulado > 0 ? `${avgPvSimulado.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}%` : '—',
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
       {CARDS.map((card, i) => {
         const Icon = card.icon;
         return (
