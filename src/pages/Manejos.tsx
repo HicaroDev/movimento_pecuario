@@ -289,7 +289,7 @@ function LotesTab({
 
   // Card por PASTO — contém todas as infos do pasto + lotes dentro
   function PastoCard({
-    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao, onMetaSave,
+    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao,
   }: {
     pasto: Pasture;
     animaisPasto: Animal[];
@@ -298,9 +298,7 @@ function LotesTab({
     bezTotal: number;
     bezPesoMedio: number | null;
     taxaLotacao: number | null;
-    onMetaSave: (animalId: string, pct: number | null) => Promise<void>;
   }) {
-    const [metaDraft, setMetaDraft] = useState<Record<string, string>>({});
     return (
       <motion.div
         layout
@@ -745,7 +743,6 @@ function LotesTab({
                   bezTotal={bezPasto}
                   bezPesoMedio={bezPesoMedioPasto}
                   taxaLotacao={taxaLotacao}
-                  onMetaSave={handleMetaSave}
                 />
               );
             })}
