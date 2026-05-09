@@ -244,16 +244,19 @@ function LotesTab({
 
   function AnimalRow({ a }: { a: Animal }) {
     const [draft, setDraft] = useState('');
+    const [editMode, setEditMode] = useState(false); // desbloqueia input antes de salvar no banco
     const inputRef = useRef<HTMLInputElement>(null);
-    // Limpa draft quando o servidor confirma o novo valor (evita piscar o valor antigo)
-    useEffect(() => { setDraft(''); }, [a.meta_percentagem]);
+    // Quando o banco confirma o novo valor, sai do editMode e limpa o draft
+    useEffect(() => { setDraft(''); setEditMode(false); }, [a.meta_percentagem]);
 
     // META do suplemento para o pasto deste lote (via closure)
     const pastoNome    = a.pasto_id ? (pastoMap[a.pasto_id] ?? '') : '';
     const pastoMetaPct = pastoNomeMetaMap[pastoNome] ?? null;
 
-    // isAuto = meta_percentagem null → usa suplemento; false → usa valor manual
-    const isAuto  = a.meta_percentagem == null;
+    // isAuto: sem valor manual E não está em modo de edição
+    const isAuto    = a.meta_percentagem == null && !editMode;
+    const inputLocked = isAuto; // input só é disabled quando realmente auto
+
     const activePct = isAuto
       ? pastoMetaPct
       : (draft !== '' ? parseFloat(draft.replace(',', '.')) : (a.meta_percentagem ?? null));
@@ -275,10 +278,13 @@ function LotesTab({
                 <button
                   onClick={async () => {
                     if (!isAuto) {
-                      // Manual → AUTO: limpa meta_percentagem
+                      // Manual/editMode → AUTO: limpa meta_percentagem no banco
+                      setEditMode(false);
+                      setDraft('');
                       await handleMetaSave(a.id, null);
                     } else {
-                      // AUTO → Manual: pré-preenche com valor do suplemento e foca
+                      // AUTO → Manual: entra em editMode e pré-preenche o input
+                      setEditMode(true);
                       setDraft(String(pastoMetaPct));
                       setTimeout(() => inputRef.current?.focus(), 30);
                     }
@@ -292,21 +298,21 @@ function LotesTab({
               <input
                 ref={inputRef}
                 type="number" step="0.1" min="0" max="100"
-                value={isAuto
+                value={inputLocked
                   ? (pastoMetaPct != null ? String(pastoMetaPct) : '')
                   : (draft !== '' ? draft : (a.meta_percentagem != null ? String(a.meta_percentagem) : ''))
                 }
                 placeholder="—"
-                disabled={isAuto}
+                disabled={inputLocked}
                 onChange={e => setDraft(e.target.value)}
                 onBlur={async () => {
-                  if (draft === '' && a.meta_percentagem == null) return;
+                  if (draft === '' && a.meta_percentagem == null && !editMode) return;
                   const val = draft === '' ? null : parseFloat(draft.replace(',', '.'));
                   if (val !== null && isNaN(val)) return;
                   await handleMetaSave(a.id, val);
                 }}
                 className={`w-12 h-6 px-1 text-xs font-semibold rounded text-center transition-colors ${
-                  isAuto
+                  inputLocked
                     ? 'text-teal-600 bg-teal-50 border border-teal-200 opacity-70 cursor-not-allowed focus:outline-none'
                     : 'text-blue-700 bg-blue-50 border border-blue-200 focus:outline-none focus:ring-1 focus:ring-blue-400'
                 }`}
