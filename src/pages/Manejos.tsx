@@ -326,6 +326,20 @@ function LotesTab({
               )}
             </div>
           </td>
+          <td className="px-4 py-2.5">
+            {a.gmd && a.data_entrada ? (() => {
+              const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+              const acum = a.gmd * dias;
+              return (
+                <div>
+                  <p className="text-xs font-bold" style={{ color: '#1a6040' }}>
+                    {acum.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                  </p>
+                  <p className="text-[9px] text-gray-400">{dias}d · {a.gmd} kg/d</p>
+                </div>
+              );
+            })() : <span className="text-xs text-gray-300">—</span>}
+          </td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
           <td className="px-4 py-2.5 no-print">
             {canEdit && (!a.pasto_id ? (
@@ -347,6 +361,7 @@ function LotesTab({
             <td className="px-4 py-1.5 text-xs font-semibold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')}</td>
             <td className="px-4 py-1.5 text-xs text-orange-600">{a.bezerros_peso_medio ? `${a.bezerros_peso_medio} kg` : '—'}</td>
             <td />
+            <td />
             <td className="no-print" />
           </tr>
         )}
@@ -361,8 +376,8 @@ function LotesTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', '% Meta', 'Sexo', ''].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider${h === '% Meta' ? ' text-blue-400' : ' text-gray-500'}${i === 6 ? ' no-print' : ''}`}>{h}</th>
+                {['Lote', 'Categoria', 'Cabeças', 'Peso Médio', '% Meta', 'Meta Acum.', 'Sexo', ''].map((h, i) => (
+                  <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider${h === '% Meta' ? ' text-blue-400' : h === 'Meta Acum.' ? ' text-teal-600' : ' text-gray-500'}${i === 7 ? ' no-print' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
