@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
@@ -11,7 +11,9 @@ import { useAuth } from '../context/AuthContext';
 import { manejoService, type Animal, type AnimalCategory, type ManejoEvent } from '../services/manejoService';
 import { farmService } from '../services/farmService';
 import type { Pasture } from '../context/DataContext';
+import type { DataEntry } from '../lib/data';
 import { SkeletonTable } from '../components/Skeleton';
+import { META_CONSUMO } from '../lib/data';
 
 /* ── helpers ── */
 
@@ -85,9 +87,12 @@ function HistoricoTable({ events, loading }: { events: ManejoEvent[]; loading: b
 
 function LotesTab({
   animals, pastures, categories, onReload, farmName, canEdit = true,
+  suppTypes = [], entries = [],
 }: {
   animals: Animal[]; pastures: Pasture[]; categories: AnimalCategory[];
   onReload: () => void; farmName: string; canEdit?: boolean;
+  suppTypes?: Array<{ id: string; nome: string; consumo: string | null }>;
+  entries?: DataEntry[];
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
@@ -126,6 +131,39 @@ function LotesTab({
     () => Object.fromEntries(pastures.map(p => [p.id, p.nome])),
     [pastures]
   );
+
+  // Mapa: nome do pasto → consumoPct (%) do suplemento mais recente lançado nele
+  const pastoNomeMetaMap = useMemo(() => {
+    const suppByNome: Record<string, string | null> = {};
+    for (const s of suppTypes) suppByNome[s.nome] = s.consumo;
+
+    const latestByPasto: Record<string, string> = {};
+    for (const e of entries) {
+      if (!e.pasto || !e.data || !e.tipo) continue;
+      if (!latestByPasto[e.pasto] || e.data > latestByPasto[e.pasto]) {
+        latestByPasto[e.pasto] = e.data;
+      }
+    }
+
+    const pastoSuppMap: Record<string, string> = {};
+    for (const e of entries) {
+      if (!e.pasto || !e.data || !e.tipo) continue;
+      if (e.data === latestByPasto[e.pasto]) {
+        pastoSuppMap[e.pasto] = e.tipo;
+      }
+    }
+
+    const result: Record<string, number> = {};
+    for (const [pastoNome, suppNome] of Object.entries(pastoSuppMap)) {
+      const consumo = suppByNome[suppNome] ?? null;
+      if (!consumo) continue;
+      const pctStr = META_CONSUMO[consumo] ?? null;
+      if (!pctStr) continue;
+      const pct = parseFloat(pctStr.replace('%', '').replace(',', '.'));
+      if (!isNaN(pct) && pct > 0) result[pastoNome] = pct;
+    }
+    return result;
+  }, [suppTypes, entries]);
 
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
@@ -206,9 +244,23 @@ function LotesTab({
 
   function AnimalRow({ a }: { a: Animal }) {
     const [draft, setDraft] = useState('');
-    const meta = a.meta_percentagem != null && a.peso_medio != null
-      ? (a.peso_medio * a.meta_percentagem / 100)
+    const inputRef = useRef<HTMLInputElement>(null);
+    // Limpa draft quando o servidor confirma o novo valor (evita piscar o valor antigo)
+    useEffect(() => { setDraft(''); }, [a.meta_percentagem]);
+
+    // META do suplemento para o pasto deste lote (via closure)
+    const pastoNome    = a.pasto_id ? (pastoMap[a.pasto_id] ?? '') : '';
+    const pastoMetaPct = pastoNomeMetaMap[pastoNome] ?? null;
+
+    // isAuto = meta_percentagem null → usa suplemento; false → usa valor manual
+    const isAuto  = a.meta_percentagem == null;
+    const activePct = isAuto
+      ? pastoMetaPct
+      : (draft !== '' ? parseFloat(draft.replace(',', '.')) : (a.meta_percentagem ?? null));
+    const meta = activePct != null && !isNaN(activePct) && a.peso_medio != null
+      ? (a.peso_medio * activePct / 100)
       : null;
+
     return (
       <>
         <tr className="hover:bg-gray-50 transition-colors">
@@ -217,24 +269,51 @@ function LotesTab({
           <td className="px-4 py-2.5 text-sm font-semibold" style={{ color: '#1a6040' }}>{a.quantidade.toLocaleString('pt-BR')}</td>
           <td className="px-4 py-2.5 text-xs text-gray-600">{a.peso_medio ? `${a.peso_medio} kg` : '—'}</td>
           <td className="px-4 py-2.5">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              {/* Toggle AUTO ↔ Manual (só aparece quando há suplemento no pasto) */}
+              {pastoMetaPct != null && (
+                <button
+                  onClick={async () => {
+                    if (!isAuto) {
+                      // Manual → AUTO: limpa meta_percentagem
+                      await handleMetaSave(a.id, null);
+                    } else {
+                      // AUTO → Manual: pré-preenche com valor do suplemento e foca
+                      setDraft(String(pastoMetaPct));
+                      setTimeout(() => inputRef.current?.focus(), 30);
+                    }
+                  }}
+                  title={isAuto ? 'AUTO (suplemento) — clique para definir manualmente' : 'Manual — clique para usar automático'}
+                  className={`flex-shrink-0 w-7 h-4 rounded-full transition-colors relative ${isAuto ? 'bg-teal-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isAuto ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                </button>
+              )}
               <input
+                ref={inputRef}
                 type="number" step="0.1" min="0" max="100"
-                value={draft !== '' ? draft : (a.meta_percentagem != null ? String(a.meta_percentagem) : '')}
+                value={isAuto
+                  ? (pastoMetaPct != null ? String(pastoMetaPct) : '')
+                  : (draft !== '' ? draft : (a.meta_percentagem != null ? String(a.meta_percentagem) : ''))
+                }
                 placeholder="—"
+                disabled={isAuto}
                 onChange={e => setDraft(e.target.value)}
                 onBlur={async () => {
-                  if (draft === '') return;
+                  if (draft === '' && a.meta_percentagem == null) return;
                   const val = draft === '' ? null : parseFloat(draft.replace(',', '.'));
                   if (val !== null && isNaN(val)) return;
                   await handleMetaSave(a.id, val);
-                  setDraft('');
                 }}
-                className="w-12 h-6 px-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-center"
+                className={`w-12 h-6 px-1 text-xs font-semibold rounded text-center transition-colors ${
+                  isAuto
+                    ? 'text-teal-600 bg-teal-50 border border-teal-200 opacity-70 cursor-not-allowed focus:outline-none'
+                    : 'text-blue-700 bg-blue-50 border border-blue-200 focus:outline-none focus:ring-1 focus:ring-blue-400'
+                }`}
               />
-              <span className="text-[10px] text-blue-400">%</span>
+              <span className={`text-[10px] ${isAuto ? 'text-teal-400' : 'text-blue-400'}`}>%</span>
               {meta != null && (
-                <span className="text-xs font-bold text-blue-700 ml-1">
+                <span className={`text-xs font-bold ml-0.5 ${isAuto ? 'text-teal-700' : 'text-blue-700'}`}>
                   ={meta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
                 </span>
               )}
@@ -289,7 +368,7 @@ function LotesTab({
 
   // Card por PASTO — contém todas as infos do pasto + lotes dentro
   function PastoCard({
-    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao,
+    pasto, animaisPasto, totalCab, pesoMedio, bezTotal, bezPesoMedio, taxaLotacao, pastoMetaPct,
   }: {
     pasto: Pasture;
     animaisPasto: Animal[];
@@ -298,6 +377,7 @@ function LotesTab({
     bezTotal: number;
     bezPesoMedio: number | null;
     taxaLotacao: number | null;
+    pastoMetaPct: number | null;
   }) {
     return (
       <motion.div
@@ -409,18 +489,23 @@ function LotesTab({
                   })()}
                 </div>
 
-                {/* META/CAB/DIA badge */}
-                {a.peso_medio != null && a.meta_percentagem != null && (
-                  <div className="mt-2">
-                    <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-                      <p className="text-[9px] text-blue-400 font-semibold uppercase tracking-wide leading-none">META/CAB/DIA</p>
-                      <p className="text-sm font-bold text-blue-700 leading-none">
-                        {(a.peso_medio * a.meta_percentagem / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        <span className="text-[10px] font-normal text-blue-400"> KG</span>
-                      </p>
+                {/* META/CAB/DIA badge — usa meta_percentagem individual ou fallback do suplemento */}
+                {(() => {
+                  const pct = a.meta_percentagem ?? pastoMetaPct;
+                  if (a.peso_medio == null || pct == null) return null;
+                  const isCustom = a.meta_percentagem != null;
+                  return (
+                    <div className="mt-2">
+                      <div className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${isCustom ? 'bg-blue-50 border border-blue-200' : 'bg-teal-50 border border-teal-200'}`}>
+                        <p className={`text-[9px] font-semibold uppercase tracking-wide leading-none ${isCustom ? 'text-blue-400' : 'text-teal-500'}`}>META/CAB/DIA</p>
+                        <p className={`text-sm font-bold leading-none ${isCustom ? 'text-blue-700' : 'text-teal-700'}`}>
+                          {(a.peso_medio * pct / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span className={`text-[10px] font-normal ${isCustom ? 'text-blue-400' : 'text-teal-400'}`}> KG</span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Bezerros */}
                 {hasBez && (
@@ -743,6 +828,7 @@ function LotesTab({
                   bezTotal={bezPasto}
                   bezPesoMedio={bezPesoMedioPasto}
                   taxaLotacao={taxaLotacao}
+                  pastoMetaPct={pastoNomeMetaMap[p.nome] ?? null}
                 />
               );
             })}
@@ -1807,12 +1893,13 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 export function Manejos() {
-  const { activeFarmId, pastures } = useData();
+  const { activeFarmId, pastures, entries } = useData();
   const { user, isAdmin, hasEditPermission } = useAuth();
   const canEdit = isAdmin || hasEditPermission('manejos');
   const [tab, setTab]             = useState<Tab>('lotes');
   const [animals, setAnimals]     = useState<Animal[]>([]);
   const [categories, setCategories] = useState<AnimalCategory[]>([]);
+  const [suppTypes, setSuppTypes] = useState<Array<{ id: string; nome: string; consumo: string | null }>>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [farmName, setFarmName]   = useState('');
@@ -1828,9 +1915,11 @@ export function Manejos() {
     Promise.all([
       manejoService.listarAnimais(activeFarmId),
       manejoService.listarCategorias(activeFarmId),
-    ]).then(([a, c]) => {
+      manejoService.listarSupplementTypes(activeFarmId),
+    ]).then(([a, c, s]) => {
       setAnimals(a);
       setCategories(c);
+      setSuppTypes(s);
     }).catch(() => {
       toast.error('Erro ao carregar dados de manejos.');
     }).finally(() => setLoading(false));
@@ -1896,7 +1985,8 @@ export function Manejos() {
               exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               {tab === 'lotes' && (
                 <LotesTab animals={animals} pastures={pastures} categories={categories}
-                  onReload={reload} farmName={farmName} canEdit={canEdit} />
+                  onReload={reload} farmName={farmName} canEdit={canEdit}
+                  suppTypes={suppTypes} entries={entries} />
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}

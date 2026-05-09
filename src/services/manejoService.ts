@@ -540,6 +540,14 @@ export const manejoService = {
     });
   },
 
+  async listarSupplementTypes(farmId: string): Promise<Array<{ id: string; nome: string; consumo: string | null }>> {
+    const { data } = await supabaseAdmin
+      .from('supplement_types')
+      .select('id, nome, consumo')
+      .eq('farm_id', farmId);
+    return (data ?? []) as Array<{ id: string; nome: string; consumo: string | null }>;
+  },
+
   async atualizarMetaPercentagem(animalId: string, percentagem: number | null): Promise<void> {
     const { error } = await supabaseAdmin
       .from('animals')
