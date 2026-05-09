@@ -540,6 +540,65 @@ export const manejoService = {
     });
   },
 
+  async upsertHistoricoDiario(
+    farmId: string,
+    animals: Animal[],
+    pastoMap: Record<string, string>,    // pasto_id → pasto_nome
+    pastoSuppMap: Record<string, string> // pasto_nome → suplemento mais recente
+  ): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+    const ativos = animals.filter(a =>
+      (a.status === 'ativo' || !a.status) && a.gmd && a.data_entrada && a.pasto_id
+    );
+    if (ativos.length === 0) return;
+
+    // Remove registros não confirmados de hoje para recriar com dados frescos
+    await supabaseAdmin
+      .from('lote_historico_diario')
+      .delete()
+      .eq('farm_id', farmId)
+      .eq('data', today)
+      .eq('confirmado', false);
+
+    const records = ativos.map(a => {
+      const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada!).getTime()) / 86_400_000));
+      const ganho_acum = parseFloat((a.gmd! * dias).toFixed(3));
+      const peso_estimado = parseFloat(((a.peso_medio ?? 0) + ganho_acum).toFixed(1));
+      const pastoNome = pastoMap[a.pasto_id!] ?? null;
+      return {
+        farm_id: farmId,
+        animal_id: a.id,
+        data: today,
+        pasto_id: a.pasto_id,
+        pasto_nome: pastoNome,
+        suplemento: pastoNome ? (pastoSuppMap[pastoNome] ?? null) : null,
+        gmd: a.gmd,
+        peso_estimado,
+        ganho_acum,
+        confirmado: false,
+      };
+    });
+
+    await supabaseAdmin.from('lote_historico_diario').insert(records);
+  },
+
+  async buscarGanhoAcumulado(farmId: string): Promise<Record<string, { ganho: number; data: string; confirmado: boolean }>> {
+    const { data } = await supabaseAdmin
+      .from('lote_historico_diario')
+      .select('animal_id, ganho_acum, data, confirmado')
+      .eq('farm_id', farmId)
+      .order('data', { ascending: false });
+
+    const result: Record<string, { ganho: number; data: string; confirmado: boolean }> = {};
+    for (const row of (data ?? [])) {
+      const r = row as { animal_id: string; ganho_acum: number; data: string; confirmado: boolean };
+      if (!result[r.animal_id]) {
+        result[r.animal_id] = { ganho: r.ganho_acum, data: r.data, confirmado: r.confirmado };
+      }
+    }
+    return result;
+  },
+
   async listarSupplementTypes(farmId: string): Promise<Array<{ id: string; nome: string; consumo: string | null }>> {
     const { data } = await supabaseAdmin
       .from('supplement_types')

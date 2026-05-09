@@ -87,12 +87,13 @@ function HistoricoTable({ events, loading }: { events: ManejoEvent[]; loading: b
 
 function LotesTab({
   animals, pastures, categories, onReload, farmName, canEdit = true,
-  suppTypes = [], entries = [],
+  suppTypes = [], entries = [], ganhoAcumMap = {},
 }: {
   animals: Animal[]; pastures: Pasture[]; categories: AnimalCategory[];
   onReload: () => void; farmName: string; canEdit?: boolean;
   suppTypes?: Array<{ id: string; nome: string; consumo: string | null }>;
   entries?: DataEntry[];
+  ganhoAcumMap?: Record<string, { ganho: number; data: string; confirmado: boolean }>;
 }) {
   const [alocarAnimal, setAlocarAnimal] = useState<Animal | null>(null);
   const [pastoSel, setPastoSel] = useState('');
@@ -327,18 +328,36 @@ function LotesTab({
             </div>
           </td>
           <td className="px-4 py-2.5">
-            {a.gmd && a.data_entrada ? (() => {
-              const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
-              const acum = a.gmd * dias;
-              return (
-                <div>
-                  <p className="text-xs font-bold" style={{ color: '#1a6040' }}>
-                    {acum.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                  </p>
-                  <p className="text-[9px] text-gray-400">{dias}d · {a.gmd} kg/d</p>
-                </div>
-              );
-            })() : <span className="text-xs text-gray-300">—</span>}
+            {(() => {
+              const hist = ganhoAcumMap[a.id];
+              if (hist) {
+                return (
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-bold" style={{ color: '#1a6040' }}>
+                        {hist.ganho.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                      </p>
+                      {hist.confirmado && (
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700">✓</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] text-gray-400">{a.gmd ? `${a.gmd} kg/d` : ''}</p>
+                  </div>
+                );
+              }
+              if (a.gmd && a.data_entrada) {
+                const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+                return (
+                  <div>
+                    <p className="text-xs font-bold text-gray-400">
+                      {(a.gmd * dias).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                    </p>
+                    <p className="text-[9px] text-gray-400">{dias}d · {a.gmd} kg/d</p>
+                  </div>
+                );
+              }
+              return <span className="text-xs text-gray-300">—</span>;
+            })()}
           </td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
           <td className="px-4 py-2.5 no-print">
@@ -524,6 +543,26 @@ function LotesTab({
                           {(a.peso_medio * pct / 100).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                           <span className={`text-[10px] font-normal ${isCustom ? 'text-blue-400' : 'text-teal-400'}`}> KG</span>
                         </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Badge M.A. — ganho acumulado do lote neste pasto */}
+                {(() => {
+                  const hist = ganhoAcumMap[a.id];
+                  if (!hist) return null;
+                  return (
+                    <div className="mt-1">
+                      <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                        <p className="text-[9px] text-green-500 font-semibold uppercase tracking-wide leading-none">M.A.</p>
+                        <p className="text-sm font-bold text-green-700 leading-none">
+                          {hist.ganho.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          <span className="text-[10px] font-normal text-green-400"> KG</span>
+                        </p>
+                        {hist.confirmado && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-200 text-green-800">✓</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -1922,6 +1961,7 @@ export function Manejos() {
   const [animals, setAnimals]     = useState<Animal[]>([]);
   const [categories, setCategories] = useState<AnimalCategory[]>([]);
   const [suppTypes, setSuppTypes] = useState<Array<{ id: string; nome: string; consumo: string | null }>>([]);
+  const [ganhoAcumMap, setGanhoAcumMap] = useState<Record<string, { ganho: number; data: string; confirmado: boolean }>>({});
   const [loading, setLoading]     = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [farmName, setFarmName]   = useState('');
@@ -1946,6 +1986,26 @@ export function Manejos() {
       toast.error('Erro ao carregar dados de manejos.');
     }).finally(() => setLoading(false));
   }, [activeFarmId, refreshTick]);
+
+  // Upsert histórico diário e carrega ganho acumulado (roda após animals + entries estarem prontos)
+  useEffect(() => {
+    if (!activeFarmId || animals.length === 0) return;
+    const pMap = Object.fromEntries(pastures.map(p => [p.id, p.nome]));
+    const latestByPasto: Record<string, string> = {};
+    for (const e of entries) {
+      if (!e.pasto || !e.data || !e.tipo) continue;
+      if (!latestByPasto[e.pasto] || e.data > latestByPasto[e.pasto]) latestByPasto[e.pasto] = e.data;
+    }
+    const pastoSuppMap: Record<string, string> = {};
+    for (const e of entries) {
+      if (!e.pasto || !e.data || !e.tipo) continue;
+      if (e.data === latestByPasto[e.pasto]) pastoSuppMap[e.pasto] = e.tipo;
+    }
+    manejoService.upsertHistoricoDiario(activeFarmId, animals, pMap, pastoSuppMap)
+      .then(() => manejoService.buscarGanhoAcumulado(activeFarmId))
+      .then(gMap => setGanhoAcumMap(gMap))
+      .catch(() => {});
+  }, [activeFarmId, animals, pastures, entries]);
 
   function reload() { setRefreshTick(t => t + 1); }
 
@@ -2008,7 +2068,7 @@ export function Manejos() {
               {tab === 'lotes' && (
                 <LotesTab animals={animals} pastures={pastures} categories={categories}
                   onReload={reload} farmName={farmName} canEdit={canEdit}
-                  suppTypes={suppTypes} entries={entries} />
+                  suppTypes={suppTypes} entries={entries} ganhoAcumMap={ganhoAcumMap} />
               )}
               {tab === 'transferir' && (
                 <TransferirTab animals={animals} pastures={pastures}
