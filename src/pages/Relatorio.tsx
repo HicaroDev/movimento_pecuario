@@ -59,14 +59,15 @@ export function Relatorio() {
         .eq('tipo', 'evolucao_categoria')
         .not('peso_medio', 'is', null)
     ).then(({ data }) => setEvolucaoHistorico((data ?? []) as Array<{animal_id: string; created_at: string; peso_medio: number}>)).catch(() => {});
-    void supabaseAdmin.from('manejo_historico')
-      .select('animal_id, pasto_origem')
-      .eq('farm_id', farmId)
-      .eq('tipo', 'transferencia')
-      .not('pasto_origem', 'is', null)
-      .then(({ data }) => setTransferHistorico(
-        (data ?? []).filter((r: Record<string, unknown>) => r.pasto_origem) as Array<{animal_id: string; pasto_origem: string}>
-      )).catch(() => {});
+    void Promise.resolve(
+      supabaseAdmin.from('manejo_historico')
+        .select('animal_id, pasto_origem')
+        .eq('farm_id', farmId)
+        .eq('tipo', 'transferencia')
+        .not('pasto_origem', 'is', null)
+    ).then(({ data }) => setTransferHistorico(
+      (data ?? []).filter((r: Record<string, unknown>) => r.pasto_origem) as Array<{animal_id: string; pasto_origem: string}>
+    )).catch(() => {});
   }, [farmId]);
 
   // Quando filterLote muda, buscar histórico de pastos do lote no manejo_historico
