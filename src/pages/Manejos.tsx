@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ClipboardList, MapPin, ArrowRight, TrendingUp, Scissors,
   X, Save, RefreshCw, ChevronDown, AlertTriangle, History, Baby, Milk, Search, FileText, GitMerge,
-  LayoutGrid, List,
+  LayoutGrid, List, Edit2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
@@ -215,6 +215,45 @@ function LotesTab({
     return result;
   }, [suppTypes, entries]);
 
+  // Mapa: pasto_nome → consumo% do Creep mais recente (para bezerros)
+  const pastoCreepMetaMap = useMemo(() => {
+    const suppByNome: Record<string, string | null> = {};
+    for (const s of suppTypes) suppByNome[s.nome] = s.consumo;
+    const suppIsCreep: Record<string, boolean> = {};
+    for (const s of suppTypes) {
+      suppIsCreep[s.nome] = s.categoria_simulador === 'Ração Creep' || s.nome.toLowerCase().includes('creep');
+    }
+    const latestByPasto: Record<string, string> = {};
+    const suppForPasto: Record<string, string> = {};
+    for (const e of entries) {
+      if (!e.pasto || !e.data || !e.tipo || !suppIsCreep[e.tipo]) continue;
+      if (!latestByPasto[e.pasto] || e.data > latestByPasto[e.pasto]) {
+        latestByPasto[e.pasto] = e.data;
+        suppForPasto[e.pasto] = e.tipo;
+      }
+    }
+    const result: Record<string, number> = {};
+    for (const [pastoNome, suppNome] of Object.entries(suppForPasto)) {
+      const consumo = suppByNome[suppNome] ?? null;
+      if (!consumo) continue;
+      const pctStr = META_CONSUMO[consumo] ?? null;
+      if (!pctStr) continue;
+      const pct = parseFloat(pctStr.replace('%', '').replace(',', '.'));
+      if (!isNaN(pct) && pct > 0) result[pastoNome] = pct;
+    }
+    return result;
+  }, [suppTypes, entries]);
+
+  // Mapa: pasto_nome → total de dias de consumo (soma dos períodos lançados)
+  const pastoDiasConsumoMap = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const e of entries) {
+      if (!e.pasto) continue;
+      result[e.pasto] = (result[e.pasto] ?? 0) + (e.periodo ?? 1);
+    }
+    return result;
+  }, [entries]);
+
   const ativos = animals.filter(a => a.status === 'ativo' || !a.status);
 
   // Categorias que têm pelo menos 1 animal ativo
@@ -303,11 +342,17 @@ function LotesTab({
 
     // META do suplemento para o pasto deste lote (via closure)
     const pastoNome    = a.pasto_id ? (pastoMap[a.pasto_id] ?? '') : '';
-    const pastoMetaPct = pastoNomeMetaMap[pastoNome] ?? null;
 
-    // Creep: GMD do suplemento é exclusivo dos bezerros
+    // Creep: GMD e % META do suplemento são exclusivos dos bezerros — adultos não herdam nada
     const isCreepPastoRow = pastoIsCreepMap[pastoNome] ?? false;
     const creepGmd = isCreepPastoRow ? (pastoGmdMap[pastoNome] ?? null) : null;
+
+    // Se Creep, adultos não recebem % META automática do pasto
+    const pastoMetaPct = isCreepPastoRow ? null : (pastoNomeMetaMap[pastoNome] ?? null);
+
+    // Creep meta para bezerros + dias acumulados
+    const creepMetaPct  = pastoCreepMetaMap[pastoNome] ?? null;
+    const diasConsumo   = pastoDiasConsumoMap[pastoNome] ?? null;
 
     // isAuto: sem valor manual E não está em modo de edição
     const isAuto    = a.meta_percentagem == null && !editMode;
@@ -331,7 +376,7 @@ function LotesTab({
             <div className="flex flex-col gap-1">
               {/* Linha 1: toggle + input + % */}
               <div className="flex items-center gap-1.5">
-                {pastoMetaPct != null && (
+                {pastoMetaPct != null ? (
                   <button
                     onClick={async () => {
                       if (!isAuto) {
@@ -349,6 +394,16 @@ function LotesTab({
                   >
                     <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isAuto ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                   </button>
+                ) : (
+                  !editMode && a.meta_percentagem == null && (
+                    <button
+                      onClick={() => { setEditMode(true); setTimeout(() => inputRef.current?.focus(), 30); }}
+                      title="Inserir % META manualmente"
+                      className="flex-shrink-0 text-gray-300 hover:text-blue-400 transition-colors"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )
                 )}
                 <input
                   ref={inputRef}
@@ -361,7 +416,7 @@ function LotesTab({
                   disabled={inputLocked}
                   onChange={e => setDraft(e.target.value)}
                   onBlur={async () => {
-                    if (draft === '' && a.meta_percentagem == null && !editMode) return;
+                    if (draft === '' && a.meta_percentagem == null) { setEditMode(false); return; }
                     const val = draft === '' ? null : parseFloat(draft.replace(',', '.'));
                     if (val !== null && isNaN(val)) return;
                     await handleMetaSave(a.id, val);
@@ -383,58 +438,65 @@ function LotesTab({
             </div>
           </td>
           <td className="px-4 py-2.5">
-            {(() => {
-              const hist = ganhoAcumMap[a.id];
-              if (hist) {
-                return (
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-bold" style={{ color: '#1a6040' }}>
-                        {hist.ganho.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                      </p>
-                      {hist.confirmado && (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700">✓</span>
-                      )}
+            <div>
+              {(() => {
+                const hist = ganhoAcumMap[a.id];
+                if (hist) {
+                  return (
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs font-bold" style={{ color: '#1a6040' }}>
+                          {hist.ganho.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                        </p>
+                        {hist.confirmado && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700">✓</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400">{a.gmd ? `${a.gmd} kg/d` : ''}</p>
                     </div>
-                    <p className="text-[9px] text-gray-400">{a.gmd ? `${a.gmd} kg/d` : ''}</p>
+                  );
+                }
+                // Se é pasto Creep, o GMD do suplemento é só para bezerros — adultos usam apenas gmd individual
+                const effectiveGmd = a.gmd ?? (isCreepPastoRow ? null : (pastoGmdMap[pastoNome] ?? null));
+                const gmdInput = (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-[9px] text-gray-400 w-8">GMD:</span>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={gmdDraft !== '' ? gmdDraft : (a.gmd != null ? String(a.gmd) : '')}
+                      placeholder={effectiveGmd ? String(effectiveGmd) : 'kg/d'}
+                      onChange={e => setGmdDraft(e.target.value)}
+                      onBlur={async () => {
+                        if (gmdDraft === '' && a.gmd == null) return;
+                        const val = gmdDraft === '' ? null : parseFloat(gmdDraft);
+                        if (val !== null && isNaN(val)) return;
+                        await handleGmdSave(a.id, val);
+                      }}
+                      className="w-14 h-5 px-1 text-[10px] rounded text-center border border-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-400 text-gray-600 bg-white"
+                    />
+                    <span className="text-[9px] text-gray-400">kg/d</span>
                   </div>
                 );
-              }
-              // Se é pasto Creep, o GMD do suplemento é só para bezerros — adultos usam apenas gmd individual
-              const effectiveGmd = a.gmd ?? (isCreepPastoRow ? null : (pastoGmdMap[pastoNome] ?? null));
-              const gmdInput = (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[9px] text-gray-400 w-8">GMD:</span>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={gmdDraft !== '' ? gmdDraft : (a.gmd != null ? String(a.gmd) : '')}
-                    placeholder={effectiveGmd ? String(effectiveGmd) : 'kg/d'}
-                    onChange={e => setGmdDraft(e.target.value)}
-                    onBlur={async () => {
-                      if (gmdDraft === '' && a.gmd == null) return;
-                      const val = gmdDraft === '' ? null : parseFloat(gmdDraft);
-                      if (val !== null && isNaN(val)) return;
-                      await handleGmdSave(a.id, val);
-                    }}
-                    className="w-14 h-5 px-1 text-[10px] rounded text-center border border-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-400 text-gray-600 bg-white"
-                  />
-                  <span className="text-[9px] text-gray-400">kg/d</span>
-                </div>
-              );
-              if (effectiveGmd && a.data_entrada) {
-                const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
-                return (
-                  <div>
-                    <p className="text-xs font-bold text-gray-400">
-                      {(effectiveGmd * dias).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                    </p>
-                    <p className="text-[9px] text-gray-400">{dias}d · {effectiveGmd} kg/d</p>
-                    {gmdInput}
-                  </div>
-                );
-              }
-              return <div><span className="text-xs text-gray-300">—</span>{gmdInput}</div>;
-            })()}
+                if (effectiveGmd && a.data_entrada) {
+                  const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+                  return (
+                    <div>
+                      <p className="text-xs font-bold text-gray-400">
+                        {(effectiveGmd * dias).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                      </p>
+                      <p className="text-[9px] text-gray-400">{dias}d · {effectiveGmd} kg/d</p>
+                      {gmdInput}
+                    </div>
+                  );
+                }
+                return <div><span className="text-xs text-gray-300">—</span>{gmdInput}</div>;
+              })()}
+              {diasConsumo != null && (
+                <p className="text-[9px] text-teal-600 font-medium mt-1">
+                  {diasConsumo}d supl.{meta != null ? ` · ${(diasConsumo * meta).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg acum.` : ''}
+                </p>
+              )}
+            </div>
           </td>
           <td className="px-4 py-2.5 text-xs text-gray-500">{a.sexo ?? '—'}</td>
           <td className="px-4 py-2.5 no-print">
@@ -456,20 +518,48 @@ function LotesTab({
             <td className="px-4 py-1.5 text-xs text-orange-600">—</td>
             <td className="px-4 py-1.5 text-xs font-semibold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')}</td>
             <td className="px-4 py-1.5 text-xs text-orange-600">{a.bezerros_peso_medio ? `${a.bezerros_peso_medio} kg` : '—'}</td>
-            <td />
             <td className="px-4 py-1.5">
-              {creepGmd && a.data_entrada ? (() => {
-                const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+              {(() => {
+                if (!creepMetaPct || !a.bezerros_peso_medio) return <span className="text-xs text-gray-300">—</span>;
+                const bezMeta = a.bezerros_peso_medio * creepMetaPct / 100;
                 return (
-                  <div>
-                    <p className="text-xs font-bold text-orange-600">
-                      {(creepGmd * dias).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                    </p>
-                    <p className="text-[9px] text-orange-400">{dias}d · {creepGmd} kg/d</p>
-                    <p className="text-[8px] text-orange-300 font-medium uppercase tracking-wide">Creep</p>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-semibold text-orange-600">
+                      {creepMetaPct.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}%
+                      <span className="text-[8px] text-orange-400 ml-1">Creep</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-orange-700">
+                      ={bezMeta.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG
+                    </span>
                   </div>
                 );
-              })() : null}
+              })()}
+            </td>
+            <td className="px-4 py-1.5">
+              <div>
+                {creepGmd && a.data_entrada ? (() => {
+                  const dias = Math.max(0, Math.floor((Date.now() - new Date(a.data_entrada).getTime()) / 86_400_000));
+                  const bezMeta = creepMetaPct && a.bezerros_peso_medio ? a.bezerros_peso_medio * creepMetaPct / 100 : null;
+                  return (
+                    <div>
+                      <p className="text-xs font-bold text-orange-600">
+                        {(creepGmd * dias).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                      </p>
+                      <p className="text-[9px] text-orange-400">{dias}d · {creepGmd} kg/d</p>
+                      <p className="text-[8px] text-orange-300 font-medium uppercase tracking-wide">Creep</p>
+                      {bezMeta != null && diasConsumo != null && (
+                        <p className="text-[9px] text-orange-500 font-medium mt-0.5">
+                          {diasConsumo}d supl. · {(diasConsumo * bezMeta).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg acum.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })() : (
+                  diasConsumo != null && (
+                    <p className="text-[9px] text-orange-400">{diasConsumo}d supl.</p>
+                  )
+                )}
+              </div>
             </td>
             <td className="no-print" />
           </tr>
@@ -658,19 +748,63 @@ function LotesTab({
                   );
                 })()}
 
+                {/* Badge SUPL. ACUM. — dias e kg meta acumulados de suplementação */}
+                {(() => {
+                  const diasSupl = pastoDiasConsumoMap[pasto.nome] ?? null;
+                  if (!diasSupl) return null;
+                  const pct = a.meta_percentagem ?? pastoMetaPct;
+                  const metaKgDia = a.peso_medio != null && pct != null ? a.peso_medio * pct / 100 : null;
+                  return (
+                    <div className="mt-1">
+                      <div className="inline-flex items-center gap-1.5 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
+                        <p className="text-[9px] text-teal-500 font-semibold uppercase tracking-wide leading-none">SUPL.</p>
+                        <p className="text-sm font-bold text-teal-700 leading-none">
+                          {diasSupl}d
+                          {metaKgDia != null && (
+                            <span className="text-[10px] font-normal text-teal-400"> · {(diasSupl * metaKgDia).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Bezerros */}
                 {hasBez && (
-                  <div className="mt-2 rounded-lg bg-orange-50 border border-orange-200 px-3 py-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Baby className="w-3 h-3 text-orange-500 flex-shrink-0" />
-                      <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Bezerros</span>
+                  <div className="mt-2 rounded-lg bg-orange-50 border border-orange-200 px-3 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Baby className="w-3 h-3 text-orange-500 flex-shrink-0" />
+                        <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Bezerros</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')} cab.</span>
+                        {a.bezerros_peso_medio && (
+                          <span className="text-[10px] text-orange-500 font-medium">{a.bezerros_peso_medio} kg</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-orange-700">{a.bezerros_quantidade!.toLocaleString('pt-BR')} cab.</span>
-                      {a.bezerros_peso_medio && (
-                        <span className="text-[10px] text-orange-500 font-medium">{a.bezerros_peso_medio} kg</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const creepPct = pastoCreepMetaMap[pasto.nome] ?? null;
+                      if (!creepPct || !a.bezerros_peso_medio) return null;
+                      const bezMetaKg = a.bezerros_peso_medio * creepPct / 100;
+                      const diasSupl = pastoDiasConsumoMap[pasto.nome] ?? null;
+                      return (
+                        <div className="mt-1 pt-1 border-t border-orange-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-orange-400 font-semibold uppercase tracking-wide">META/BEZ/DIA</span>
+                            <span className="text-xs font-bold text-orange-700">
+                              {bezMetaKg.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG
+                            </span>
+                          </div>
+                          {diasSupl != null && (
+                            <p className="text-[8px] text-orange-400 mt-0.5 text-right">
+                              {diasSupl}d · {(diasSupl * bezMetaKg).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg acum.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
