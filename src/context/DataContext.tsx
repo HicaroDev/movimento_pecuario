@@ -270,9 +270,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const tempId = `temp-${Date.now()}`;
     setEntries(prev => [...prev, { ...entry, id: tempId }]);
     const dataLanc = entry.data || new Date().toISOString().split('T')[0];
+    const pastureId = pastures.find(p => p.nome === entry.pasto)?.id ?? null;
     supabaseAdmin.from('data_entries').insert({
       farm_id:     activeFarmId,
       data:        dataLanc,
+      pasto_id:    pastureId,
       pasto_nome:  entry.pasto,
       suplemento:  entry.tipo,
       quantidade:  entry.quantidade,
@@ -288,6 +290,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Retroativo: popula lote_diario para cada dia do período deste lançamento
       if (!error && activeFarmId && entry.pasto && entry.tipo) {
         manejoService.upsertDiarioByLancamento(activeFarmId, {
+          pasto_id:   pastureId ?? undefined,
           pasto_nome: entry.pasto,
           suplemento: entry.tipo,
           data: dataLanc,

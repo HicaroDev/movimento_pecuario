@@ -90,7 +90,10 @@ BEGIN
     SELECT de.suplemento
     FROM data_entries de
     WHERE de.farm_id = a.farm_id
-      AND UPPER(TRIM(de.pasto_nome)) = UPPER(TRIM(p.nome))
+      AND (
+        de.pasto_id = a.pasto_id
+        OR (de.pasto_id IS NULL AND UPPER(TRIM(de.pasto_nome)) = UPPER(TRIM(p.nome)))
+      )
       AND UPPER(de.suplemento) NOT LIKE '%CREEP%'
     ORDER BY de.data DESC, de.created_at DESC
     LIMIT 1

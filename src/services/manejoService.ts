@@ -698,19 +698,25 @@ export const manejoService = {
   async upsertDiarioByLancamento(
     farmId: string,
     lancamento: {
+      pasto_id?:  string;  // UUID — quando disponível, evita lookup por nome
       pasto_nome: string;
       suplemento: string;
-      data: string;        // YYYY-MM-DD — último dia do período
-      periodo: number;     // quantidade de dias cobertos
-      consumo: number;     // kg/cab/dia do lançamento
+      data: string;
+      periodo: number;
+      consumo: number;
     },
   ): Promise<void> {
     const n = (s: string) => s.trim().toUpperCase();
 
-    // 1. Localiza pasto pelo nome
-    const { data: pastos } = await supabaseAdmin
-      .from('pastures').select('id, nome').eq('farm_id', farmId);
-    const pasto = (pastos ?? []).find(p => n(p.nome) === n(lancamento.pasto_nome));
+    // 1. Localiza pasto — usa pasto_id direto quando disponível
+    let pasto: { id: string; nome: string } | undefined;
+    if (lancamento.pasto_id) {
+      pasto = { id: lancamento.pasto_id, nome: lancamento.pasto_nome };
+    } else {
+      const { data: pastos } = await supabaseAdmin
+        .from('pastures').select('id, nome').eq('farm_id', farmId);
+      pasto = (pastos ?? []).find(p => n(p.nome) === n(lancamento.pasto_nome));
+    }
     if (!pasto) return;
 
     // 2. Resolve meta_pct e gmd via supplement_types
