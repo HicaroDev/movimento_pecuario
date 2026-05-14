@@ -1161,7 +1161,7 @@ interface SupplementForm { nome: string; unidade: string; peso: number; valor_kg
 
 const CATEGORIA_SIMULADOR_OPTIONS = [
   'Mineral',
-  'Mineral Aditivo',
+  'Mineral Aditivado',
   'Proteico 0,1% PV',
   'Proteico 0,3% PV',
   'Proteico Energético 0,5% PV',
