@@ -17,10 +17,6 @@ const PERIOD_OPTIONS: { label: string; value: '7' | '30' | '90' | '180' | 'all' 
   { label: 'Sem Data', value: 'all' },
 ];
 
-const LINE_COLORS = [
-  '#1a6040', '#0b2748', '#6b2fa0', '#c2410c',
-  '#0e7490', '#2d8a60', '#b45309', '#7c3aed',
-];
 
 interface Props {
   farmId: string;
@@ -114,28 +110,16 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
     return map;
   }, [records]);
 
-  /* ── Dados do gráfico: um ponto por data, uma chave por animal ── */
-  const { chartData, animalLines } = useMemo(() => {
-    const byDate: Record<string, Record<string, number>> = {};
-    const names = new Set<string>();
-
-    for (const r of records) {
-      if (r.peso_estimado == null) continue;
-      const nome = animalMap[r.animal_id]?.nome ?? r.animal_id.slice(0, 8);
-      names.add(nome);
-      if (!byDate[r.data]) byDate[r.data] = {};
-      byDate[r.data][nome] = r.peso_estimado;
-    }
-
-    const chartData = Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([data, vals]) => ({
-        data: data.split('-').reverse().join('/'),
-        ...vals,
+  /* ── Dados do gráfico: linha verde = peso inicial estático, azul = ganho simulado ── */
+  const chartData = useMemo(() => {
+    return [...records]
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .map(r => ({
+        data: r.data.split('-').reverse().join('/'),
+        'Peso Inicial':   r.peso_estimado ?? undefined,
+        'Ganho Simulado': pesoSimuladoMap[`${r.data}_${r.animal_id}`] ?? undefined,
       }));
-
-    return { chartData, animalLines: Array.from(names) };
-  }, [records, animalMap]);
+  }, [records, pesoSimuladoMap]);
 
   return (
     <div className="space-y-5">
@@ -245,17 +229,23 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                   ]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                {animalLines.map((nome, i) => (
-                  <Line
-                    key={nome}
-                    type="monotone"
-                    dataKey={nome}
-                    stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    connectNulls
-                  />
-                ))}
+                <Line
+                  type="monotone"
+                  dataKey="Peso Inicial"
+                  stroke="#1a6040"
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Ganho Simulado"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
