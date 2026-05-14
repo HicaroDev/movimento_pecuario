@@ -55,7 +55,10 @@ BEGIN
               * COALESCE(a.quantidade, 1))::numeric, 3)
     END                                                             AS meta_kg_total,
 
-    NULL                                                            AS consumo_kg_cab,
+    CASE WHEN COALESCE(ls.quantidade, 0) > 0
+      THEN ROUND((ls.kg::numeric / ls.quantidade), 4)
+      ELSE NULL
+    END                                                             AS consumo_kg_cab,
 
     COALESCE(a.gmd, st.gmd_esperado)                                AS gmd,
     COALESCE(a.gmd, st.gmd_esperado)                                AS ganho_dia,
@@ -87,7 +90,7 @@ BEGIN
 
   -- Suplemento adulto mais recente do pasto (ignora Creep)
   LEFT JOIN LATERAL (
-    SELECT de.suplemento
+    SELECT de.suplemento, de.kg, de.quantidade
     FROM data_entries de
     WHERE de.farm_id = a.farm_id
       AND (

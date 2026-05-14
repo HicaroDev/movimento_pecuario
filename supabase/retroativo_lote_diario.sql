@@ -16,7 +16,10 @@ BEGIN
       p.id                 AS pasto_id,
       de.pasto_nome,
       de.suplemento,
-      de.consumo           AS consumo_kg_cab,
+      CASE WHEN COALESCE(de.quantidade, 0) > 0
+        THEN ROUND((de.kg::numeric / de.quantidade), 4)
+        ELSE NULL
+      END                  AS consumo_kg_cab,
       de.data::date        AS data_lancamento,
       gs::date             AS dia,
       st.gmd_esperado,

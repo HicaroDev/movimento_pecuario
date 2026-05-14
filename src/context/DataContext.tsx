@@ -295,7 +295,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           suplemento: entry.tipo,
           data: dataLanc,
           periodo: entry.periodo,
-          consumo: entry.consumo,
+          consumo: entry.quantidade > 0 ? parseFloat((entry.kg / entry.quantidade).toFixed(4)) : 0,
         }).catch(() => {});
       }
     });
