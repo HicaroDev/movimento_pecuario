@@ -358,7 +358,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Data', 'Lote', 'Pasto', 'Suplemento', 'Meta kg/cab', 'Consumo kg/cab', 'Peso Est.', 'Simulado'].map(h => (
+                    {['Data', 'Lote', 'Pasto', 'Suplemento', 'Meta kg/cab', 'Consumo kg/cab', 'GMD', 'Peso Est.', 'Simulado'].map(h => (
                       <th key={h}
                         className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         {h}
@@ -409,6 +409,10 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
 
                         <td className="px-4 py-2.5 text-xs font-mono text-gray-700 whitespace-nowrap">
                           {fmt(r.consumo_kg_cab)}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs font-mono text-gray-500 whitespace-nowrap">
+                          {r.gmd != null ? `${r.gmd.toLocaleString('pt-BR', { minimumFractionDigits: 3 })} kg/d` : '—'}
                         </td>
 
                         <td className="px-4 py-2.5 text-xs font-semibold text-gray-900 whitespace-nowrap">
