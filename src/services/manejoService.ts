@@ -878,4 +878,21 @@ export const manejoService = {
     if (error) throw new Error(error.message);
     return (data ?? []) as LoteDiario[];
   },
+
+  async buscarDatasLancamentos(
+    farmId: string,
+    options: { pastoNome?: string; dataInicio?: string; dataFim?: string } = {},
+  ): Promise<Set<string>> {
+    let q = supabaseAdmin
+      .from('data_entries')
+      .select('data')
+      .eq('farm_id', farmId);
+
+    if (options.pastoNome)  q = q.eq('pasto_nome', options.pastoNome);
+    if (options.dataInicio) q = q.gte('data', options.dataInicio);
+    if (options.dataFim)    q = q.lte('data', options.dataFim);
+
+    const { data } = await q;
+    return new Set((data ?? []).map((r: { data: string }) => r.data?.slice(0, 10)));
+  },
 };

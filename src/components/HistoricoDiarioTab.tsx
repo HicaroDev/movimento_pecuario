@@ -33,6 +33,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>('all');
   const [period, setPeriod] = useState<'7' | '30' | '90' | '180' | 'all'>('30');
   const [records, setRecords] = useState<LoteDiario[]>([]);
+  const [lancamentoDates, setLancamentoDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -65,15 +66,17 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   useEffect(() => {
     if (!farmId || selectedAnimalId === 'all') {
       setRecords([]);
+      setLancamentoDates(new Set());
       return;
     }
     setLoading(true);
-    manejoService.buscarHistoricoDiario(farmId, {
-      animalId: selectedAnimalId,
-      ...buildDateRange(),
-    })
-      .then(r => setRecords(r))
-      .catch(() => setRecords([]))
+    const range = buildDateRange();
+    Promise.all([
+      manejoService.buscarHistoricoDiario(farmId, { animalId: selectedAnimalId, ...range }),
+      manejoService.buscarDatasLancamentos(farmId, range),
+    ])
+      .then(([r, dates]) => { setRecords(r); setLancamentoDates(dates); })
+      .catch(() => { setRecords([]); setLancamentoDates(new Set()); })
       .finally(() => setLoading(false));
   }, [farmId, selectedAnimalId, period]);
 
@@ -338,7 +341,15 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                       <tr key={i} className="hover:bg-gray-50/70 transition-colors">
 
                         <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                          {r.data.split('-').reverse().join('/')}
+                          <span className="flex items-center gap-1.5">
+                            {lancamentoDates.has(r.data) && (
+                              <span
+                                title="Dia de lançamento real"
+                                className="inline-block w-2 h-2 rounded-full bg-green-500 flex-shrink-0"
+                              />
+                            )}
+                            {r.data.split('-').reverse().join('/')}
+                          </span>
                         </td>
 
                         <td className="px-4 py-2.5">
