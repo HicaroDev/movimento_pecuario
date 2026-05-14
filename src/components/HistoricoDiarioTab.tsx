@@ -138,14 +138,14 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
     [records],
   );
 
-  /* ── Gráfico 1: evolução de peso ── */
+  /* ── Gráfico 1: Peso Est. (flat = peso_medio) × Simulado (acumulado via GMD) ── */
   const chartData = useMemo(() => {
     return sortedAsc.map(r => ({
-      data: r.data.split('-').reverse().join('/'),
-      'Peso Inicial':   animalMap[r.animal_id]?.peso_medio ?? undefined,
-      'Ganho Simulado': r.peso_estimado ?? undefined,
+      data:        r.data.split('-').reverse().join('/'),
+      'Peso Est.': animalMap[r.animal_id]?.peso_medio ?? undefined,
+      'Simulado':  pesoSimuladoMap[`${r.data}_${r.animal_id}`] ?? undefined,
     }));
-  }, [sortedAsc, animalMap]);
+  }, [sortedAsc, animalMap, pesoSimuladoMap]);
 
   /* ── Gráfico 2: consumo diário vs meta ── */
   const consumoChartData = useMemo(() => {
@@ -279,7 +279,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Line
                     type="monotone"
-                    dataKey="Peso Inicial"
+                    dataKey="Peso Est."
                     stroke="#1a6040"
                     strokeWidth={2}
                     strokeDasharray="5 4"
@@ -289,7 +289,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                   {!naoGanhaPeso && (
                     <Line
                       type="monotone"
-                      dataKey="Ganho Simulado"
+                      dataKey="Simulado"
                       stroke="#2563eb"
                       strokeWidth={2}
                       dot={false}
