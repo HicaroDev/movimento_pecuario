@@ -3,7 +3,7 @@ import { History, Filter, TrendingUp, RefreshCw, BarChart2, AlertCircle } from '
 import { toast } from 'sonner';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
-  Tooltip, Legend, CartesianGrid, ComposedChart, Bar, ReferenceLine,
+  Tooltip, Legend, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { manejoService, type Animal, type AnimalCategory, type LoteDiario } from '../services/manejoService';
 import { useAuth } from '../context/AuthContext';
