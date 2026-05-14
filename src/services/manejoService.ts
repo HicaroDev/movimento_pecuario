@@ -810,6 +810,13 @@ export const manejoService = {
     }
   },
 
+  async reprocessarRetroativo(farmId?: string): Promise<number> {
+    const params = farmId ? { p_farm_id: farmId } : {};
+    const { data, error } = await supabaseAdmin.rpc('upsert_lote_diario_retroativo', params);
+    if (error) throw new Error(error.message);
+    return (data as number) ?? 0;
+  },
+
   async listarSupplementTypes(farmId: string): Promise<Array<{ id: string; nome: string; consumo: string | null; gmd_esperado: number | null; categoria_simulador: string | null }>> {
     const { data } = await supabaseAdmin
       .from('supplement_types')
