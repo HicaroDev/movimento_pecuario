@@ -9,10 +9,12 @@ import { manejoService, type Animal, type LoteDiario } from '../services/manejoS
 import { useAuth } from '../context/AuthContext';
 import { SkeletonTable } from './Skeleton';
 
-const PERIOD_OPTIONS: { label: string; value: '7' | '30' | '90' }[] = [
-  { label: '7 dias',  value: '7'  },
-  { label: '30 dias', value: '30' },
-  { label: '90 dias', value: '90' },
+const PERIOD_OPTIONS: { label: string; value: '7' | '30' | '90' | '180' | 'all' }[] = [
+  { label: '7 dias',   value: '7'   },
+  { label: '30 dias',  value: '30'  },
+  { label: '90 dias',  value: '90'  },
+  { label: '180 dias', value: '180' },
+  { label: 'Sem Data', value: 'all' },
 ];
 
 const LINE_COLORS = [
@@ -33,25 +35,29 @@ function fmt(n: number | null | undefined, dec = 3): string {
 export function HistoricoDiarioTab({ farmId, animals }: Props) {
   const { isAdmin } = useAuth();
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>('all');
-  const [period, setPeriod] = useState<'7' | '30' | '90'>('30');
+  const [period, setPeriod] = useState<'7' | '30' | '90' | '180' | 'all'>('30');
   const [records, setRecords] = useState<LoteDiario[]>([]);
   const [loading, setLoading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+
+  function buildDateRange() {
+    if (period === 'all') return {};
+    const hoje = new Date();
+    return {
+      dataFim:    hoje.toISOString().split('T')[0],
+      dataInicio: new Date(hoje.getTime() - parseInt(period) * 86_400_000).toISOString().split('T')[0],
+    };
+  }
 
   async function handleReprocessar() {
     setReprocessing(true);
     try {
       const total = await manejoService.reprocessarRetroativo(farmId);
       toast.success('Retroativo concluído', { description: `${total} registros atualizados` });
-      // Recarrega os dados exibidos
       setLoading(true);
-      const hoje = new Date();
-      const dataFim   = hoje.toISOString().split('T')[0];
-      const dataInicio = new Date(hoje.getTime() - parseInt(period) * 86_400_000).toISOString().split('T')[0];
       manejoService.buscarHistoricoDiario(farmId, {
         animalId: selectedAnimalId !== 'all' ? selectedAnimalId : undefined,
-        dataInicio,
-        dataFim,
+        ...buildDateRange(),
       }).then(r => setRecords(r)).catch(() => {}).finally(() => setLoading(false));
     } catch {
       toast.error('Erro ao reprocessar retroativo');
@@ -63,14 +69,9 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   useEffect(() => {
     if (!farmId) return;
     setLoading(true);
-    const hoje = new Date();
-    const dataFim   = hoje.toISOString().split('T')[0];
-    const dataInicio = new Date(hoje.getTime() - parseInt(period) * 86_400_000)
-      .toISOString().split('T')[0];
     manejoService.buscarHistoricoDiario(farmId, {
       animalId: selectedAnimalId !== 'all' ? selectedAnimalId : undefined,
-      dataInicio,
-      dataFim,
+      ...buildDateRange(),
     })
       .then(r => setRecords(r))
       .catch(() => setRecords([]))

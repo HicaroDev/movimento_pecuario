@@ -868,7 +868,7 @@ export const manejoService = {
       .eq('farm_id', farmId)
       .order('data', { ascending: false })
       .order('animal_id', { ascending: true })
-      .limit(600);
+      .limit(10000);
 
     if (options.animalId)   q = q.eq('animal_id', options.animalId);
     if (options.dataInicio) q = q.gte('data', options.dataInicio);

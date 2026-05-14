@@ -47,7 +47,11 @@ BEGIN
       AND UPPER(TRIM(st.nome)) = UPPER(TRIM(de.suplemento))
     CROSS JOIN LATERAL generate_series(
       (de.data::date - LEAST(GREATEST(COALESCE(de.periodo::integer, 1), 1), 90) + 1),
-       de.data::date,
+      CASE
+        WHEN de.data::date >= CURRENT_DATE - INTERVAL '365 days'
+        THEN CURRENT_DATE
+        ELSE de.data::date
+      END,
       '1 day'::interval
     ) AS gs
     WHERE (p_farm_id IS NULL OR de.farm_id = p_farm_id)
