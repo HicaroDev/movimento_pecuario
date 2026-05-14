@@ -1,3 +1,32 @@
+## [1.29.0] — 2026-05-14
+
+### Adicionado
+- **Histórico Diário — módulo completo**: aba dedicada separada do Manejos com gráficos e tabela
+- **SQL retroativo `upsert_lote_diario_retroativo`**: backfill a partir de `data_entries`, projeta até `CURRENT_DATE` para entradas nos últimos 365 dias
+- **Cron 23h automático**: gera registros de `lote_diario` diariamente para todas as fazendas
+- **Filtros de período**: 7 / 30 / 90 / 180 dias + "Sem Data" (todos os registros)
+- **Carga sob demanda**: dados carregam somente ao selecionar um lote específico (performance)
+- **Coluna Simulado — peso acumulado**: `peso_inicial + Σ consumo_kg_cab` diário — cálculo incremental no frontend, independente por lote
+- **Gráfico Evolução do Peso**: linha verde tracejada (Peso Inicial estático) + linha azul sólida (Ganho Simulado acumulado)
+- **Gráfico Consumo Diário vs Meta**: lado a lado com o de peso — linha verde tracejada (Meta kg/cab) + linha azul (Consumo real)
+- **Botão Reprocessar Retroativo** (admin): dispara o SQL retroativo manualmente via UI
+
+### Alterado
+- Colunas da tabela reorganizadas: removido GMD (reservado para v2.0), Status renomeado para "Simulado"
+- `buscarHistoricoDiario` com limite 10.000 registros (era 600)
+- Dois gráficos lado a lado em grid `xl:grid-cols-2` (antes era um único gráfico de linha)
+- `data_entries` vinculados a `pastures` por UUID em vez de nome de texto
+
+### Corrigido
+- `consumo_kg_cab` calculado como `kg / quantidade` (campo `consumo` estava zerado)
+- Retroativo parava na data do último lançamento — agora projeta até hoje
+- Filtros de 7/30 dias não mostravam dados (registros eram antigos — corrigido com retroativo estendido)
+
+### Tokens de Design
+- Brand: #1a6040 (verde Movimento Pecuário)
+- Navy: #0b2748 | Purple: #6b2fa0
+- Stack: React 18 + Vite 6 + Tailwind v4 + Recharts 2
+
 ## [1.25.0] — 2026-04-25
 
 ### Adicionado

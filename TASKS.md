@@ -1,6 +1,6 @@
 # Tasks — Suplemento Control
 
-> Última atualização: 2026-04-01
+> Última atualização: 2026-05-14 — v1.29.0
 
 ## Legenda
 - [ ] Pendente
