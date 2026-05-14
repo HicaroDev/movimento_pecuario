@@ -1,0 +1,278 @@
+import { useState, useEffect, useMemo } from 'react';
+import { History, Filter, TrendingUp } from 'lucide-react';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis,
+  Tooltip, Legend, CartesianGrid,
+} from 'recharts';
+import { manejoService, type Animal, type LoteDiario } from '../services/manejoService';
+import { SkeletonTable } from './Skeleton';
+
+const PERIOD_OPTIONS: { label: string; value: '7' | '30' | '90' }[] = [
+  { label: '7 dias',  value: '7'  },
+  { label: '30 dias', value: '30' },
+  { label: '90 dias', value: '90' },
+];
+
+const LINE_COLORS = [
+  '#1a6040', '#0b2748', '#6b2fa0', '#c2410c',
+  '#0e7490', '#2d8a60', '#b45309', '#7c3aed',
+];
+
+interface Props {
+  farmId: string;
+  animals: Animal[];
+}
+
+function fmt(n: number | null | undefined, dec = 3): string {
+  if (n == null) return '—';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+export function HistoricoDiarioTab({ farmId, animals }: Props) {
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('all');
+  const [period, setPeriod] = useState<'7' | '30' | '90'>('30');
+  const [records, setRecords] = useState<LoteDiario[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!farmId) return;
+    setLoading(true);
+    const hoje = new Date();
+    const dataFim   = hoje.toISOString().split('T')[0];
+    const dataInicio = new Date(hoje.getTime() - parseInt(period) * 86_400_000)
+      .toISOString().split('T')[0];
+    manejoService.buscarHistoricoDiario(farmId, {
+      animalId: selectedAnimalId !== 'all' ? selectedAnimalId : undefined,
+      dataInicio,
+      dataFim,
+    })
+      .then(r => setRecords(r))
+      .catch(() => setRecords([]))
+      .finally(() => setLoading(false));
+  }, [farmId, selectedAnimalId, period]);
+
+  const animalMap = useMemo(
+    () => Object.fromEntries(animals.map(a => [a.id, a])),
+    [animals],
+  );
+
+  const ativos = useMemo(
+    () => animals.filter(a => a.status === 'ativo' || !a.status),
+    [animals],
+  );
+
+  /* ── Dados do gráfico: um ponto por data, uma chave por animal ── */
+  const { chartData, animalLines } = useMemo(() => {
+    const byDate: Record<string, Record<string, number>> = {};
+    const names = new Set<string>();
+
+    for (const r of records) {
+      if (r.peso_estimado == null) continue;
+      const nome = animalMap[r.animal_id]?.nome ?? r.animal_id.slice(0, 8);
+      names.add(nome);
+      if (!byDate[r.data]) byDate[r.data] = {};
+      byDate[r.data][nome] = r.peso_estimado;
+    }
+
+    const chartData = Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([data, vals]) => ({
+        data: data.split('-').reverse().join('/'),
+        ...vals,
+      }));
+
+    return { chartData, animalLines: Array.from(names) };
+  }, [records, animalMap]);
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Filtros ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Filter className="w-4 h-4" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Filtros</span>
+          </div>
+
+          <select
+            value={selectedAnimalId}
+            onChange={e => setSelectedAnimalId(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white
+                       focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+          >
+            <option value="all">Todos os lotes</option>
+            {ativos.map(a => (
+              <option key={a.id} value={a.id}>{a.nome}</option>
+            ))}
+          </select>
+
+          <div className="flex gap-1">
+            {PERIOD_OPTIONS.map(o => (
+              <button
+                key={o.value}
+                onClick={() => setPeriod(o.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  period === o.value
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'border border-gray-200 text-gray-500 hover:border-teal-400 hover:text-teal-600'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          {records.length > 0 && (
+            <span className="ml-auto text-xs text-gray-400">
+              {records.length} registros
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Conteúdo ── */}
+      {loading ? (
+        <SkeletonTable rows={6} cols={7} />
+      ) : records.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm py-20 text-center">
+          <History className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Nenhum registro para o período selecionado.</p>
+          <p className="text-xs text-gray-400 mt-1">
+            O histórico é gerado diariamente às 23h ou quando há lançamentos de suplemento.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ── Gráfico de evolução de peso ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <TrendingUp className="w-4 h-4 text-teal-600" />
+              <span className="text-sm font-semibold text-gray-800">Evolução do Peso Estimado</span>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis
+                  dataKey="data"
+                  tick={{ fontSize: 11, fill: '#9ca3af' }}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#9ca3af' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={v => `${v} kg`}
+                  width={72}
+                />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  formatter={(v: number) => [
+                    `${v.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} kg`,
+                  ]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {animalLines.map((nome, i) => (
+                  <Line
+                    key={nome}
+                    type="monotone"
+                    dataKey={nome}
+                    stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* ── Tabela ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Data', 'Lote', 'Pasto', 'Suplemento', 'Meta kg/cab', 'Consumo kg/cab', 'GMD', 'Peso Est.', 'Status'].map(h => (
+                      <th key={h}
+                        className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {records.map((r, i) => {
+                    const animal = animalMap[r.animal_id];
+                    return (
+                      <tr key={i} className="hover:bg-gray-50/70 transition-colors">
+
+                        <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                          {r.data.split('-').reverse().join('/')}
+                        </td>
+
+                        <td className="px-4 py-2.5">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {animal?.nome ?? '—'}
+                          </span>
+                          {animal?.quantidade != null && (
+                            <span className="ml-1.5 text-[10px] text-gray-400">
+                              {animal.quantidade} cab
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[120px] truncate">
+                          {r.pasto_nome ?? '—'}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[140px] truncate">
+                          {r.suplemento ?? '—'}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs font-mono text-teal-700 whitespace-nowrap">
+                          {fmt(r.meta_kg_cab)}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs font-mono text-gray-700 whitespace-nowrap">
+                          {fmt(r.consumo_kg_cab)}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs font-mono text-gray-700 whitespace-nowrap">
+                          {fmt(r.gmd)}
+                        </td>
+
+                        <td className="px-4 py-2.5 text-xs font-semibold text-gray-900 whitespace-nowrap">
+                          {r.peso_estimado != null
+                            ? `${r.peso_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} kg`
+                            : '—'}
+                          {r.peso_real != null && (
+                            <span className="ml-1 text-[10px] text-green-600 font-normal">
+                              ✓ {r.peso_real.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} kg
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            r.confirmado
+                              ? 'bg-green-50 text-green-700 border border-green-100'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {r.confirmado ? '✓ Confirmado' : 'Estimado'}
+                          </span>
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

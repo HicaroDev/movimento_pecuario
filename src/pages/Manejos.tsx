@@ -13,6 +13,7 @@ import { farmService } from '../services/farmService';
 import type { Pasture } from '../context/DataContext';
 import type { DataEntry } from '../lib/data';
 import { SkeletonTable } from '../components/Skeleton';
+import { HistoricoDiarioTab } from '../components/HistoricoDiarioTab';
 import { META_CONSUMO } from '../lib/data';
 
 /* ── helpers ── */
@@ -2198,13 +2199,14 @@ function AbateTab({
 
 /* ── tabs ── */
 
-type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate';
+type Tab = 'lotes' | 'transferir' | 'evolucao' | 'abate' | 'historico_diario';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'lotes',     label: 'Lotes por Pasto',    icon: MapPin },
-  { id: 'transferir',label: 'Transferir',          icon: ArrowRight },
-  { id: 'evolucao',  label: 'Evolução',            icon: TrendingUp },
-  { id: 'abate',     label: 'Saída',               icon: Scissors },
+  { id: 'lotes',            label: 'Lotes por Pasto',  icon: MapPin },
+  { id: 'transferir',       label: 'Transferir',        icon: ArrowRight },
+  { id: 'evolucao',         label: 'Evolução',          icon: TrendingUp },
+  { id: 'abate',            label: 'Saída',             icon: Scissors },
+  { id: 'historico_diario', label: 'Histórico Diário',  icon: History },
 ];
 
 export function Manejos() {
@@ -2362,6 +2364,9 @@ export function Manejos() {
               )}
               {tab === 'abate' && (
                 <AbateTab animals={animals} categories={categories} farmId={activeFarmId} onReload={reload} canEdit={canEdit} />
+              )}
+              {tab === 'historico_diario' && (
+                <HistoricoDiarioTab farmId={activeFarmId} animals={animals} />
               )}
             </motion.div>
           </AnimatePresence>

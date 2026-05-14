@@ -30,6 +30,26 @@ export interface AnimalCategory {
   nome: string;
 }
 
+export interface LoteDiario {
+  id?: string;
+  animal_id: string;
+  data: string;
+  pasto_id?: string | null;
+  pasto_nome?: string | null;
+  suplemento?: string | null;
+  fonte_meta?: string | null;
+  meta_pct?: number | null;
+  meta_kg_cab?: number | null;
+  meta_kg_total?: number | null;
+  consumo_kg_cab?: number | null;
+  gmd?: number | null;
+  ganho_dia?: number | null;
+  ganho_acum?: number | null;
+  peso_estimado?: number | null;
+  peso_real?: number | null;
+  confirmado?: boolean;
+}
+
 export interface ManejoEvent {
   id: string;
   farm_id: string;
@@ -823,5 +843,26 @@ export const manejoService = {
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return (data ?? []).map(toEvent);
+  },
+
+  async buscarHistoricoDiario(
+    farmId: string,
+    options: { animalId?: string; dataInicio?: string; dataFim?: string } = {},
+  ): Promise<LoteDiario[]> {
+    let q = supabaseAdmin
+      .from('lote_diario')
+      .select('*')
+      .eq('farm_id', farmId)
+      .order('data', { ascending: false })
+      .order('animal_id', { ascending: true })
+      .limit(600);
+
+    if (options.animalId)   q = q.eq('animal_id', options.animalId);
+    if (options.dataInicio) q = q.gte('data', options.dataInicio);
+    if (options.dataFim)    q = q.lte('data', options.dataFim);
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return (data ?? []) as LoteDiario[];
   },
 };
