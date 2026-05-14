@@ -3,7 +3,7 @@ import { History, Filter, TrendingUp, RefreshCw, BarChart2, AlertCircle } from '
 import { toast } from 'sonner';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
-  Tooltip, Legend, CartesianGrid,
+  Tooltip, Legend, CartesianGrid, ComposedChart, Bar, ReferenceLine,
 } from 'recharts';
 import { manejoService, type Animal, type AnimalCategory, type LoteDiario } from '../services/manejoService';
 import { useAuth } from '../context/AuthContext';
@@ -147,14 +147,19 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
     }));
   }, [sortedAsc, animalMap, pesoSimuladoMap]);
 
-  /* ── Gráfico 2: consumo diário vs meta ── */
-  const consumoChartData = useMemo(() => {
-    return sortedAsc.map(r => ({
-      data:          r.data.split('-').reverse().join('/'),
-      'Consumo':     r.consumo_kg_cab ?? undefined,
-      'Meta':        r.meta_kg_cab    ?? undefined,
-    }));
-  }, [sortedAsc]);
+  /* ── Gráfico 2: Simulado (kg) × Desvio consumo - meta (kg/cab) ── */
+  const consumoSimuladoChartData = useMemo(() => {
+    return sortedAsc.map(r => {
+      const desvio = r.consumo_kg_cab != null && r.meta_kg_cab != null
+        ? +((r.consumo_kg_cab - r.meta_kg_cab).toFixed(4))
+        : undefined;
+      return {
+        data:      r.data.split('-').reverse().join('/'),
+        'Simulado': naoGanhaPeso ? undefined : (pesoSimuladoMap[`${r.data}_${r.animal_id}`] ?? undefined),
+        'Desvio':   desvio,
+      };
+    });
+  }, [sortedAsc, pesoSimuladoMap, naoGanhaPeso]);
 
   return (
     <div className="space-y-5">
@@ -300,14 +305,15 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
               </ResponsiveContainer>
             </div>
 
-            {/* Gráfico 2 — consumo diário vs meta */}
+            {/* Gráfico 2 — Simulado (kg) × Consumo Real (g/cab) */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <div className="flex items-center gap-2 mb-5">
+              <div className="flex items-center gap-2 mb-1">
                 <BarChart2 className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-gray-800">Consumo Diário vs Meta</span>
+                <span className="text-sm font-semibold text-gray-800">Ganho de Peso Simulado × Desvio de Consumo</span>
               </div>
+              <p className="text-[11px] text-gray-400 mb-4 ml-6">Peso simulado (kg) · Desvio = Consumo − Meta (kg/cab/dia)</p>
               <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={consumoChartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                <LineChart data={consumoSimuladoChartData} margin={{ top: 4, right: 64, bottom: 4, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                   <XAxis
                     dataKey="data"
@@ -316,32 +322,46 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                     interval="preserveStartEnd"
                   />
                   <YAxis
+                    yAxisId="kg"
                     tick={{ fontSize: 11, fill: '#9ca3af' }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={v => `${v} kg`}
+                    width={72}
+                  />
+                  <YAxis
+                    yAxisId="desvio"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={v => `${v > 0 ? '+' : ''}${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                     width={60}
                   />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
-                    formatter={(v: number) => [
-                      `${v.toLocaleString('pt-BR', { minimumFractionDigits: 3 })} kg/cab`,
-                    ]}
+                    formatter={(v: number, name: string) =>
+                      name === 'Simulado'
+                        ? [`${v.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} kg`, name]
+                        : [`${v > 0 ? '+' : ''}${v.toLocaleString('pt-BR', { minimumFractionDigits: 3 })} kg/cab`, name]
+                    }
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <ReferenceLine yAxisId="desvio" y={0} stroke="#d1d5db" strokeDasharray="4 3" />
                   <Line
+                    yAxisId="kg"
                     type="monotone"
-                    dataKey="Meta"
-                    stroke="#1a6040"
+                    dataKey="Simulado"
+                    stroke="#2563eb"
                     strokeWidth={2}
-                    strokeDasharray="5 4"
                     dot={false}
                     connectNulls
                   />
                   <Line
+                    yAxisId="desvio"
                     type="monotone"
-                    dataKey="Consumo"
-                    stroke="#2563eb"
+                    dataKey="Desvio"
+                    stroke="#f59e0b"
                     strokeWidth={2}
                     dot={false}
                     connectNulls
@@ -358,7 +378,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Data', 'Lote', 'Pasto', 'Suplemento', 'Meta kg/cab', 'Consumo kg/cab', 'GMD', 'Peso Est.', 'Simulado'].map(h => (
+                    {['Data', 'Lote', 'Pasto', 'Suplemento', 'Meta kg/cab', '% PV', 'GMD', 'Peso Est.', 'Simulado'].map(h => (
                       <th key={h}
                         className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         {h}
@@ -407,8 +427,13 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                           {fmt(r.meta_kg_cab)}
                         </td>
 
-                        <td className="px-4 py-2.5 text-xs font-mono text-gray-700 whitespace-nowrap">
-                          {fmt(r.consumo_kg_cab)}
+                        <td className="px-4 py-2.5 text-xs font-mono text-blue-700 whitespace-nowrap">
+                          {(() => {
+                            const pesoRef = pesoSimuladoMap[`${r.data}_${r.animal_id}`] ?? r.peso_estimado ?? 0;
+                            if (!pesoRef || r.consumo_kg_cab == null) return '—';
+                            const pv = (r.consumo_kg_cab / pesoRef) * 100;
+                            return `${pv.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}%`;
+                          })()}
                         </td>
 
                         <td className="px-4 py-2.5 text-xs font-mono text-gray-500 whitespace-nowrap">

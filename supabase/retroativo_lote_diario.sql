@@ -10,17 +10,47 @@ DECLARE
 BEGIN
   WITH
 
-  lancamentos_dias AS (
+  -- Calcula periodo_efetivo = dias até o próximo lançamento do mesmo pasto+suplemento
+  -- Mesma lógica do timeSeriesConsumo() do frontend (utils.ts)
+  lancamentos_com_periodo AS (
     SELECT
       de.farm_id,
-      p.id                 AS pasto_id,
+      de.id,
       de.pasto_nome,
+      de.pasto_id,
       de.suplemento,
-      CASE WHEN COALESCE(de.quantidade, 0) > 0
-        THEN ROUND((de.kg::numeric / de.quantidade), 4)
+      de.data::date   AS data_lancamento,
+      de.kg,
+      de.quantidade,
+      GREATEST(
+        COALESCE(
+          -- Intervalo até o próximo lançamento (mesma lógica que timeSeriesConsumo)
+          LEAD(de.data::date) OVER (
+            PARTITION BY de.farm_id, UPPER(TRIM(de.pasto_nome)), UPPER(TRIM(de.suplemento))
+            ORDER BY de.data::date
+          ) - de.data::date,
+          NULLIF(de.periodo::integer, 0),
+          30  -- fallback: 30 dias se não há próximo lançamento
+        ),
+        1
+      ) AS periodo_efetivo
+    FROM data_entries de
+    WHERE (p_farm_id IS NULL OR de.farm_id = p_farm_id)
+      AND de.data IS NOT NULL
+      AND UPPER(de.suplemento) NOT LIKE '%CREEP%'
+  ),
+
+  lancamentos_dias AS (
+    SELECT
+      lcp.farm_id,
+      p.id                 AS pasto_id,
+      lcp.pasto_nome,
+      lcp.suplemento,
+      CASE WHEN COALESCE(lcp.quantidade, 0) > 0
+        THEN ROUND((lcp.kg::numeric / lcp.quantidade / lcp.periodo_efetivo), 4)
         ELSE NULL
       END                  AS consumo_kg_cab,
-      de.data::date        AS data_lancamento,
+      lcp.data_lancamento,
       gs::date             AS dia,
       st.gmd_esperado,
       st.categoria_simulador,
@@ -37,28 +67,22 @@ BEGIN
         WHEN '1,50 A 2,30% PV'            THEN 2.000
         ELSE NULL
       END                  AS meta_pct_supp
-    FROM data_entries de
+    FROM lancamentos_com_periodo lcp
     JOIN pastures p
-      ON  p.farm_id = de.farm_id
+      ON  p.farm_id = lcp.farm_id
       AND (
-        de.pasto_id = p.id
-        OR (de.pasto_id IS NULL AND UPPER(TRIM(p.nome)) = UPPER(TRIM(de.pasto_nome)))
+        lcp.pasto_id = p.id
+        OR (lcp.pasto_id IS NULL AND UPPER(TRIM(p.nome)) = UPPER(TRIM(lcp.pasto_nome)))
       )
     LEFT JOIN supplement_types st
-      ON  st.farm_id = de.farm_id
-      AND UPPER(TRIM(st.nome)) = UPPER(TRIM(de.suplemento))
+      ON  st.farm_id = lcp.farm_id
+      AND UPPER(TRIM(st.nome)) = UPPER(TRIM(lcp.suplemento))
+    -- Série PARA FRENTE: do dia do lançamento até o dia antes do próximo
     CROSS JOIN LATERAL generate_series(
-      (de.data::date - LEAST(GREATEST(COALESCE(de.periodo::integer, 1), 1), 90) + 1),
-      CASE
-        WHEN de.data::date >= CURRENT_DATE - INTERVAL '365 days'
-        THEN CURRENT_DATE
-        ELSE de.data::date
-      END,
+      lcp.data_lancamento,
+      LEAST(lcp.data_lancamento + lcp.periodo_efetivo - 1, CURRENT_DATE),
       '1 day'::interval
     ) AS gs
-    WHERE (p_farm_id IS NULL OR de.farm_id = p_farm_id)
-      AND de.data IS NOT NULL
-      AND UPPER(de.suplemento) NOT LIKE '%CREEP%'
   ),
 
   lancamentos_latest AS (
