@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
   Tooltip, Legend, CartesianGrid,
 } from 'recharts';
-import { manejoService, type Animal, type LoteDiario } from '../services/manejoService';
+import { manejoService, type Animal, type AnimalCategory, type LoteDiario } from '../services/manejoService';
 import { useAuth } from '../context/AuthContext';
 import { SkeletonTable } from './Skeleton';
 
@@ -34,6 +34,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   const [period, setPeriod] = useState<'7' | '30' | '90' | '180' | 'all'>('30');
   const [records, setRecords] = useState<LoteDiario[]>([]);
   const [lancamentoDates, setLancamentoDates] = useState<Set<string>>(new Set());
+  const [categorias, setCategorias] = useState<AnimalCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -64,6 +65,12 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   }
 
   useEffect(() => {
+    if (farmId) {
+      manejoService.listarCategorias(farmId).then(setCategorias).catch(() => {});
+    }
+  }, [farmId]);
+
+  useEffect(() => {
     if (!farmId || selectedAnimalId === 'all') {
       setRecords([]);
       setLancamentoDates(new Set());
@@ -90,18 +97,25 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
     [animals],
   );
 
+  const categoriaMap = useMemo(
+    () => Object.fromEntries(categorias.map(c => [c.id, c.nome.toUpperCase().trim()])),
+    [categorias],
+  );
+
+  // Vaca Descarte: mostra histórico normal. Qualquer outra "VACA *": peso estabilizado.
   const naoGanhaPeso = useMemo(() => {
     if (selectedAnimalId === 'all') return false;
     const a = animalMap[selectedAnimalId];
-    return !!a?.prenha || (a?.bezerros_quantidade ?? 0) > 0;
-  }, [selectedAnimalId, animalMap]);
+    if (!a?.categoria_id) return false;
+    const cat = categoriaMap[a.categoria_id] ?? '';
+    return cat.includes('VACA') && !cat.includes('DESCARTE');
+  }, [selectedAnimalId, animalMap, categoriaMap]);
 
-  /* ── Peso simulado acumulado: peso_inicial + soma de consumo_kg_cab dia a dia ── */
+  /* ── Peso simulado acumulado: peso_inicial + gmd × dias (gmd vem do simulador_parametros via SQL) ── */
   const pesoSimuladoMap = useMemo(() => {
     const map: Record<string, number> = {};
     const sorted = [...records].sort((a, b) => a.data.localeCompare(b.data));
 
-    // Agrupa por animal para calcular acumulado independente por lote
     const byAnimal: Record<string, typeof sorted> = {};
     for (const r of sorted) {
       if (!byAnimal[r.animal_id]) byAnimal[r.animal_id] = [];
@@ -109,10 +123,10 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
     }
 
     for (const [, rows] of Object.entries(byAnimal)) {
-      let acum = rows[0]?.peso_estimado ?? 0;
+      const pesoInicial = rows[0]?.peso_estimado ?? 0;
       for (const r of rows) {
-        acum += r.consumo_kg_cab ?? 0;
-        map[`${r.data}_${r.animal_id}`] = acum;
+        // usa peso_estimado do banco (já calculado com gmd no SQL retroativo)
+        map[`${r.data}_${r.animal_id}`] = r.peso_estimado ?? pesoInicial;
       }
     }
 
@@ -128,10 +142,10 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
   const chartData = useMemo(() => {
     return sortedAsc.map(r => ({
       data: r.data.split('-').reverse().join('/'),
-      'Peso Inicial':   r.peso_estimado ?? undefined,
-      'Ganho Simulado': pesoSimuladoMap[`${r.data}_${r.animal_id}`] ?? undefined,
+      'Peso Inicial':   animalMap[r.animal_id]?.peso_medio ?? undefined,
+      'Ganho Simulado': r.peso_estimado ?? undefined,
     }));
-  }, [sortedAsc, pesoSimuladoMap]);
+  }, [sortedAsc, animalMap]);
 
   /* ── Gráfico 2: consumo diário vs meta ── */
   const consumoChartData = useMemo(() => {
@@ -226,7 +240,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
             <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-500" />
               <span>
-                <strong>Atenção:</strong> vaca prenha ou com bezerros — o animal não ganha mais peso neste período. O consumo de suplemento é registrado normalmente, mas o ganho de peso simulado não se aplica.
+                <strong>Atenção:</strong> Esse animal está com peso estabilizado, Vaca Adulta. O consumo de suplemento é registrado normalmente, mas o ganho de peso simulado não se aplica.
               </span>
             </div>
           )}
@@ -409,7 +423,7 @@ export function HistoricoDiarioTab({ farmId, animals }: Props) {
                         </td>
 
                         <td className="px-4 py-2.5 text-xs font-mono text-teal-700 whitespace-nowrap">
-                          {(() => {
+                          {naoGanhaPeso ? '—' : (() => {
                             const v = pesoSimuladoMap[`${r.data}_${r.animal_id}`];
                             return v != null
                               ? `${v.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`
